@@ -66,7 +66,7 @@ object DmvCrypto {
         val isExpired: Boolean get() = expiresAt != null && currentTimeMillis() > expiresAt
     }
 
-    class DmvException(message: String) : Exception(message)
+    open class DmvException(message: String) : Exception(message)
     class DmvWrongPassword : DmvException("Incorrect password")
     class DmvPasswordRequired : DmvException("A password is required")
     class DmvExpired : DmvException("This .dmv file has expired")
