@@ -5,6 +5,7 @@ import com.amyrmo.damavand.domain.config.AetherProfile
 import java.io.File
 import kotlin.random.Random
 
+/**
  * The Aether core (patterniha/Aether, Rust) as a child process exposing a local
  * SOCKS5 listener. The VPN layer bridges that listener into the TUN via a
  * sing-box socks outbound, so Aether behaves like any other engine.
