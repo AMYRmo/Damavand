@@ -111,7 +111,7 @@ fun AetherSheet(
             PickerField(
                 label = stringResource(Res.string.aether_scan),
                 options = listOf(
-                    "off" to stringResource(Res.string.action_off),
+                    "off" to stringResource(Res.string.aether_off),
                     "balanced" to stringResource(Res.string.aether_scan_balanced),
                     "thorough" to stringResource(Res.string.aether_scan_thorough),
                     "turbo" to "Turbo",
@@ -148,7 +148,7 @@ fun AetherSheet(
             PickerField(
                 label = "Psiphon",
                 options = listOf(
-                    "off" to stringResource(Res.string.action_off),
+                    "off" to stringResource(Res.string.aether_off),
                     "on" to stringResource(Res.string.aether_on),
                     "cdn" to "CDN",
                     "frontend" to "Fronted",
@@ -163,7 +163,7 @@ fun AetherSheet(
             PickerField(
                 label = "Tor",
                 options = listOf(
-                    "off" to stringResource(Res.string.action_off),
+                    "off" to stringResource(Res.string.aether_off),
                     "on" to stringResource(Res.string.aether_on),
                     "bridges-only" to stringResource(Res.string.aether_tor_only),
                 ),

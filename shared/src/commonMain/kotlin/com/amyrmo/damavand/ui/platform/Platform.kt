@@ -39,6 +39,15 @@ interface Platform {
 
     fun shareFiles(files: List<Pair<String, ByteArray>>) {}
 
+    /** Seal [payload] into a password/expiry/size-limited .dmv file and hand it to the system share sheet. */
+    fun shareDmvFile(
+        fileName: String,
+        payload: String,
+        password: String,
+        expiresAt: Long?,
+        maxSizeBytes: Long?,
+    ) {}
+
     fun saveFile(name: String, mime: String, bytes: ByteArray) {}
 
     fun liveStats(): LiveStats = LiveStats()

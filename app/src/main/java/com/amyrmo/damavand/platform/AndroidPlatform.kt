@@ -201,6 +201,25 @@ class AndroidPlatform(
         ZsxSharing.shareMany(context, files)
     }
 
+    override fun shareDmvFile(
+        fileName: String,
+        payload: String,
+        password: String,
+        expiresAt: Long?,
+        maxSizeBytes: Long?,
+    ) {
+        runCatching {
+            val bytes = com.amyrmo.damavand.crypto.DmvCrypto.seal(
+                payload = payload,
+                name = fileName.removeSuffix(".dmv"),
+                password = password,
+                expiresAt = expiresAt,
+                maxSizeBytes = maxSizeBytes,
+            )
+            ZsxSharing.share(context, com.amyrmo.damavand.crypto.dmvFileName(fileName), bytes)
+        }.onFailure { toast(it.message ?: "dmv failed") }
+    }
+
     override fun saveFile(name: String, mime: String, bytes: ByteArray) {
         ZsxSharing.shareAs(context, name, mime, bytes)
     }

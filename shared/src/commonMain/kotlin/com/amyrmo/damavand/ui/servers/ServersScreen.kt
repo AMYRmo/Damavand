@@ -1302,22 +1302,13 @@ fun ServersScreen(
                     dmvTarget = null
                     return@onShare
                 }
-                val bytes = runCatching {
-                    com.amyrmo.damavand.crypto.DmvCrypto.seal(
-                        payload = link,
-                        name = target.name,
-                        password = password,
-                        expiresAt = expiresHours?.let { com.amyrmo.damavand.platform.currentTimeMillis() + it * 3600_000L },
-                        maxSizeBytes = sizeKiB?.let { it.toLong() * 1024 },
-                    )
-                }.fold(
-                    onSuccess = { it },
-                    onFailure = {
-                        dmvTarget = null
-                        return@onShare
-                    },
+                platform.shareDmvFile(
+                    fileName = target.name,
+                    payload = link,
+                    password = password,
+                    expiresAt = expiresHours?.let { com.amyrmo.damavand.platform.currentTimeMillis() + it * 3600_000L },
+                    maxSizeBytes = sizeKiB?.let { it.toLong() * 1024 },
                 )
-                platform.shareFiles(listOf(com.amyrmo.damavand.crypto.dmvFileName(target.name) to bytes))
                 dmvTarget = null
             },
         )
