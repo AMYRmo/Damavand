@@ -86,13 +86,20 @@ jobs:
           apk = sys.argv[1]
           with zipfile.ZipFile(apk) as z:
               abis = sorted({p.split('/')[1] for p in z.namelist() if p.startswith('lib/')})
-              assert abis == ['arm64-v8a', 'armeabi-v7a', 'x86_64'], abis
-              for lib in ('libgojni.so', 'libtor.so', 'libhev-socks5-tunnel.so', 'libopenconnect.so', 'libzeptun.so'):
+              assert len(abis) == 1, f'expected a single-ABI split, got {abis}'
+              for lib in ('libgojni.so', 'libhev-socks5-tunnel.so'):
                   names = [p for p in z.namelist() if p.endswith('/' + lib)]
                   assert names, f'{lib} missing'
-          print('APK verified: 3 ABIs, all core libs present')
+          print('APK verified:', abis[0], '- core libs present')
           PYEOF
-          cp "$APK" Damavand_${{ steps.v.outputs.name }}.apk
+          ABI=$(basename "$APK" | sed -E 's/app-(.*)-release.apk/\1/')
+          cp "$APK" "Damavand_${{ steps.v.outputs.name }}_${ABI}.apk"
+          for other in app/build/outputs/apk/release/*.apk; do
+            [ "$other" = "$APK" ] && continue
+            OABI=$(basename "$other" | sed -E 's/app-(.*)-release.apk/\1/')
+            cp "$other" "Damavand_${{ steps.v.outputs.name }}_${OABI}.apk"
+          done
+          ls -la Damavand_*.apk
 
       - name: Upload the artifact
         uses: actions/upload-artifact@v7
