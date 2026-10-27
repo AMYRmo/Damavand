@@ -151,13 +151,13 @@
             </intent-filter>
             <meta-data
                 android:name="android.appwidget.provider"
-                android:resource="@xml/appwidget_zed" />
+                android:resource="@xml/appwidget_damavand" />
         </receiver>
 
         <service
             android:name=".core.DamavandTileService"
             android:exported="true"
-            android:icon="@drawable/ic_tile_zed"
+            android:icon="@drawable/ic_tile_damavand"
             android:label="@string/tile_label"
             android:permission="android.permission.BIND_QUICK_SETTINGS_TILE">
             <intent-filter>

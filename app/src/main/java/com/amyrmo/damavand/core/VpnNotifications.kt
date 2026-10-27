@@ -54,7 +54,7 @@ class VpnNotifications(private val ctx: Context) {
     ): android.app.Notification {
         val title = BidiText.auto(server.ifBlank { ctx.getString(R.string.app_name) })
         val b = NotificationCompat.Builder(ctx, CHANNEL_ID)
-            .setSmallIcon(R.drawable.ic_tile_zed)
+            .setSmallIcon(R.drawable.ic_tile_damavand)
             .setContentTitle(title)
             .setColor(BRAND)
             .setOngoing(true)
@@ -230,7 +230,7 @@ class VpnNotifications(private val ctx: Context) {
     companion object {
         private const val CHIP_MAX_CHARS = 10
 
-        const val CHANNEL_ID = "zed_vpn"
+        const val CHANNEL_ID = "damavand_vpn"
         const val NOTIFICATION_ID = 1
 
         const val ACTION_CONNECT = "com.amyrmo.damavand.action.CONNECT"
@@ -242,14 +242,14 @@ class VpnNotifications(private val ctx: Context) {
         private const val STAGE_COUNT = 4
         private const val SEGMENT_LEN = 25
 
-        private const val BRAND = 0xFF5646D6.toInt()
+        private const val BRAND = 0xFFE11D2E.toInt()
         private const val ERROR_COLOR = 0xFFB3261E.toInt()
         private const val POINT_COLOR = 0xFFFFFFFF.toInt()
         private val SEGMENT_COLORS = listOf(
-            0xFF3B3193.toInt(),
-            0xFF5646D6.toInt(),
-            0xFF7C6BFF.toInt(),
-            0xFF35C48C.toInt(),
+            0xFF7A1010.toInt(),
+            0xFFB71C1C.toInt(),
+            0xFFE11D2E.toInt(),
+            0xFFFF5252.toInt(),
         )
     }
 }

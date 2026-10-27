@@ -141,9 +141,9 @@ class DamavandWidgetProvider : AppWidgetProvider() {
 
         private fun render(ctx: Context): RemoteViews {
             val snap = snapshot(ctx)
-            val standard = build(ctx, snap, R.layout.widget_zed, rich = true)
+            val standard = build(ctx, snap, R.layout.widget_damavand, rich = true)
             if (Build.VERSION.SDK_INT < Build.VERSION_CODES.S) return standard
-            val compact = build(ctx, snap, R.layout.widget_zed_compact, rich = false)
+            val compact = build(ctx, snap, R.layout.widget_damavand_compact, rich = false)
             return RemoteViews(
                 mapOf(
                     SizeF(COMPACT_W, ROW_H) to compact,

@@ -124,7 +124,7 @@ class DamavandTileService : TileService() {
         tile.state = if (state.isActive) Tile.STATE_ACTIVE else Tile.STATE_INACTIVE
         tile.icon = Icon.createWithResource(
             this,
-            R.drawable.ic_tile_zed,
+            R.drawable.ic_tile_damavand,
         )
         tile.label = getString(R.string.app_name)
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {

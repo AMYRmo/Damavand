@@ -742,7 +742,7 @@ private fun Hero(
                     softWrap = false,
                 )
                 else -> Text(
-                    text = "Z",
+                    text = "D",
                     fontSize = coreTextSize(size, 0.315f),
                     fontWeight = FontWeight.Bold,
                     style = MaterialTheme.typography.displayLarge,

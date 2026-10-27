@@ -11,6 +11,6 @@
     android:resizeMode="horizontal|vertical"
     android:widgetCategory="home_screen"
     android:description="@string/widget_description"
-    android:previewLayout="@layout/widget_zed_preview"
-    android:initialLayout="@layout/widget_zed"
+    android:previewLayout="@layout/widget_damavand_preview"
+    android:initialLayout="@layout/widget_damavand"
     android:updatePeriodMillis="0" />

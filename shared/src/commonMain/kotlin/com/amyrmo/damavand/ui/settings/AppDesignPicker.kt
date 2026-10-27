@@ -255,7 +255,7 @@ private fun OldPreview() {
                 .background(ZedGradients.idle),
             contentAlignment = Alignment.Center,
         ) {
-            Text("Z", color = Color.White, style = MaterialTheme.typography.titleLargeEmphasized)
+            Text("D", color = Color.White, style = MaterialTheme.typography.titleLargeEmphasized)
         }
         Spacer(Modifier.height(2.dp))
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(5.dp)) {
