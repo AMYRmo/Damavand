@@ -75,7 +75,24 @@ sealed interface ProfileSource {
 
     @Serializable
     @SerialName("aether")
-    data class Aether(val mode: String = "tunnel", val accessKey: String = "") : ProfileSource
+    data class Aether(
+        val mode: String = "tunnel",
+        val accessKey: String = "",
+        // adjustable config (PattNG-style screen); blank = defaults
+        val protocol: String = "wg",
+        val scanMode: String = "balanced",
+        val obfuscation: String = "automatic",
+        val exitNode: String = "freedom",
+        val exitMaskJson: String = "",
+        val exitDialMode: String = "",
+        val psiphon: String = "off",
+        val psiphonRegion: String = "",
+        val tor: String = "off",
+        val address: String = "",
+        val port: String = "",
+        val ipVersion: String = "v4",
+        val extraArgs: String = "",
+    ) : ProfileSource
 }
 
 @Serializable
@@ -457,6 +474,43 @@ data class VpnProfile(
                 else -> "Aether"
             },
             source = ProfileSource.Aether(mode = mode, accessKey = accessKey),
+            addedAt = addedAt,
+        )
+
+        fun fromAetherConfig(
+            id: String,
+            addedAt: Long,
+            config: AetherProfile,
+        ): VpnProfile = VpnProfile(
+            id = id,
+            name = config.remarks.ifBlank { "Aether" },
+            protocol = "AETHER",
+            address = "aether",
+            port = 0,
+            transportLabel = when {
+                config.tor == "bridges-only" -> "Aether · Tor"
+                config.psiphon == "only" -> "Aether · Psiphon"
+                config.psiphon !in setOf("off", "") -> "Aether · Psiphon"
+                config.tor == "on" -> "Aether · Tor"
+                else -> "Aether"
+            },
+            source = ProfileSource.Aether(
+                mode = "tunnel",
+                accessKey = "",
+                protocol = config.protocol,
+                scanMode = config.scanMode,
+                obfuscation = config.obfuscation,
+                exitNode = config.exitNode,
+                exitMaskJson = config.exitMaskJson,
+                exitDialMode = config.exitDialMode,
+                psiphon = config.psiphon,
+                psiphonRegion = config.psiphonRegion,
+                tor = config.tor,
+                address = config.address,
+                port = config.port,
+                ipVersion = config.ipVersion,
+                extraArgs = config.extraArgs,
+            ),
             addedAt = addedAt,
         )
 

@@ -97,6 +97,8 @@ import com.amyrmo.damavand.domain.config.AutoSelectIds
 import com.amyrmo.damavand.domain.config.ConfigParseException
 import com.amyrmo.damavand.domain.config.ConfigParser
 import com.amyrmo.damavand.domain.config.VpnProfile
+import com.amyrmo.damavand.domain.config.AetherProfile
+import com.amyrmo.damavand.domain.config.toAetherProfile
 import com.amyrmo.damavand.ui.onboarding.TourTargets
 import com.amyrmo.damavand.ui.onboarding.tourTarget
 import com.amyrmo.damavand.ui.platform.LocalPlatform
@@ -325,6 +327,8 @@ fun ServersScreen(
     var showOpenConnect by remember { mutableStateOf(false) }
     var showIkev2 by remember { mutableStateOf(false) }
     var showSsh by remember { mutableStateOf(false) }
+    var showAether by remember { mutableStateOf(false) }
+    var dmvTarget by remember { mutableStateOf<VpnProfile?>(null) }
     var showSniSpoof by remember { mutableStateOf(false) }
     var showProxyChain by remember { mutableStateOf(false) }
     var showCrossChain by remember { mutableStateOf(false) }
@@ -894,6 +898,7 @@ fun ServersScreen(
                             qrTarget = runCatching { repository.shareLinkOf(profile) }.getOrNull()
                                 ?.let { profile.name to it }
                         },
+                        onShareDmv = { dmvTarget = profile },
                         onRename = { renameTarget = profile },
                         onEdit = { editTarget = profile },
                         onMoveGroup = { moveTarget = profile },
@@ -1184,9 +1189,7 @@ fun ServersScreen(
             },
             onAether = {
                 showAddSheet = false
-                repository.addAether("Aether")
-
-                toastRes(Res.string.aether_added)
+                showAether = true
             },
             onSsh = {
                 showAddSheet = false
@@ -1274,6 +1277,48 @@ fun ServersScreen(
                 showSsh = false
                 repository.addSsh(settings, name)
                 onServerActivated()
+            },
+        )
+    }
+
+    if (showAether) {
+        AetherSheet(
+            onDismiss = { showAether = false },
+            onSave = { config ->
+                showAether = false
+                repository.addAetherProfile(config)
+                onServerActivated()
+            },
+        )
+    }
+
+    dmvTarget?.let { target ->
+        DmvShareSheet(
+            profileName = target.name,
+            onDismiss = { dmvTarget = null },
+            onShare = { password, expiresHours, sizeKiB ->
+                val link = runCatching { repository.shareLinkOf(target) }.getOrNull()
+                if (link == null) {
+                    dmvTarget = null
+                    return@onShare
+                }
+                val bytes = runCatching {
+                    com.amyrmo.damavand.crypto.DmvCrypto.seal(
+                        payload = link,
+                        name = target.name,
+                        password = password,
+                        expiresAt = expiresHours?.let { com.amyrmo.damavand.platform.currentTimeMillis() + it * 3600_000L },
+                        maxSizeBytes = sizeKiB?.let { it.toLong() * 1024 },
+                    )
+                }.fold(
+                    onSuccess = { it },
+                    onFailure = {
+                        dmvTarget = null
+                        return@onShare
+                    },
+                )
+                platform.shareFiles(listOf(com.amyrmo.damavand.crypto.dmvFileName(target.name) to bytes))
+                dmvTarget = null
             },
         )
     }
@@ -1442,6 +1487,17 @@ fun ServersScreen(
                     onDismiss = { editTarget = null },
                     onSave = { name, settings ->
                         repository.addPsiphon(settings, name, id = target.id)
+                        toastRes(Res.string.saved)
+                        editTarget = null
+                    },
+                )
+            }
+            target.isAether -> {
+                AetherSheet(
+                    initial = target.aetherSettings()?.toAetherProfile(),
+                    onDismiss = { editTarget = null },
+                    onSave = { config ->
+                        repository.addAetherProfile(config, id = target.id)
                         toastRes(Res.string.saved)
                         editTarget = null
                     },
@@ -1813,6 +1869,7 @@ private fun ServerCard(
     onClick: () -> Unit,
     onShare: () -> Unit,
     onShareQr: () -> Unit,
+    onShareDmv: () -> Unit = {},
 
     shareLink: String?,
     onRename: () -> Unit,
@@ -1950,6 +2007,12 @@ private fun ServerCard(
                         leadingIcon = { Icon(painterResource(Res.drawable.ic_qr_code_2), null) },
                         enabled = shareLink != null,
                         onClick = { menuOpen = false; onShareQr() },
+                    )
+                    DropdownMenuItem(
+                        text = { Text(stringResource(Res.string.dmv_share_create)) },
+                        leadingIcon = { Icon(painterResource(Res.drawable.ic_lock), null) },
+                        enabled = shareLink != null,
+                        onClick = { menuOpen = false; onShareDmv() },
                     )
                     DropdownMenuItem(
                         text = { Text(stringResource(Res.string.action_edit)) },

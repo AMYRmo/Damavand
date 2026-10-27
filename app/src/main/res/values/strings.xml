@@ -107,6 +107,12 @@
     <string name="vault_intro_title">Locked configs</string>
     <string name="vault_intro_body">Share a server as an encrypted .zsx file. Recipients can connect but cannot read or edit the underlying config.</string>
     <string name="vault_create">Create locked config</string>
+    <string name="dmv_import_title">Import .dmv config</string>
+    <string name="dmv_imported">Config imported</string>
+    <string name="dmv_bad_file">This file is not a valid .dmv config</string>
+    <string name="dmv_wrong_password">Wrong password</string>
+    <string name="dmv_too_large">The config exceeds the declared size limit</string>
+    <string name="dmv_expired">This .dmv file has expired</string>
     <string name="vault_import">Import .zsx file</string>
     <string name="vault_empty_title">Your vault is empty</string>
     <string name="vault_empty_body">Create a locked config to share privately, or import a .zsx someone sent you.</string>

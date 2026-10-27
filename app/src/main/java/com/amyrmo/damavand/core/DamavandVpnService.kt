@@ -16,6 +16,7 @@ import com.amyrmo.damavand.data.settings.SettingsRepository
 import com.amyrmo.damavand.domain.config.LocalPorts
 import com.amyrmo.damavand.domain.config.RoutingMigration
 import com.amyrmo.damavand.domain.config.singBoxDeviceOptions
+import com.amyrmo.damavand.domain.config.toAetherProfile
 import com.amyrmo.damavand.domain.model.AppSettings
 import com.amyrmo.damavand.domain.model.RulesetItem
 import com.amyrmo.damavand.domain.model.VpnBypassLan
@@ -621,12 +622,7 @@ class DamavandVpnService : VpnService() {
         advance(VpnNotifications.Stage.Engine)
         val engine = AetherEngine(
             context = this,
-            mode = when (settings.mode) {
-                "psiphon" -> AetherEngine.Mode.Psiphon
-                "tor" -> AetherEngine.Mode.Tor
-                else -> AetherEngine.Mode.Tunnel
-            },
-            accessKey = settings.accessKey,
+            config = settings.toAetherProfile(),
             onLog = { LogBus.append(it) },
             onStopped = { reason -> onTunnelFailed(reason) },
         )

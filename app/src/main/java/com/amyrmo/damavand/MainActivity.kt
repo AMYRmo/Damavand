@@ -201,6 +201,27 @@ class MainActivity : ComponentActivity() {
         setIntent(intent)
         handleDeepLink(intent)
         handleConnectRequest(intent)
+        handleDmvIntent(intent)
+    }
+
+    private fun handleDmvIntent(intent: Intent?) {
+        if (intent == null) return
+        val isSend = intent.action == Intent.ACTION_SEND
+        val isView = intent.action == Intent.ACTION_VIEW
+        if (!isSend && !isView) return
+        val uri = if (isSend) {
+            @Suppress("DEPRECATION")
+            intent.getParcelableExtra<android.net.Uri>(Intent.EXTRA_STREAM)
+        } else {
+            intent.data
+        } ?: return
+        runCatching {
+            val bytes = contentResolver.openInputStream(uri)?.use { it.readBytes() } ?: return
+            val name = uri.lastPathSegment ?: "config.dmv"
+            com.amyrmo.damavand.core.DmvImportBus.request(
+                com.amyrmo.damavand.core.DmvImportBus.Request(name, bytes),
+            )
+        }.onFailure { toast(getString(R.string.dmv_bad_file)) }
     }
 
     private fun handleDeepLink(intent: Intent?): Boolean {
@@ -237,6 +258,7 @@ class MainActivity : ComponentActivity() {
             handleDeepLink(intent)
         }
         handleConnectRequest(intent)
+        handleDmvIntent(intent)
         val repo = (application as DamavandApp).container.settingsRepository
         enableEdgeToEdge()
         setContent {
@@ -309,6 +331,7 @@ class MainActivity : ComponentActivity() {
                         },
                     )
                     com.amyrmo.damavand.ui.OpenConnectSsoDialog()
+                    DmvImportDialogHost(configRepository)
                 }
             }
         }
