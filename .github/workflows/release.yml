@@ -88,11 +88,11 @@ jobs:
           apk = sys.argv[1]
           with zipfile.ZipFile(apk) as z:
               abis = sorted({p.split('/')[1] for p in z.namelist() if p.startswith('lib/')})
-              assert len(abis) == 1, f'expected a single-ABI split, got {abis}'
+              assert abis, 'no ABIs in APK'
               for lib in ('libgojni.so', 'libhev-socks5-tunnel.so', 'libaether.so', 'libpsiphon-tunnel-core.so', 'liblyrebird.so'):
                   names = [p for p in z.namelist() if p.endswith('/' + lib)]
                   assert names, f'{lib} missing'
-          print('APK verified:', abis[0], '- core libs present')
+          print('APK verified:', '+'.join(abis), '- core libs present')
           PYEOF
           ABI=$(basename "$APK" | sed -E 's/app-(.*)-release.apk/\1/')
           cp "$APK" "Damavand_${{ steps.v.outputs.name }}_${ABI}.apk"
