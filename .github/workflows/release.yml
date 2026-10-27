@@ -48,7 +48,9 @@ jobs:
             for lib in libtor libobfs4proxy libsnowflake libconjure libsnispoof libhev-socks5-tunnel libzeptun-jni; do
               [ -f "app/src/main/jniLibs/$abi/$lib.so" ] || { echo "::error::$abi/$lib.so is missing"; exit 1; }
             done
-            for so in app/src/main/jniLibs/$abi/*.so; do
+            # libconjure/libobfs4proxy/libsnowflake are pure-Go bridges without JNI exports — skip them
+            for so in app/src/main/jniLibs/$abi/libtor.so app/src/main/jniLibs/$abi/libhev-socks5-tunnel.so app/src/main/jniLibs/$abi/libzeptun*.so app/src/main/jniLibs/$abi/libsnispoof.so; do
+              [ -f "$so" ] || continue
               readelf --dyn-syms -W "$so" | grep -qE ' (JNI_OnLoad|Java_)' || { echo "::error::$so has no JNI entry points"; exit 1; }
             done
           done
