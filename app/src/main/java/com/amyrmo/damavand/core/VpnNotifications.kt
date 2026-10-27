@@ -204,7 +204,7 @@ class VpnNotifications(private val ctx: Context) {
     private fun stopTunnel(): PendingIntent =
         PendingIntent.getService(
             ctx, REQ_STOP,
-            Intent(ctx, ZedVpnService::class.java)
+            Intent(ctx, DamavandVpnService::class.java)
                 .putExtra(VpnManager.EXTRA_COMMAND, VpnManager.CMD_STOP),
             PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,
         )

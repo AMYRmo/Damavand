@@ -24,7 +24,7 @@ object AndroidVpn {
         } else {
             null
         }
-        val intent = Intent(context, ZedVpnService::class.java).apply {
+        val intent = Intent(context, DamavandVpnService::class.java).apply {
             putExtra(VpnManager.EXTRA_COMMAND, VpnManager.CMD_START)
             if (handoff != null) putExtra(VpnManager.EXTRA_CONFIG_PATH, handoff.absolutePath)
             else putExtra(VpnManager.EXTRA_CONFIG, configJson)
@@ -40,7 +40,7 @@ object AndroidVpn {
 
     fun stop(context: Context) {
         if (!VpnManager.onStopping()) return
-        val intent = Intent(context, ZedVpnService::class.java).apply {
+        val intent = Intent(context, DamavandVpnService::class.java).apply {
             putExtra(VpnManager.EXTRA_COMMAND, VpnManager.CMD_STOP)
         }
         context.startService(intent)
