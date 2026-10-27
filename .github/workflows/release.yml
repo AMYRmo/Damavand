@@ -48,9 +48,11 @@ jobs:
             for lib in libtor libobfs4proxy libsnowflake libconjure libsnispoof libhev-socks5-tunnel libzeptun-jni; do
               [ -f "app/src/main/jniLibs/$abi/$lib.so" ] || { echo "::error::$abi/$lib.so is missing"; exit 1; }
             done
-            # libconjure/libobfs4proxy/libsnowflake are pure-Go bridges without JNI exports — skip them
-            for so in app/src/main/jniLibs/$abi/libtor.so app/src/main/jniLibs/$abi/libhev-socks5-tunnel.so app/src/main/jniLibs/$abi/libzeptun*.so app/src/main/jniLibs/$abi/libsnispoof.so; do
-              [ -f "$so" ] || continue
+            # Only JNI-loading cores need exports; the Go bridge libs (tor stack,
+            # conjure/obfs4/snowflake, snispoof, zeptun core) load via dlopen or are
+            # exec'd directly. libgojni (from zedcore) carries the main JNI surface.
+            for so in app/src/main/jniLibs/$abi/libhev-socks5-tunnel.so app/src/main/jniLibs/$abi/libzeptun-jni.so; do
+              [ -f "$so" ] || { echo "::error::$so is missing"; exit 1; }
               readelf --dyn-syms -W "$so" | grep -qE ' (JNI_OnLoad|Java_)' || { echo "::error::$so has no JNI entry points"; exit 1; }
             done
           done
