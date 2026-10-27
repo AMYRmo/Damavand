@@ -1,0 +1,12 @@
+*.iml
+.gradle
+/local.properties
+/.idea
+.DS_Store
+/build
+*/build
+app/libs/zedcore.aar
+keystore.properties
+release.keystore
+*.jks
+*.p12

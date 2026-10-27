@@ -1,0 +1,125 @@
+# Damavand CI: fetch cores, build, sign, verify, release.
+name: Damavand Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      release_tag:
+        required: false
+        type: string
+  push:
+    branches:
+      - main
+    paths-ignore:
+      - '**/*.md'
+      - 'tools/**'
+      - '.gitignore'
+
+permissions:
+  contents: write
+
+concurrency:
+  group: damavand-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      - uses: gradle/actions/setup-gradle@v5
+
+      - name: Fetch the cores
+        run: bash tools/get-cores.sh android
+
+      - name: Verify the cores
+        run: |
+          set -e
+          ls -l app/libs/zedcore.aar
+          for abi in arm64-v8a armeabi-v7a x86_64; do
+            for lib in libtor libobfs4proxy libsnowflake libconjure libsnispoof libhev-socks5-tunnel libzeptun-jni; do
+              [ -f "app/src/main/jniLibs/$abi/$lib.so" ] || { echo "::error::$abi/$lib.so is missing"; exit 1; }
+            done
+            for so in app/src/main/jniLibs/$abi/*.so; do
+              readelf --dyn-syms -W "$so" | grep -qE ' (JNI_OnLoad|Java_)' || { echo "::error::$so has no JNI entry points"; exit 1; }
+            done
+          done
+
+      - name: Read the version
+        id: v
+        run: echo "name=$(grep '^damavand.versionName=' gradle.properties | cut -d= -f2)" >> "$GITHUB_OUTPUT"
+
+      - name: Unlock signing
+        env:
+          KEYSTORE_BASE64: ${{ secrets.APP_KEYSTORE_BASE64 }}
+          KEYSTORE_PASSWORD: ${{ secrets.APP_KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.APP_KEYSTORE_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.APP_KEY_PASSWORD }}
+        run: |
+          umask 077
+          printf '%s' "$KEYSTORE_BASE64" | base64 -d > release.keystore
+          { echo "storeFile=release.keystore"; echo "storePassword=$KEYSTORE_PASSWORD"
+            echo "keyPassword=$KEY_PASSWORD"; echo "keyAlias=$KEY_ALIAS"; } > keystore.properties
+
+      - name: Build the APK
+        run: ./gradlew :app:assembleRelease --no-daemon -x lint
+
+      - name: Verify the APK
+        run: |
+          set -e
+          APK=$(ls app/build/outputs/apk/release/*.apk | head -1)
+          echo "APK: $APK ($(du -m "$APK" | cut -f1) MB)"
+          python3 - "$APK" <<'PYEOF'
+          import sys, zipfile
+          apk = sys.argv[1]
+          with zipfile.ZipFile(apk) as z:
+              abis = sorted({p.split('/')[1] for p in z.namelist() if p.startswith('lib/')})
+              assert abis == ['arm64-v8a', 'armeabi-v7a', 'x86_64'], abis
+              for lib in ('libgojni.so', 'libtor.so', 'libhev-socks5-tunnel.so', 'libopenconnect.so', 'libzeptun.so'):
+                  names = [p for p in z.namelist() if p.endswith('/' + lib)]
+                  assert names, f'{lib} missing'
+          print('APK verified: 3 ABIs, all core libs present')
+          PYEOF
+          cp "$APK" Damavand_${{ steps.v.outputs.name }}.apk
+
+      - name: Upload the artifact
+        uses: actions/upload-artifact@v7
+        with:
+          name: Damavand-${{ steps.v.outputs.name }}
+          if-no-files-found: error
+          path: Damavand_*.apk
+
+  release:
+    needs: build
+    runs-on: ubuntu-latest
+    if: github.event_name == 'workflow_dispatch' && inputs.release_tag != ''
+
+    steps:
+      - name: Download the artifact
+        uses: actions/download-artifact@v8
+        with:
+          path: release
+
+      - name: Upload the release
+        uses: svenstaro/upload-release-action@v2
+        with:
+          file: release/**/*.apk
+          file_glob: true
+          tag: ${{ inputs.release_tag }}
+          release_name: Damavand ${{ inputs.release_tag }} 🗿
+          body: |
+            ## دماوند 🗿
+            کلاینت VPN اندروید — UI کامل [ZedSecure](https://github.com/CluvexStudio/ZedSecure) + هسته‌های قدرتمند (Xray / sing-box / Aether / Psiphon / Tor / DNS tunnels / OpenConnect).
+
+            📢 کانال: https://t.me/AMYR_NEWS
+          target_commit: ${{ github.sha }}
+          prerelease: false
+          overwrite: true
