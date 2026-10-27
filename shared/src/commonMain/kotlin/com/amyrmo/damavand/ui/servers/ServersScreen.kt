@@ -1298,17 +1298,15 @@ fun ServersScreen(
             onDismiss = { dmvTarget = null },
             onShare = { password, expiresHours, sizeKiB ->
                 val link = runCatching { repository.shareLinkOf(target) }.getOrNull()
-                if (link == null) {
-                    dmvTarget = null
-                    return@onShare
-                }
-                platform.shareDmvFile(
+                if (link != null) {
+                    platform.shareDmvFile(
                     fileName = target.name,
                     payload = link,
                     password = password,
                     expiresAt = expiresHours?.let { com.amyrmo.damavand.platform.currentTimeMillis() + it * 3600_000L },
-                    maxSizeBytes = sizeKiB?.let { it.toLong() * 1024 },
-                )
+                        maxSizeBytes = sizeKiB?.let { it.toLong() * 1024 },
+                    )
+                }
                 dmvTarget = null
             },
         )
