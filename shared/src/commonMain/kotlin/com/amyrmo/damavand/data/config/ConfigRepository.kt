@@ -742,6 +742,7 @@ class ConfigRepository(private val store: KeyValueStore) {
             ?: throw IllegalArgumentException("invalid damavand:// link")
         val name = payload.name
         return when (val src = payload.source) {
+            is ProfileSource.Aether -> { addAether(name, src.mode, src.accessKey); 1 }
             is ProfileSource.Psiphon -> { addPsiphon(src.settings, name); 1 }
             is ProfileSource.DnsTunnel -> { addDnsTunnel(src.settings, name); 1 }
             is ProfileSource.Tor -> { addTor(name); 1 }

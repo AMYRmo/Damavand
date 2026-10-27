@@ -197,6 +197,7 @@ data class VpnProfile(
     fun rawPayload(): String? = when (val src = source) {
         is ProfileSource.Link -> src.link
         is ProfileSource.RawJson -> src.json
+        is ProfileSource.Aether -> null
 
         is ProfileSource.Sealed -> null
 
@@ -246,6 +247,7 @@ data class VpnProfile(
             )
 
         is ProfileSource.Psiphon -> throw IllegalStateException("Psiphon profiles do not build Xray config")
+        is ProfileSource.Aether -> throw IllegalStateException("Aether profiles do not build Xray config")
         is ProfileSource.DnsTunnel -> throw IllegalStateException("DNS-tunnel profiles do not build Xray config")
         is ProfileSource.MasterDns -> throw IllegalStateException("MasterDNS profiles do not build Xray config")
         is ProfileSource.OpenConnect -> throw IllegalStateException("OpenConnect profiles do not build Xray config")
