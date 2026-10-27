@@ -2,11 +2,9 @@ package com.amyrmo.damavand.ui.navigation
 
 import com.amyrmo.damavand.shared.resources.Res
 import com.amyrmo.damavand.shared.resources.ic_dns
-import com.amyrmo.damavand.shared.resources.ic_encrypted
 import com.amyrmo.damavand.shared.resources.ic_home
 import com.amyrmo.damavand.shared.resources.ic_settings
 import com.amyrmo.damavand.shared.resources.nav_home
-import com.amyrmo.damavand.shared.resources.nav_locked
 import com.amyrmo.damavand.shared.resources.nav_servers
 import com.amyrmo.damavand.shared.resources.nav_settings
 import org.jetbrains.compose.resources.DrawableResource
@@ -18,6 +16,5 @@ enum class TopDestination(
 ) {
     Home(Res.string.nav_home, Res.drawable.ic_home),
     Servers(Res.string.nav_servers, Res.drawable.ic_dns),
-    Vault(Res.string.nav_locked, Res.drawable.ic_encrypted),
     Settings(Res.string.nav_settings, Res.drawable.ic_settings),
 }

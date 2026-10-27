@@ -423,7 +423,7 @@ class SingBoxEngine(
 
                 fixAndroidStack = true
                 logMaxLines = 3000L
-                crashReportSource = "zedsecure"
+                crashReportSource = "damavand"
                 appVersion = AppInfo.versionName
             })
         }

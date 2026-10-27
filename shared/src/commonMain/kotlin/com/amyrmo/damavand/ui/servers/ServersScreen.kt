@@ -1182,6 +1182,12 @@ fun ServersScreen(
 
                 toastRes(Res.string.tor_added)
             },
+            onAether = {
+                showAddSheet = false
+                repository.addAether("Aether")
+
+                toastRes(Res.string.aether_added)
+            },
             onSsh = {
                 showAddSheet = false
                 showSsh = true
@@ -2052,6 +2058,7 @@ private fun AddServerSheet(
     onOpenConnect: () -> Unit,
     onIkev2: () -> Unit,
     onTor: () -> Unit,
+    onAether: () -> Unit,
     onSsh: () -> Unit,
     onSniSpoof: () -> Unit,
     onProxyChain: () -> Unit,
@@ -2101,6 +2108,7 @@ private fun AddServerSheet(
             OptionGroup(Res.string.add_group_tunnels)
             Option(Res.drawable.ic_bolt, Res.string.psiphon_add_title, onPsiphon, free = true)
             Option(Res.drawable.ic_lock, Res.string.tor_add_title, onTor, free = true)
+            Option(Res.drawable.ic_bolt, Res.string.aether_add_title, onAether, free = true)
             Option(Res.drawable.ic_speed, Res.string.ssh_add_title, onSsh)
             if (LocalPlatform.current.supportsSniSpoof) Option(Res.drawable.ic_bolt, Res.string.snispoof_add_title, onSniSpoof)
 

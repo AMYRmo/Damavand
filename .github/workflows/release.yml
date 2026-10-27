@@ -38,7 +38,9 @@ jobs:
       - uses: gradle/actions/setup-gradle@v5
 
       - name: Fetch the cores
-        run: bash tools/get-cores.sh android
+        run: |
+          bash tools/get-cores.sh android
+          bash tools/get-aether.sh
 
       - name: Verify the cores
         run: |
@@ -87,7 +89,7 @@ jobs:
           with zipfile.ZipFile(apk) as z:
               abis = sorted({p.split('/')[1] for p in z.namelist() if p.startswith('lib/')})
               assert len(abis) == 1, f'expected a single-ABI split, got {abis}'
-              for lib in ('libgojni.so', 'libhev-socks5-tunnel.so'):
+              for lib in ('libgojni.so', 'libhev-socks5-tunnel.so', 'libaether.so', 'libpsiphon-tunnel-core.so', 'liblyrebird.so'):
                   names = [p for p in z.namelist() if p.endswith('/' + lib)]
                   assert names, f'{lib} missing'
           print('APK verified:', abis[0], '- core libs present')
@@ -128,7 +130,7 @@ jobs:
           release_name: Damavand ${{ inputs.release_tag }} 🗿
           body: |
             ## دماوند 🗿
-            کلاینت VPN اندروید — UI کامل [ZedSecure](https://github.com/CluvexStudio/ZedSecure) + هسته‌های قدرتمند (Xray / sing-box / Aether / Psiphon / Tor / DNS tunnels / OpenConnect).
+            کلاینت VPN اندروید — UI اختصاصی دماوند + هسته‌های قدرتمند (Xray / sing-box / Aether / Psiphon / Tor / DNS tunnels / OpenConnect).
 
             📢 کانال: https://t.me/AMYR_NEWS
           target_commit: ${{ github.sha }}

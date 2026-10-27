@@ -50,14 +50,11 @@ import com.amyrmo.damavand.domain.model.AppSettings
 import com.amyrmo.damavand.ui.servers.ServersScreen
 import com.amyrmo.damavand.ui.theme.toPersonalization
 import com.amyrmo.damavand.ui.connection.ConnectionViewModel
-import com.amyrmo.damavand.ui.easteregg.SpaceScreen
 import com.amyrmo.damavand.ui.home.HomeScreen
 import com.amyrmo.damavand.ui.motion.transitionDecoration
 import com.amyrmo.damavand.ui.navigation.TopDestination
 import com.amyrmo.damavand.ui.settings.SettingsScreen
 import com.amyrmo.damavand.ui.update.NudgeHost
-import com.amyrmo.damavand.ui.vault.VaultImportHost
-import com.amyrmo.damavand.ui.vault.VaultScreen
 
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
@@ -67,7 +64,6 @@ fun MainScaffold(
     onToggleConnection: () -> Unit,
 
     onActiveServerChanged: () -> Unit = {},
-    onImportZsx: () -> Unit,
     onUpdateSettings: ((AppSettings) -> AppSettings) -> Unit,
     onLanguage: (AppLanguage) -> Unit,
 
@@ -81,7 +77,6 @@ fun MainScaffold(
         mutableStateOf(settings.onboardingVersion >= com.amyrmo.damavand.ui.onboarding.ONBOARDING_VERSION)
     }
     var tourStep by rememberSaveable { mutableStateOf(-1) }
-    var spaceUnlocked by rememberSaveable { mutableStateOf(false) }
 
     var deepLinkOrigin by rememberSaveable { mutableStateOf<TopDestination?>(null) }
 
@@ -117,11 +112,6 @@ fun MainScaffold(
         )
     }
 
-    VaultImportHost(
-        repository = configRepository,
-        onImported = { current = TopDestination.Vault },
-    )
-
     com.amyrmo.damavand.ui.servers.DeepLinkImportHost(
         repository = configRepository,
         onImported = { current = TopDestination.Servers },
@@ -134,11 +124,6 @@ fun MainScaffold(
     BackHandler(enabled = tourStep >= 0) {
         tourStep = -1
         current = TopDestination.Home
-    }
-
-    if (spaceUnlocked) {
-        SpaceScreen(onExit = { spaceUnlocked = false })
-        return
     }
 
     if (!setupDone) {
@@ -234,11 +219,7 @@ fun MainScaffold(
                     contentPadding = innerPadding,
                     onToggleConnection = onToggleConnection,
 
-                    onBrowseConfigs = {
-                        current = if (activeProfile?.isLocked == true) TopDestination.Vault
-                        else TopDestination.Servers
-                    },
-                    onSecretUnlocked = { spaceUnlocked = true },
+                    onBrowseConfigs = { current = TopDestination.Servers },
                 )
                 TopDestination.Servers -> ServersScreen(
                     repository = configRepository,
@@ -258,11 +239,6 @@ fun MainScaffold(
 
                         onActiveServerChanged()
                     },
-                )
-                TopDestination.Vault -> VaultScreen(
-                    repository = configRepository,
-                    contentPadding = innerPadding,
-                    onImportRequested = onImportZsx,
                 )
                 TopDestination.Settings -> SettingsScreen(
                     settings = settings,

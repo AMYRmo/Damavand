@@ -739,7 +739,7 @@ class ConfigRepository(private val store: KeyValueStore) {
 
     private fun importZedLink(text: String): Int {
         val payload = ZedLink.parse(text)
-            ?: throw IllegalArgumentException("invalid zedsecure:// link")
+            ?: throw IllegalArgumentException("invalid damavand:// link")
         val name = payload.name
         return when (val src = payload.source) {
             is ProfileSource.Psiphon -> { addPsiphon(src.settings, name); 1 }
@@ -760,7 +760,7 @@ class ConfigRepository(private val store: KeyValueStore) {
                 else addCrossChain(ids[0], ids[1], name)
                 1
             }
-            else -> throw IllegalArgumentException("unsupported zedsecure:// payload")
+            else -> throw IllegalArgumentException("unsupported damavand:// payload")
         }
     }
 
@@ -879,6 +879,20 @@ class ConfigRepository(private val store: KeyValueStore) {
             id = newId(),
             addedAt = currentTimeMillis(),
             name = name,
+        )
+        _profiles.value = listOf(profile) + _profiles.value
+        persistProfiles()
+        if (_activeId.value == null) setActive(profile.id)
+        return profile
+    }
+
+    fun addAether(name: String, mode: String = "tunnel", accessKey: String = ""): VpnProfile {
+        val profile = VpnProfile.fromAether(
+            id = newId(),
+            addedAt = currentTimeMillis(),
+            name = name,
+            mode = mode,
+            accessKey = accessKey,
         )
         _profiles.value = listOf(profile) + _profiles.value
         persistProfiles()

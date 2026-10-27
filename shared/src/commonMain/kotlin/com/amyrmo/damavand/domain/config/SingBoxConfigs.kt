@@ -197,6 +197,27 @@ object SingBoxConfigs {
         put("listen_port", port)
     }
 
+    /**
+     * The Aether bridge: a sing-box config whose only outbound dials the Aether
+     * core's local SOCKS listener, with the TUN inbound on top. Traffic entering
+     * the TUN leaves through the Aether core (tunnel, plain Psiphon or plain Tor).
+     */
+    fun aetherBridge(aetherSocksPort: Int, device: DeviceOptions): String {
+        val config = buildJsonObject {
+            put("inbounds", buildJsonArray { add(tunInbound(true, device)) })
+            put("outbounds", buildJsonArray {
+                add(buildJsonObject {
+                    put("type", "socks")
+                    put("tag", "aether")
+                    put("server", "127.0.0.1")
+                    put("server_port", aetherSocksPort)
+                })
+            })
+            put("route", routeForAddedTun(null))
+        }
+        return SingBoxJson.encode(config)
+    }
+
     private fun routeForAddedTun(route: JsonObject?): JsonObject {
         val rules = (route?.get("rules") as? JsonArray)?.mapNotNull { it as? JsonObject }.orEmpty()
         val sniffs = rules.any { it.string("action") == "sniff" }

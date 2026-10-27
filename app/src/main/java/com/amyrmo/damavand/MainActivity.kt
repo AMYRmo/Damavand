@@ -26,7 +26,6 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import com.amyrmo.damavand.core.AndroidVpn
 import com.amyrmo.damavand.core.StartPlanner
-import com.amyrmo.damavand.core.VaultImportBus
 import com.amyrmo.damavand.core.VpnManager
 import com.amyrmo.damavand.core.platform.LocaleManager
 import com.amyrmo.damavand.data.config.ConfigRepository
@@ -82,15 +81,6 @@ class MainActivity : ComponentActivity() {
     private val notificationPermissionLauncher =
         registerForActivityResult(ActivityResultContracts.RequestPermission()) { }
 
-    private val openZsxLauncher =
-        registerForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
-            if (uri == null) return@registerForActivityResult
-            offerLockedConfig(uri)
-        }
-
-    private fun importZsx() {
-        openZsxLauncher.launch(arrayOf("*/*"))
-    }
 
     private var filePickPending: CompletableDeferred<FilePick?>? = null
     private val filePickLauncher =
@@ -209,7 +199,7 @@ class MainActivity : ComponentActivity() {
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
         setIntent(intent)
-        if (!handleDeepLink(intent)) handleIncomingZsx(intent)
+        handleDeepLink(intent)
         handleConnectRequest(intent)
     }
 
@@ -235,39 +225,6 @@ class MainActivity : ComponentActivity() {
         toggleConnection()
     }
 
-    private fun handleIncomingZsx(intent: Intent?) {
-        val uri = when (intent?.action) {
-            Intent.ACTION_VIEW -> intent.data
-            Intent.ACTION_SEND -> IntentCompat.getParcelableExtra(
-                intent, Intent.EXTRA_STREAM, Uri::class.java,
-            )
-            else -> null
-        } ?: return
-
-        offerLockedConfig(uri)
-    }
-
-    private fun offerLockedConfig(uri: Uri) {
-        val bytes = runCatching {
-            contentResolver.openInputStream(uri)?.use { it.readBytes() }
-        }.getOrNull()
-        if (bytes == null) {
-            toast(getString(R.string.zsx_invalid))
-            return
-        }
-        val peeked = runCatching { configRepository.peekLocked(bytes) }
-        val meta = peeked.getOrNull()
-        if (meta == null) {
-            val legacy = peeked.exceptionOrNull() is com.amyrmo.damavand.crypto.ZsxLegacyException
-            toast(getString(if (legacy) R.string.zsx_legacy else R.string.zsx_invalid))
-            return
-        }
-        if (meta.isExpired) {
-            toast(getString(R.string.zsx_expired))
-            return
-        }
-        VaultImportBus.request(bytes, meta)
-    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -277,7 +234,7 @@ class MainActivity : ComponentActivity() {
         maybeRequestNotificationPermission()
 
         if (savedInstanceState == null) {
-            if (!handleDeepLink(intent)) handleIncomingZsx(intent)
+            handleDeepLink(intent)
         }
         handleConnectRequest(intent)
         val repo = (application as DamavandApp).container.settingsRepository
@@ -334,7 +291,6 @@ class MainActivity : ComponentActivity() {
                         configRepository = configRepository,
                         onToggleConnection = ::toggleConnection,
                         onActiveServerChanged = ::switchActiveServer,
-                        onImportZsx = ::importZsx,
                         onUpdateSettings = repo::update,
                         onLanguage = { lang ->
                             repo.update { it.copy(language = lang) }

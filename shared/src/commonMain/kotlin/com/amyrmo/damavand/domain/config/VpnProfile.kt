@@ -72,6 +72,10 @@ sealed interface ProfileSource {
     @Serializable
     @SerialName("sing_box_config")
     data class SingBoxConfig(val json: String) : ProfileSource
+
+    @Serializable
+    @SerialName("aether")
+    data class Aether(val mode: String = "tunnel", val accessKey: String = "") : ProfileSource
 }
 
 @Serializable
@@ -122,6 +126,10 @@ data class VpnProfile(
     val isSingBox: Boolean get() = source is ProfileSource.SingBox
 
     val isSingBoxConfig: Boolean get() = source is ProfileSource.SingBoxConfig
+
+    val isAether: Boolean get() = source is ProfileSource.Aether
+
+    fun aetherSettings(): ProfileSource.Aether? = source as? ProfileSource.Aether
 
     fun autoSelectSettings(): ProfileSource.AutoSelect? = source as? ProfileSource.AutoSelect
 
@@ -426,6 +434,27 @@ data class VpnProfile(
             port = 0,
             transportLabel = "Tor",
             source = ProfileSource.Tor,
+            addedAt = addedAt,
+        )
+
+        fun fromAether(
+            id: String,
+            addedAt: Long,
+            name: String,
+            mode: String,
+            accessKey: String,
+        ): VpnProfile = VpnProfile(
+            id = id,
+            name = name.ifBlank { "Aether" },
+            protocol = "AETHER",
+            address = "aether",
+            port = 0,
+            transportLabel = when (mode) {
+                "psiphon" -> "Aether · Psiphon"
+                "tor" -> "Aether · Tor"
+                else -> "Aether"
+            },
+            source = ProfileSource.Aether(mode = mode, accessKey = accessKey),
             addedAt = addedAt,
         )
 

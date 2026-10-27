@@ -127,6 +127,7 @@ class StartPlanner(context: Context) {
         profile.sshSettings() != null -> VpnManager.KIND_SSH
         profile.sniSpoofSettings() != null -> VpnManager.KIND_SNISPOOF
         profile.isSingBoxConfig -> VpnManager.KIND_SINGBOX
+        profile.isAether -> VpnManager.KIND_AETHER
         else -> VpnManager.KIND_XRAY
     }
 

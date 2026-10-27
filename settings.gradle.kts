@@ -26,7 +26,7 @@ dependencyResolutionManagement {
     }
 }
 
-rootProject.name = "ZedSecure"
+rootProject.name = "Damavand"
 include(":app")
 include(":shared")
 

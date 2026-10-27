@@ -15,6 +15,7 @@ import com.amyrmo.damavand.R
 import com.amyrmo.damavand.data.settings.SettingsRepository
 import com.amyrmo.damavand.domain.config.LocalPorts
 import com.amyrmo.damavand.domain.config.RoutingMigration
+import com.amyrmo.damavand.domain.config.singBoxDeviceOptions
 import com.amyrmo.damavand.domain.model.AppSettings
 import com.amyrmo.damavand.domain.model.RulesetItem
 import com.amyrmo.damavand.domain.model.VpnBypassLan
@@ -58,6 +59,8 @@ class DamavandVpnService : VpnService() {
     private var sniSpoofEdge: String? = null
     private var openConnect: OpenConnectController? = null
     private var singBox: SingBoxEngine? = null
+
+    private var aether: AetherEngine? = null
 
     private var singBoxLastUp = 0L
     private var singBoxLastDown = 0L
@@ -241,6 +244,8 @@ class DamavandVpnService : VpnService() {
         if (kind == VpnManager.KIND_OPENCONNECT) { startOpenConnect(configJson, settings); return }
 
         if (kind == VpnManager.KIND_SINGBOX) { startSingBox(configJson, settings); return }
+
+        if (kind == VpnManager.KIND_AETHER) { startAether(settings); return }
 
         val dnsInChain = kind == VpnManager.KIND_DNS_TUNNEL || kind == VpnManager.KIND_MASTERDNS ||
             (kind == VpnManager.KIND_CROSS_CHAIN && crossChainHasDnsTunnel(configJson))
@@ -601,6 +606,51 @@ class DamavandVpnService : VpnService() {
         if (!controller.start()) stopEverything()
     }
 
+    private fun startAether(appSettings: AppSettings) {
+        VpnManager.setActiveKind(kind)
+        if (!AetherEngine.available(this)) {
+            VpnManager.onError(getString(R.string.engine_aether_missing))
+            stopEverything()
+            return
+        }
+        val settings = activeAetherSettings ?: run {
+            VpnManager.onError(getString(R.string.engine_aether_missing))
+            stopEverything()
+            return
+        }
+        advance(VpnNotifications.Stage.Engine)
+        val engine = AetherEngine(
+            context = this,
+            mode = when (settings.mode) {
+                "psiphon" -> AetherEngine.Mode.Psiphon
+                "tor" -> AetherEngine.Mode.Tor
+                else -> AetherEngine.Mode.Tunnel
+            },
+            accessKey = settings.accessKey,
+            onLog = { LogBus.append(it) },
+            onStopped = { reason -> onTunnelFailed(reason) },
+        )
+        aether = engine
+        engine.start()
+        if (!engine.isRunning) {
+            VpnManager.onError(engineFailed(R.string.engine_singbox_failed, "aether core did not start"))
+            stopEverything()
+            return
+        }
+
+        // Bridge the core's SOCKS listener into the TUN via sing-box.
+        val bridgeJson = com.amyrmo.damavand.domain.config.SingBoxConfigs.aetherBridge(
+            engine.socksPort,
+            appSettings.singBoxDeviceOptions(),
+        )
+        startSingBox(bridgeJson, appSettings)
+    }
+
+    private val activeAetherSettings: com.amyrmo.damavand.domain.config.ProfileSource.Aether? by lazy {
+        (application as com.amyrmo.damavand.DamavandApp).container
+            .configRepository.activeProfile()?.aetherSettings()
+    }
+
     private fun startSingBox(configJson: String, appSettings: AppSettings) {
         VpnManager.setActiveKind(kind)
         advance(VpnNotifications.Stage.Engine)
@@ -885,6 +935,7 @@ class DamavandVpnService : VpnService() {
 
     private fun protocolLabel(): String = when (kind) {
         VpnManager.KIND_PSIPHON -> "Psiphon"
+        VpnManager.KIND_AETHER -> "Aether"
         VpnManager.KIND_DNS_TUNNEL -> "DNS"
         VpnManager.KIND_MASTERDNS -> "MasterDNS"
         VpnManager.KIND_TOR -> "Tor"
@@ -1077,6 +1128,7 @@ class DamavandVpnService : VpnService() {
                     VpnManager.KIND_SSH -> ssh?.isRunning == true
                     VpnManager.KIND_OPENCONNECT -> openConnect?.isRunning == true
                     VpnManager.KIND_SINGBOX -> singBox?.isRunning == true
+                    VpnManager.KIND_AETHER -> aether?.isRunning == true
 
                     VpnManager.KIND_CROSS_CHAIN ->
                         engineAlive(crossInnerKind, outer = false) && engineAlive(crossOuterKind, outer = true)
@@ -1108,6 +1160,8 @@ class DamavandVpnService : VpnService() {
                         singBoxLastUp = engine.uplinkTotal
                         down to up
                     } ?: (0L to 0L)
+
+                    VpnManager.KIND_AETHER -> uidTrafficDelta()
 
                     else -> XrayController.readTrafficDelta()
                 }
@@ -1292,6 +1346,7 @@ class DamavandVpnService : VpnService() {
         sniSpoof?.stop(); sniSpoof = null
         openConnect?.stop(); openConnect = null
         singBox?.stop(); singBox = null
+        aether?.stop(); aether = null
         outerPsiphon?.stop(); outerPsiphon = null
         outerTor?.stop(); outerTor = null
         outerSsh?.stop(); outerSsh = null

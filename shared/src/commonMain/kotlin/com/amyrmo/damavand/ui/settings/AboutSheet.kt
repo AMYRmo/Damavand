@@ -34,11 +34,11 @@ import com.amyrmo.damavand.ui.platform.LocalPlatform
 import com.amyrmo.damavand.ui.components.MorphingBlob
 import com.amyrmo.damavand.ui.theme.ZedGradients
 
-private const val TELEGRAM_URL = "https://t.me/CluvexStudio"
-private const val GITHUB_URL = "https://github.com/CluvexStudio"
+private const val TELEGRAM_URL = "https://t.me/AMYR_NEWS"
+private const val GITHUB_URL = "https://github.com/AMYRmo"
 
-private const val XRAY_SOURCE_URL = "https://github.com/CluvexStudio/Xray-core"
-private const val LIB_SOURCE_URL = "https://github.com/CluvexStudio/AndroidLibXrayLite"
+private const val PATTNG_URL = "https://github.com/patterniha/PattNG"
+private const val ZEDSECURE_URL = "https://github.com/CluvexStudio/ZedSecure"
 
 @Composable
 fun AboutSheet(onDismiss: () -> Unit) {
@@ -56,7 +56,7 @@ fun AboutSheet(onDismiss: () -> Unit) {
                 modifier = Modifier.size(96.dp),
             ) {
                 Text(
-                    "Z",
+                    "D",
                     style = MaterialTheme.typography.displaySmall,
                     fontWeight = FontWeight.Bold,
                     color = Color.White,
@@ -84,13 +84,13 @@ fun AboutSheet(onDismiss: () -> Unit) {
             LinkRow(
                 iconRes = Res.drawable.ic_add_link,
                 title = stringResource(Res.string.about_telegram),
-                subtitle = "t.me/CluvexStudio",
+                subtitle = "t.me/AMYR_NEWS",
                 onClick = { platform.openUri(TELEGRAM_URL) },
             )
             LinkRow(
                 iconRes = Res.drawable.ic_description,
                 title = stringResource(Res.string.about_github),
-                subtitle = "github.com/CluvexStudio",
+                subtitle = "github.com/AMYRmo",
                 onClick = { platform.openUri(GITHUB_URL) },
             )
 
@@ -109,15 +109,15 @@ fun AboutSheet(onDismiss: () -> Unit) {
             )
             LinkRow(
                 iconRes = Res.drawable.ic_description,
-                title = stringResource(Res.string.about_source_xray),
-                subtitle = "github.com/CluvexStudio/Xray-core",
-                onClick = { platform.openUri(XRAY_SOURCE_URL) },
+                title = stringResource(Res.string.about_source_pattng),
+                subtitle = "github.com/patterniha/PattNG",
+                onClick = { platform.openUri(PATTNG_URL) },
             )
             LinkRow(
                 iconRes = Res.drawable.ic_description,
-                title = stringResource(Res.string.about_source_lib),
-                subtitle = "github.com/CluvexStudio/AndroidLibXrayLite",
-                onClick = { platform.openUri(LIB_SOURCE_URL) },
+                title = stringResource(Res.string.about_source_zedsecure),
+                subtitle = "github.com/CluvexStudio/ZedSecure",
+                onClick = { platform.openUri(ZEDSECURE_URL) },
             )
         }
     }

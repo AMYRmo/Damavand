@@ -8,7 +8,10 @@ import kotlin.io.encoding.ExperimentalEncodingApi
 
 @OptIn(ExperimentalEncodingApi::class)
 object ZedLink {
-    const val SCHEME = "zedsecure://"
+    const val SCHEME = "damavand://"
+
+    /** Links minted by older builds — still parse. */
+    const val LEGACY_SCHEME = "zedsecure://"
 
     private val json = Json {
         ignoreUnknownKeys = true
@@ -24,7 +27,10 @@ object ZedLink {
         @SerialName("m") val members: List<String> = emptyList(),
     )
 
-    fun isZedLink(text: String): Boolean = text.trim().startsWith(SCHEME, ignoreCase = true)
+    fun isZedLink(text: String): Boolean {
+        val t = text.trim()
+        return t.startsWith(SCHEME, ignoreCase = true) || t.startsWith(LEGACY_SCHEME, ignoreCase = true)
+    }
 
     fun build(name: String, source: ProfileSource, members: List<String> = emptyList()): String? {
         val payload = runCatching {
@@ -36,8 +42,12 @@ object ZedLink {
 
     fun parse(uri: String): Payload? {
         val trimmed = uri.trim()
-        if (!isZedLink(trimmed)) return null
-        val body = trimmed.substring(SCHEME.length).substringBefore('#').trimEnd('=')
+        val scheme = when {
+            trimmed.startsWith(SCHEME, ignoreCase = true) -> SCHEME
+            trimmed.startsWith(LEGACY_SCHEME, ignoreCase = true) -> LEGACY_SCHEME
+            else -> return null
+        }
+        val body = trimmed.substring(scheme.length).substringBefore('#').trimEnd('=')
         val text = runCatching {
             Base64.UrlSafe.withPadding(Base64.PaddingOption.ABSENT_OPTIONAL)
                 .decode(body)

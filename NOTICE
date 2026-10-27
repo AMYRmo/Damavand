@@ -1,4 +1,4 @@
-ZedSecure — third-party notices
+Damavand — third-party notices
 ===============================
 
 Country flag SVGs
@@ -60,7 +60,7 @@ the API in `wintun.h`. The license text ships beside it as `wintun-LICENSE.txt`.
 Java Native Access (JNA)
 ------------------------
 Source: https://github.com/java-native-access/jna
-License: Apache-2.0 (dual-licensed with LGPL-2.1; ZedSecure uses it under Apache-2.0)
+License: Apache-2.0 (dual-licensed with LGPL-2.1; Damavand uses it under Apache-2.0)
 
 The desktop build uses it on Windows to ask for administrator rights and to stop its engines
 cleanly, without PowerShell.
@@ -96,18 +96,18 @@ sing-openvpn
 ------------
 Source: https://github.com/SagerNet/sing-openvpn
 License: GPL-3.0-or-later
-Our patched fork: https://github.com/CluvexStudio/sing-openvpn (branch `zedsecure`)
+Upstream: https://github.com/CluvexStudio/sing-openvpn
 
 AndroidLibXrayLite
 ------------------
 Source: https://github.com/2dust/AndroidLibXrayLite
 License: LGPL-3.0
-Our patched fork: https://github.com/CluvexStudio/AndroidLibXrayLite (branch `zedsecure`)
+Upstream: https://github.com/CluvexStudio/AndroidLibXrayLite
 It also carries `zeddns`, the DNS-tunnel client written for this app.
 
 Xray-core patches
 -----------------
-Our patched fork: https://github.com/CluvexStudio/Xray-core (branch `zedsecure`)
+Upstream: https://github.com/CluvexStudio/Xray-core
 
 Psiphon
 -------

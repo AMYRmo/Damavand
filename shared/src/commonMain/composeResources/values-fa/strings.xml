@@ -100,7 +100,6 @@
     <string name="vault_name_numbered">اگر چند سرور انتخاب شود، خودکار شماره‌گذاری می‌شود</string>
     <string name="vault_password">رمز</string>
     <string name="vault_toggle_password">نمایش یا پنهان کردن رمز</string>
-    <string name="nav_locked">گاوصندوق</string>
     <string name="nav_settings">تنظیمات</string>
 
     <string name="state_idle">متصل نیستید</string>
@@ -920,7 +919,7 @@
     <string name="personalize_upload_tile_sub">رنگ مستطیلی که پشت آن‌هاست</string>
     <string name="subs_ua_preset">یوزر ایجنت</string>
     <string name="subs_ua_v2rayng">v2rayNG (پیشنهادی)</string>
-    <string name="subs_ua_zedsecure">Damavand</string>
+    <string name="subs_ua_damavand">Damavand</string>
     <string name="subs_ua_custom">دلخواه</string>
     <string name="subs_ua_hint">خیلی از ارائه‌دهنده‌ها کانفیگ‌های JSON سفارشی خود را فقط به یوزر ایجنت v2rayNG می‌دهند و به بقیه لینک ساده می‌دهند.</string>
     <string name="subs_edit">ویرایش سابسکریپشن</string>
@@ -1435,7 +1434,7 @@
     <string name="settings_group_behaviour">فهرست‌ها و اعلان‌ها</string>
     <string name="color_style_title">سبک رنگ</string>
     <string name="color_style_sub">یک پالت کامل از رنگ تأکیدی شما ساخته می‌شود</string>
-    <string name="color_style_zedsecure">Damavand</string>
+    <string name="color_style_damavand">Damavand</string>
     <string name="color_style_tonal">ملایم</string>
     <string name="color_style_vibrant">پرانرژی</string>
     <string name="color_style_expressive">اکسپرسیو</string>

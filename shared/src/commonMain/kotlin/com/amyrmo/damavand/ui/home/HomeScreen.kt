@@ -162,7 +162,7 @@ fun HomeScreen(
     exitGeneration: Int = 0,
     onToggleConnection: () -> Unit,
     onBrowseConfigs: () -> Unit,
-    onSecretUnlocked: () -> Unit,
+    onSecretUnlocked: () -> Unit = {},
     modifier: Modifier = Modifier,
     lockedNote: String? = null,
     localProxyAddress: String? = null,

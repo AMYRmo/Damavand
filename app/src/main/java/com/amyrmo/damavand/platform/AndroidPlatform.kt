@@ -168,7 +168,7 @@ class AndroidPlatform(
 
     override fun shareText(text: String) {
         if (text.length > INLINE_SHARE_LIMIT) {
-            ZsxSharing.shareText(context, "zedsecure-export.txt", text)
+            ZsxSharing.shareText(context, "damavand-export.txt", text)
             return
         }
         val intent = Intent(Intent.ACTION_SEND).apply {
@@ -177,7 +177,7 @@ class AndroidPlatform(
         }
         val chooser = Intent.createChooser(intent, null).apply { addFlags(Intent.FLAG_ACTIVITY_NEW_TASK) }
         runCatching { context.startActivity(chooser) }
-            .onFailure { ZsxSharing.shareText(context, "zedsecure-export.txt", text) }
+            .onFailure { ZsxSharing.shareText(context, "damavand-export.txt", text) }
     }
 
     override fun openUri(url: String) {

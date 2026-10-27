@@ -12,7 +12,7 @@
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
  * Lesser General Public License for more details.
  *
- * Modified for ZedSecure in 2026: the SSO token modes and the webview
+ * Modified for Damavand in 2026: the SSO token modes and the webview
  * callbacks were added, and getAuthExpiration() was removed because
  * java.time needs Android 8.0.
  */

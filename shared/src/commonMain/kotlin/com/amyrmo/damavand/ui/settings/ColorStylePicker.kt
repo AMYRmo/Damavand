@@ -62,7 +62,7 @@ import org.jetbrains.compose.resources.stringResource
 
 val ColorStyle.label: StringResource
     get() = when (this) {
-        ColorStyle.Damavand -> Res.string.color_style_zedsecure
+        ColorStyle.Damavand -> Res.string.color_style_damavand
         ColorStyle.TonalSpot -> Res.string.color_style_tonal
         ColorStyle.Vibrant -> Res.string.color_style_vibrant
         ColorStyle.Expressive -> Res.string.color_style_expressive

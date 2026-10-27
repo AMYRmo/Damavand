@@ -7,8 +7,8 @@ import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.put
 
 object SettingsBackup {
-    const val FILE_NAME = "zedsecure-settings.json"
-    private const val MARK = "zedsecureSettings"
+    const val FILE_NAME = "damavand-settings.json"
+    private const val MARK = "damavandSettings"
     private const val VERSION = 1
 
     private val json = Json {

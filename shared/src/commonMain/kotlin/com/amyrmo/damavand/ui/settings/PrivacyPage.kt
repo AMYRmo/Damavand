@@ -28,7 +28,7 @@ import com.amyrmo.damavand.ui.platform.LocalPlatform
 import org.jetbrains.compose.resources.painterResource
 import org.jetbrains.compose.resources.stringResource
 
-private const val POLICY_URL = "https://cluvexstudio.github.io/Damavand-PrivacyPolicy/"
+private const val POLICY_URL = "https://amyrmo.github.io/Damavand-PrivacyPolicy/"
 
 @Composable
 fun PrivacyPage(

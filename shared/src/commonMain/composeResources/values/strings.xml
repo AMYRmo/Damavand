@@ -89,7 +89,6 @@
     <string name="vault_name_numbered">Multiple servers are numbered automatically</string>
     <string name="vault_password">Password</string>
     <string name="vault_toggle_password">Show or hide password</string>
-    <string name="nav_locked">Vault</string>
     <string name="nav_settings">Settings</string>
 
     <string name="state_idle">Not connected</string>
@@ -317,13 +316,13 @@
     <string name="group_manual">Manual</string>
 
     <string name="about_version">Version %1$s</string>
-    <string name="about_built_on">Built on the Xray core, with Psiphon, Tor, Snowflake, obfs4, Conjure, DNSTT, VayDNS, MasterDNS, AmneziaWG, OpenConnect and IKEv2.</string>
+    <string name="about_built_on">Built on the Xray, sing-box and Aether cores, with Psiphon, Tor, Snowflake, obfs4, Conjure, DNSTT, VayDNS, MasterDNS, AmneziaWG, OpenConnect and IKEv2.</string>
     <string name="about_telegram">Telegram channel</string>
     <string name="about_github">GitHub</string>
     <string name="about_source_title">Open-source core</string>
     <string name="about_source_body">The core that carries your traffic is built on open-source projects licensed under GPL-3.0, LGPL-3.0 and MPL-2.0. Our patched sources are published, as those licences require.</string>
-    <string name="about_source_xray">Xray core — our patches</string>
-    <string name="about_source_lib">Android core library — our patches</string>
+    <string name="about_source_pattng">Cores &amp; features — PattNG</string>
+    <string name="about_source_zedsecure">Interface design — ZedSecure</string>
 
     <string name="routing_title">Routing</string>
     <string name="routing_subtitle">Choose which traffic goes through the tunnel</string>
@@ -647,6 +646,9 @@
     <string name="tor_connection_padding_sum">Pads traffic to resist timing analysis</string>
     <string name="tor_add_title">Add Tor</string>
     <string name="tor_added">Tor added</string>
+    <string name="aether_add_title">Add Aether</string>
+    <string name="aether_added">Aether added</string>
+    <string name="engine_aether_missing">Aether core is not available for this device</string>
     <string name="ssh_add_title">Add SSH tunnel</string>
     <string name="ssh_host">SSH host</string>
     <string name="ssh_port">Port</string>
@@ -927,7 +929,7 @@
     <string name="personalize_upload_tile_sub">Colours the rectangle behind them</string>
     <string name="subs_ua_preset">User-Agent</string>
     <string name="subs_ua_v2rayng">v2rayNG (recommended)</string>
-    <string name="subs_ua_zedsecure">Damavand</string>
+    <string name="subs_ua_damavand">Damavand</string>
     <string name="subs_ua_custom">Custom</string>
     <string name="subs_ua_hint">Many providers only send their JSON custom configs to the v2rayNG User-Agent, and send plain links to anything else.</string>
     <string name="subs_edit">Edit subscription</string>
@@ -1442,7 +1444,7 @@
     <string name="settings_group_behaviour">Lists and notifications</string>
     <string name="color_style_title">Color style</string>
     <string name="color_style_sub">A full palette is generated from your accent color</string>
-    <string name="color_style_zedsecure">Damavand</string>
+    <string name="color_style_damavand">Damavand</string>
     <string name="color_style_tonal">Tonal</string>
     <string name="color_style_vibrant">Vibrant</string>
     <string name="color_style_expressive">Expressive</string>

@@ -109,7 +109,7 @@ private val CONSTELLATIONS = listOf(
     "Vela", "Virgo", "Volans", "Vulpecula",
 )
 
-private val RARE_CONSTELLATIONS = listOf("Cluvex", "Zed", "Bugdroid", "Tunnelis", "Onionis")
+private val RARE_CONSTELLATIONS = listOf("Damavand", "Alborz", "Bugdroid", "Tunnelis", "Onionis")
 
 private val SUFFIXES = listOf(
     "Prime", "Major", "Minor", "Australis", "Borealis", "Alpha", "Beta", "Gamma", "Delta",

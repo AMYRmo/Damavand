@@ -567,7 +567,7 @@ class OpenConnectController(
         }
 
         fun deviceUniqueId(): String {
-            val raw = DeviceIdentity.id.ifBlank { "zedsecure" }
+            val raw = DeviceIdentity.id.ifBlank { "damavand" }
 
             return raw.filter { it.isLetterOrDigit() }.lowercase().padEnd(16, '0').take(40)
         }

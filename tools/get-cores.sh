@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Damavand core fetcher — mirrors ZedSecure's tools/get-cores.sh android path.
+# Damavand core fetcher — sources in tools/cores.txt.
 # Uses python zipfile instead of unzip (host has no unzip).
 set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
