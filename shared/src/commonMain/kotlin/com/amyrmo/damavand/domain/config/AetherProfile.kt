@@ -64,6 +64,8 @@ data class AetherProfile(
     val dialMode: String = "",
     /** extra raw flags appended verbatim (advanced) */
     val extraArgs: String = "",
+    /** SOCKS5 upstream the core dials through (cross-chain carrier), socks5://127.0.0.1:port */
+    val upstream: String = "",
 ) {
     /** Whether the core should scan instead of dialing a named endpoint. */
     val scanning: Boolean
