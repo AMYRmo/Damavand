@@ -838,18 +838,11 @@ private fun UiPage(
         modifier = modifier,
     ) {
         val dynamicActive = s.dynamicColor && LocalPlatform.current.supportsDynamicColor
-        val oldHome = s.appDesign == AppDesign.Old
         SettingsGroup {
             AppDesignPicker(
                 selected = s.appDesign,
                 onSelect = { v -> onUpdate { it.copy(appDesign = v) } },
             )
-            if (!oldHome) {
-                SettingsInfoRow(
-                    title = stringResource(Res.string.home_design_title),
-                    body = stringResource(Res.string.home_design_old_note),
-                )
-            }
         }
 
         SettingsGroup(title = stringResource(Res.string.settings_group_colors)) {

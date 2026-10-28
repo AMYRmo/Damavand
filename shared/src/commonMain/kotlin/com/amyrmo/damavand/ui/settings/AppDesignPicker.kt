@@ -76,23 +76,11 @@ fun AppDesignPicker(selected: AppDesign, onSelect: (AppDesign) -> Unit) {
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
             ) {
                 DesignCard(
-                    name = stringResource(Res.string.home_design_pixel),
-                    selected = selected == AppDesign.Pixel,
-                    modifier = Modifier.weight(1f),
-                    onClick = { onSelect(AppDesign.Pixel) },
-                ) { PixelPreview() }
-                DesignCard(
                     name = stringResource(Res.string.home_design_portal),
-                    selected = selected == AppDesign.Portal,
-                    modifier = Modifier.weight(1f),
+                    selected = true,
+                    modifier = Modifier.fillMaxWidth(),
                     onClick = { onSelect(AppDesign.Portal) },
                 ) { PortalPreview() }
-                DesignCard(
-                    name = stringResource(Res.string.home_design_old),
-                    selected = selected == AppDesign.Old,
-                    modifier = Modifier.weight(1f),
-                    onClick = { onSelect(AppDesign.Old) },
-                ) { OldPreview() }
             }
         }
     }
