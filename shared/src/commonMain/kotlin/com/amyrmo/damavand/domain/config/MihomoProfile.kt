@@ -19,6 +19,8 @@ data class MihomoProfile(
     /** Clash subscription URL; when set and [yaml] blank the engine builds a
      *  provider-based config pulling proxies from this URL. */
     val subUrl: String = "",
+    /** SOCKS5 upstream the engine routes through (cross-chain carrier), 127.0.0.1:port */
+    val upstreamSocks: Int = 0,
 ) {
     companion object {
         /** Free public mihomo subscription used when adding Mihomo with nothing filled. */

@@ -175,6 +175,7 @@ data class AetherProfile(
                 }
                 psiphonRegion.trim().takeIf { it.isNotEmpty() }?.let { addAll(listOf("--psiphon-region", it)) }
             }
+            upstream.trim().takeIf { it.isNotEmpty() }?.let { addAll(listOf("--upstream", it)) }
             extraArgs.trim().takeIf { it.isNotEmpty() }?.let { addAll(it.split(Regex("\\s+"))) }
         }
     }

@@ -29,7 +29,6 @@ class TorController(
         return try {
             val torDir = File(context.filesDir, "tor").apply { mkdirs() }
             extractAsset("geoip", torDir)
-            extractAsset("geoip6", torDir)
             extractAsset("bridges_default.lst", torDir)
 
             val dataDir = File(context.filesDir, "tor_data").apply { mkdirs() }

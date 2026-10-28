@@ -1744,6 +1744,35 @@ class DamavandVpnService : VpnService() {
                 }
             }
 
+            VpnManager.KIND_AETHER -> {
+                val cfg = ((application as com.amyrmo.damavand.DamavandApp).container.configRepository.activeProfile()?.source
+                        as? com.amyrmo.damavand.domain.config.ProfileSource.Aether)?.config
+                if (cfg == null || !AetherEngine.available(this)) return onReady(-1)
+                val engine = AetherEngine(
+                    context = this,
+                    config = cfg,
+                    onLog = { LogBus.append(it) },
+                    onStopped = { reason -> onTunnelFailed(reason) },
+                )
+                aether = engine
+                engine.start()
+                onReady(if (engine.isRunning) engine.socksPort else -1)
+            }
+            VpnManager.KIND_MIHOMO -> {
+                val cfg = ((application as com.amyrmo.damavand.DamavandApp).container.configRepository.activeProfile()?.source
+                        as? com.amyrmo.damavand.domain.config.ProfileSource.Mihomo)?.config
+                if (cfg == null || !MihomoEngine.available(this)) return onReady(-1)
+                val engine = MihomoEngine(
+                    context = this,
+                    config = cfg,
+                    onLog = { LogBus.append(it) },
+                    onStopped = { reason -> onTunnelFailed(reason) },
+                )
+                mihomo = engine
+                engine.start()
+                onReady(if (engine.isRunning) engine.mixedPort else -1)
+            }
+
             else -> {
                 val carrierPort = LocalPortPicker.pick(LocalPorts.CHAIN_CARRIER)
                 val carrier = XrayJsonBuilder.withSocksPort(config, LocalPorts.XRAY_SOCKS, carrierPort)
@@ -1845,6 +1874,42 @@ class DamavandVpnService : VpnService() {
                 )
                 psiphon = c
                 if (!c.start()) stopEverything()
+            }
+
+            VpnManager.KIND_AETHER -> {
+                val cfg = ((application as com.amyrmo.damavand.DamavandApp).container.configRepository.activeProfile()?.source
+                        as? com.amyrmo.damavand.domain.config.ProfileSource.Aether)?.config
+                if (cfg == null || !AetherEngine.available(this)) {
+                    VpnManager.onError(getString(R.string.engine_aether_missing)); stopEverything(); return
+                }
+                val engine = AetherEngine(
+                    context = this,
+                    config = cfg.copy(upstream = "socks5://127.0.0.1:$carrierPort"),
+                    onLog = { LogBus.append(it) },
+                    onStopped = { reason -> onTunnelFailed(reason) },
+                )
+                aether = engine
+                engine.start()
+                if (!engine.isRunning) { VpnManager.onError(coreStartError()); stopEverything(); return }
+                // aether's socks then flows into the TUN through the sing-box bridge
+                bridgeEngine(descriptor, engine.socksPort, tunMtu)
+            }
+            VpnManager.KIND_MIHOMO -> {
+                val cfg = ((application as com.amyrmo.damavand.DamavandApp).container.configRepository.activeProfile()?.source
+                        as? com.amyrmo.damavand.domain.config.ProfileSource.Mihomo)?.config
+                if (cfg == null || !MihomoEngine.available(this)) {
+                    VpnManager.onError(getString(R.string.engine_mihomo_missing)); stopEverything(); return
+                }
+                val engine = MihomoEngine(
+                    context = this,
+                    config = cfg.copy(upstreamSocks = carrierPort),
+                    onLog = { LogBus.append(it) },
+                    onStopped = { reason -> onTunnelFailed(reason) },
+                )
+                mihomo = engine
+                engine.start()
+                if (!engine.isRunning) { VpnManager.onError(coreStartError()); stopEverything(); return }
+                bridgeEngine(descriptor, engine.mixedPort, tunMtu)
             }
 
             else -> {
