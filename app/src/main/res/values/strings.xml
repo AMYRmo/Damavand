@@ -681,6 +681,7 @@
     <string name="engine_failed_tunnel">The tunnel failed to start</string>
     <string name="engine_singbox_failed">sing-box failed to start</string>
     <string name="engine_aether_missing">Aether core is not available for this device</string>
+    <string name="engine_mihomo_missing">Mihomo core is not available for this device</string>
     <string name="engine_missing_config">The configuration is missing</string>
     <string name="engine_no_interface">Could not create the VPN interface</string>
     <string name="engine_snispoof_no_outbound">SNI spoof: the config has no proxy outbound</string>
