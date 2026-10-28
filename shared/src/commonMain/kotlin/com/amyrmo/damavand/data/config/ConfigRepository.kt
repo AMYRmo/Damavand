@@ -926,7 +926,7 @@ class ConfigRepository(private val store: KeyValueStore) {
         persistProfiles()
         if (_activeId.value == null) setActive(profile.id)
         return profile
-    
+    }
 
     fun addMihomoProfile(config: com.amyrmo.damavand.domain.config.MihomoProfile, id: String? = null): VpnProfile {
         val existing = id?.let { profile(it) }

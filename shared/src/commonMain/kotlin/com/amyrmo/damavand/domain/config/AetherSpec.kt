@@ -159,6 +159,7 @@ enum class AetherKeyKind(val type: String, val register: String) {
     WIREGUARD("wg", "wg"),
     MASQUE("masque", "masque"),
     GOOL("gool", "gool-classic"),
+    MIM("mim", "mim"),
     WG_OVER_MASQUE("wg-over-masque", "gool");
 
     companion object {
