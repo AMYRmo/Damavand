@@ -943,7 +943,7 @@ class ConfigRepository(private val store: KeyValueStore) {
         persistProfiles()
         if (_activeId.value == null) setActive(profile.id)
         return profile
-    }}
+    }
 
     fun update(profile: VpnProfile) {
         _profiles.update { list -> list.map { if (it.id == profile.id) profile else it } }
