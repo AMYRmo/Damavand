@@ -87,11 +87,6 @@ class MihomoEngine(
         } else {
             val url = config.subUrl.trim()
             require(url.isNotEmpty()) { "mihomo profile has neither yaml nor subUrl" }
-            //providers:
-  proxy-providers:
-    sub:
-      url: <url>
-...
             buildString {
                 appendLine("proxy-providers:")
                 appendLine("  sub:")
