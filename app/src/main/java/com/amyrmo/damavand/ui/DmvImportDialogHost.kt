@@ -27,6 +27,16 @@ import com.amyrmo.damavand.ui.servers.DmvImportSheet
 fun DmvImportDialogHost(repository: ConfigRepository) {
     val pending by DmvImportBus.pending.collectAsStateWithLifecycle()
     val request = pending ?: return
+    val errWrongPassword = stringResource(R.string.dmv_wrong_password)
+    val errExpired = stringResource(R.string.dmv_expired)
+    val errTooLarge = stringResource(R.string.dmv_too_large)
+    val errBadFile = stringResource(R.string.dmv_bad_file)
+    fun appError(res: Int): String = when (res) {
+        R.string.dmv_wrong_password -> errWrongPassword
+        R.string.dmv_expired -> errExpired
+        R.string.dmv_too_large -> errTooLarge
+        else -> errBadFile
+    }
 
     var error by remember(request) { mutableStateOf<String?>(null) }
     var meta by remember(request) {
@@ -56,28 +66,19 @@ fun DmvImportDialogHost(repository: ConfigRepository) {
         error = error,
         onDismiss = { DmvImportBus.consume() },
         onImport = { password ->
-            val result = runCatching {
-                val payload = DmvCrypto.open(request.bytes, password)
+            val opened = runCatching { DmvCrypto.open(request.bytes, password) }
+            val payload = opened.getOrNull()
+            if (payload == null) {
+                error = when (val e = opened.exceptionOrNull()) {
+                    is DmvCrypto.DmvWrongPassword -> appError(R.string.dmv_wrong_password)
+                    is DmvCrypto.DmvExpired -> appError(R.string.dmv_expired)
+                    is DmvCrypto.DmvTooLarge -> appError(R.string.dmv_too_large)
+                    else -> appError(R.string.dmv_bad_file)
+                }
+            } else {
                 repository.importText(payload)
+                DmvImportBus.consume()
             }
-            result.fold(
-                onSuccess = { count ->
-                    DmvImportBus.consume()
-                    if (count > 0) {
-                        // success — the repository toast flow already notifies
-                    } else {
-                        error = null
-                    }
-                },
-                onFailure = { e ->
-                    error = when (e) {
-                        is DmvCrypto.DmvWrongPassword -> stringResource(R.string.dmv_wrong_password)
-                        is DmvCrypto.DmvExpired -> stringResource(R.string.dmv_expired)
-                        is DmvCrypto.DmvTooLarge -> stringResource(R.string.dmv_too_large)
-                        else -> stringResource(R.string.dmv_bad_file)
-                    }
-                },
-            )
         },
     )
 }
