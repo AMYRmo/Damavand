@@ -222,11 +222,25 @@ data class AetherProfile(
             val trimmed = link.trim()
             if (!trimmed.startsWith("aether://")) return null
             val rest = trimmed.removePrefix("aether://")
-            val (hostPart, queryPart) = rest.split("?", 2).let {
-                if (it.size == 2) it[0] to it[1] else it[0] to ""
+            val hostPart: String
+            val queryPart: String
+            val qIdx = rest.indexOf('?')
+            if (qIdx >= 0) {
+                hostPart = rest.substring(0, qIdx)
+                queryPart = rest.substring(qIdx + 1)
+            } else {
+                hostPart = rest
+                queryPart = ""
             }
-            val (query, label) = queryPart.split("#", 2).let {
-                if (it.size == 2) it[0] to urlDecode(it[1]) else it[0] to ""
+            val query: String
+            val label: String
+            val hIdx = queryPart.indexOf('#')
+            if (hIdx >= 0) {
+                query = queryPart.substring(0, hIdx)
+                label = urlDecode(queryPart.substring(hIdx + 1))
+            } else {
+                query = queryPart
+                label = ""
             }
             var cfg = AetherProfile(remarks = label)
             for (pair in query.split("&")) {
