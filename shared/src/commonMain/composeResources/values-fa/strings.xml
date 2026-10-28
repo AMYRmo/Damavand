@@ -640,6 +640,9 @@
     <string name="tor_add_title">افزودن Tor</string>
     <string name="tor_added">تور اضافه شد</string>
     <string name="aether_add_title">افزودن اتر</string>
+    <string name="mihomo_add_title">افزودن می‌همو</string>
+    <string name="mihomo_yaml_hint">کانفیگ YAML کلش / می‌همو</string>
+    <string name="engine_mihomo_missing">هستهٔ می‌همو برای این دستگاه موجود نیست</string>
     <string name="aether_edit_title">ویرایش اتر</string>
     <string name="aether_protocol">پروتکل</string>
     <string name="aether_scan">حالت اسکن</string>

@@ -58,6 +58,7 @@ object ZedLink {
 
     fun handles(source: ProfileSource): Boolean = when (source) {
         is ProfileSource.Aether,
+        is ProfileSource.Mihomo,
         is ProfileSource.Psiphon,
         is ProfileSource.DnsTunnel,
         is ProfileSource.Tor,

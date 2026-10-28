@@ -67,9 +67,11 @@ data class AetherProfile(
 ) {
     /** Whether the core should scan instead of dialing a named endpoint. */
     val scanning: Boolean
-        get() = AetherProtocol.fromString(protocol).twoHops
-            ? wiwOuter.isBlank() || wiwInner.isBlank()
-            : address.isBlank()
+        get() = if (AetherProtocol.fromString(protocol).twoHops) {
+            wiwOuter.isBlank() || wiwInner.isBlank()
+        } else {
+            address.isBlank()
+        }
 
     /**
      * The core's arguments, following PattNG's AetherCoreManager.buildArguments

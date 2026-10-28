@@ -128,6 +128,7 @@ class StartPlanner(context: Context) {
         profile.sniSpoofSettings() != null -> VpnManager.KIND_SNISPOOF
         profile.isSingBoxConfig -> VpnManager.KIND_SINGBOX
         profile.isAether -> VpnManager.KIND_AETHER
+        profile.isMihomo -> VpnManager.KIND_MIHOMO
         else -> VpnManager.KIND_XRAY
     }
 

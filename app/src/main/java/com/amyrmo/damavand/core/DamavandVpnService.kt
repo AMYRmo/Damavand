@@ -62,6 +62,7 @@ class DamavandVpnService : VpnService() {
     private var singBox: SingBoxEngine? = null
 
     private var aether: AetherEngine? = null
+    private var mihomo: MihomoEngine? = null
 
     private var singBoxLastUp = 0L
     private var singBoxLastDown = 0L
@@ -247,6 +248,7 @@ class DamavandVpnService : VpnService() {
         if (kind == VpnManager.KIND_SINGBOX) { startSingBox(configJson, settings); return }
 
         if (kind == VpnManager.KIND_AETHER) { startAether(settings); return }
+        if (kind == VpnManager.KIND_MIHOMO) { startMihomo(settings); return }
 
         val dnsInChain = kind == VpnManager.KIND_DNS_TUNNEL || kind == VpnManager.KIND_MASTERDNS ||
             (kind == VpnManager.KIND_CROSS_CHAIN && crossChainHasDnsTunnel(configJson))
@@ -647,6 +649,43 @@ class DamavandVpnService : VpnService() {
             .configRepository.activeProfile()?.aetherSettings()
     }
 
+    private fun startMihomo(appSettings: AppSettings) {
+        VpnManager.setActiveKind(kind)
+        if (!MihomoEngine.available(this)) {
+            VpnManager.onError(getString(R.string.engine_mihomo_missing))
+            stopEverything()
+            return
+        }
+        val profile = (application as com.amyrmo.damavand.DamavandApp).container
+            .configRepository.activeProfile()
+        val cfg = (profile?.source as? com.amyrmo.damavand.domain.config.ProfileSource.Mihomo)?.config ?: run {
+            VpnManager.onError(getString(R.string.engine_mihomo_missing))
+            stopEverything()
+            return
+        }
+        advance(VpnNotifications.Stage.Engine)
+        val engine = MihomoEngine(
+            context = this,
+            config = cfg,
+            onLog = { LogBus.append(it) },
+            onStopped = { reason -> onTunnelFailed(reason) },
+        )
+        mihomo = engine
+        engine.start()
+        if (!engine.isRunning) {
+            VpnManager.onError(engineFailed(R.string.engine_singbox_failed, "mihomo core did not start"))
+            stopEverything()
+            return
+        }
+
+        // Bridge the core's mixed listener into the TUN via sing-box.
+        val bridgeJson = com.amyrmo.damavand.domain.config.SingBoxConfigs.aetherBridge(
+            engine.mixedPort,
+            appSettings.singBoxDeviceOptions(),
+        )
+        startSingBox(bridgeJson, appSettings)
+    }
+
     private fun startSingBox(configJson: String, appSettings: AppSettings) {
         VpnManager.setActiveKind(kind)
         advance(VpnNotifications.Stage.Engine)
@@ -932,6 +971,7 @@ class DamavandVpnService : VpnService() {
     private fun protocolLabel(): String = when (kind) {
         VpnManager.KIND_PSIPHON -> "Psiphon"
         VpnManager.KIND_AETHER -> "Aether"
+        VpnManager.KIND_MIHOMO -> "Mihomo"
         VpnManager.KIND_DNS_TUNNEL -> "DNS"
         VpnManager.KIND_MASTERDNS -> "MasterDNS"
         VpnManager.KIND_TOR -> "Tor"
@@ -1125,6 +1165,7 @@ class DamavandVpnService : VpnService() {
                     VpnManager.KIND_OPENCONNECT -> openConnect?.isRunning == true
                     VpnManager.KIND_SINGBOX -> singBox?.isRunning == true
                     VpnManager.KIND_AETHER -> aether?.isRunning == true
+                    VpnManager.KIND_MIHOMO -> mihomo?.isRunning == true
 
                     VpnManager.KIND_CROSS_CHAIN ->
                         engineAlive(crossInnerKind, outer = false) && engineAlive(crossOuterKind, outer = true)
@@ -1343,6 +1384,7 @@ class DamavandVpnService : VpnService() {
         openConnect?.stop(); openConnect = null
         singBox?.stop(); singBox = null
         aether?.stop(); aether = null
+        mihomo?.stop(); mihomo = null
         outerPsiphon?.stop(); outerPsiphon = null
         outerTor?.stop(); outerTor = null
         outerSsh?.stop(); outerSsh = null

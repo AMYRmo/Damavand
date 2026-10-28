@@ -328,6 +328,7 @@ fun ServersScreen(
     var showIkev2 by remember { mutableStateOf(false) }
     var showSsh by remember { mutableStateOf(false) }
     var showAether by remember { mutableStateOf(false) }
+    var showMihomo by remember { mutableStateOf(false) }
     var dmvTarget by remember { mutableStateOf<VpnProfile?>(null) }
     var showSniSpoof by remember { mutableStateOf(false) }
     var showProxyChain by remember { mutableStateOf(false) }
@@ -1196,6 +1197,10 @@ fun ServersScreen(
                 showAddSheet = false
                 showAether = true
             },
+            onMihomo = {
+                showAddSheet = false
+                showMihomo = true
+            },
             onSsh = {
                 showAddSheet = false
                 showSsh = true
@@ -1281,6 +1286,17 @@ fun ServersScreen(
             onSave = { name, settings ->
                 showSsh = false
                 repository.addSsh(settings, name)
+                onServerActivated()
+            },
+        )
+    }
+
+    if (showMihomo) {
+        MihomoSheet(
+            onDismiss = { showMihomo = false },
+            onSave = { config ->
+                showMihomo = false
+                repository.addMihomoProfile(config)
                 onServerActivated()
             },
         )
@@ -2124,6 +2140,7 @@ private fun AddServerSheet(
     onIkev2: () -> Unit,
     onTor: () -> Unit,
     onAether: () -> Unit,
+    onMihomo: () -> Unit,
     onSsh: () -> Unit,
     onSniSpoof: () -> Unit,
     onProxyChain: () -> Unit,
@@ -2174,6 +2191,7 @@ private fun AddServerSheet(
             Option(Res.drawable.ic_bolt, Res.string.psiphon_add_title, onPsiphon, free = true)
             Option(Res.drawable.ic_lock, Res.string.tor_add_title, onTor, free = true)
             Option(Res.drawable.ic_bolt, Res.string.aether_add_title, onAether, free = true)
+            Option(Res.drawable.ic_description, Res.string.mihomo_add_title, onMihomo, free = true)
             Option(Res.drawable.ic_speed, Res.string.ssh_add_title, onSsh)
             if (LocalPlatform.current.supportsSniSpoof) Option(Res.drawable.ic_bolt, Res.string.snispoof_add_title, onSniSpoof)
 

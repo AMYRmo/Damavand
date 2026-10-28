@@ -721,6 +721,9 @@
     <string name="dmv_too_large">The config exceeds the declared size limit</string>
 
     <string name="engine_aether_missing">Aether core is not available for this device</string>
+    <string name="mihomo_add_title">Add Mihomo</string>
+    <string name="mihomo_yaml_hint">Clash / mihomo YAML config</string>
+    <string name="engine_mihomo_missing">Mihomo core is not available for this device</string>
     <string name="ssh_add_title">Add SSH tunnel</string>
     <string name="ssh_host">SSH host</string>
     <string name="ssh_port">Port</string>

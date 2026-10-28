@@ -81,6 +81,9 @@ sealed interface ProfileSource {
         // adjustable config (PattNG-style screen)
         val config: AetherProfile = AetherProfile(),
     ) : ProfileSource
+
+    /** A mihomo (Clash.Meta) YAML document. */
+    data class Mihomo(val config: MihomoProfile = MihomoProfile()) : ProfileSource
 }
 
 @Serializable
@@ -133,6 +136,7 @@ data class VpnProfile(
     val isSingBoxConfig: Boolean get() = source is ProfileSource.SingBoxConfig
 
     val isAether: Boolean get() = source is ProfileSource.Aether
+    val isMihomo: Boolean get() = source is ProfileSource.Mihomo
 
     fun aetherSettings(): ProfileSource.Aether? = source as? ProfileSource.Aether
 
@@ -203,6 +207,7 @@ data class VpnProfile(
         is ProfileSource.Link -> src.link
         is ProfileSource.RawJson -> src.json
         is ProfileSource.Aether -> null
+        is ProfileSource.Mihomo -> src.config.yaml
 
         is ProfileSource.Sealed -> null
 
@@ -253,6 +258,7 @@ data class VpnProfile(
 
         is ProfileSource.Psiphon -> throw IllegalStateException("Psiphon profiles do not build Xray config")
         is ProfileSource.Aether -> throw IllegalStateException("Aether profiles do not build Xray config")
+        is ProfileSource.Mihomo -> throw IllegalStateException("Mihomo profiles do not build Xray config")
         is ProfileSource.DnsTunnel -> throw IllegalStateException("DNS-tunnel profiles do not build Xray config")
         is ProfileSource.MasterDns -> throw IllegalStateException("MasterDNS profiles do not build Xray config")
         is ProfileSource.OpenConnect -> throw IllegalStateException("OpenConnect profiles do not build Xray config")
@@ -483,6 +489,21 @@ data class VpnProfile(
                 else -> "Aether · ${config.protocol}"
             },
             source = ProfileSource.Aether(mode = "tunnel", config = config),
+            addedAt = addedAt,
+        )
+
+        fun fromMihomoConfig(
+            id: String,
+            addedAt: Long,
+            config: MihomoProfile,
+        ): VpnProfile = VpnProfile(
+            id = id,
+            name = config.remarks.ifBlank { "Mihomo" },
+            protocol = "MIHOMO",
+            address = "mihomo",
+            port = 0,
+            transportLabel = "Mihomo · Clash",
+            source = ProfileSource.Mihomo(config),
             addedAt = addedAt,
         )
 

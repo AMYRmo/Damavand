@@ -41,6 +41,7 @@ jobs:
         run: |
           bash tools/get-cores.sh android
           bash tools/get-aether.sh
+          bash tools/get-mihomo.sh
           bash tools/strip-cores.sh
 
       - name: Verify the cores
@@ -48,7 +49,7 @@ jobs:
           set -e
           ls -l app/libs/zedcore.aar
           for abi in arm64-v8a armeabi-v7a x86_64; do
-            for lib in libtor libobfs4proxy libsnowflake libconjure libsnispoof libhev-socks5-tunnel libzeptun-jni; do
+            for lib in libtor libobfs4proxy libsnowflake libconjure libsnispoof libhev-socks5-tunnel libzeptun-jni libaether libpsiphon-tunnel-core liblyrebird libmihomo; do
               [ -f "app/src/main/jniLibs/$abi/$lib.so" ] || { echo "::error::$abi/$lib.so is missing"; exit 1; }
             done
             # Only JNI-loading cores need exports; the Go bridge libs (tor stack,

@@ -752,6 +752,7 @@ class ConfigRepository(private val store: KeyValueStore) {
         val name = payload.name
         return when (val src = payload.source) {
             is ProfileSource.Aether -> { addAether(name, src.mode, src.accessKey); 1 }
+            is ProfileSource.Mihomo -> { addMihomoProfile(src.config.copy(remarks = name)); 1 }
             is ProfileSource.Psiphon -> { addPsiphon(src.settings, name); 1 }
             is ProfileSource.DnsTunnel -> { addDnsTunnel(src.settings, name); 1 }
             is ProfileSource.Tor -> { addTor(name); 1 }
@@ -925,7 +926,24 @@ class ConfigRepository(private val store: KeyValueStore) {
         persistProfiles()
         if (_activeId.value == null) setActive(profile.id)
         return profile
-    }
+    
+
+    fun addMihomoProfile(config: com.amyrmo.damavand.domain.config.MihomoProfile, id: String? = null): VpnProfile {
+        val existing = id?.let { profile(it) }
+        val profile = VpnProfile.fromMihomoConfig(
+            id = existing?.id ?: newId(),
+            addedAt = existing?.addedAt ?: currentTimeMillis(),
+            config = config.copy(remarks = config.remarks.ifBlank { existing?.name ?: "" }),
+        ).let { carryOver(existing, it) }
+        _profiles.value = if (existing != null) {
+            _profiles.value.map { if (it.id == profile.id) profile else it }
+        } else {
+            listOf(profile) + _profiles.value
+        }
+        persistProfiles()
+        if (_activeId.value == null) setActive(profile.id)
+        return profile
+    }}
 
     fun update(profile: VpnProfile) {
         _profiles.update { list -> list.map { if (it.id == profile.id) profile else it } }

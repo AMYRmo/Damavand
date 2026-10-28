@@ -189,6 +189,7 @@ data class DeepLinkPreview(
 
         private fun sourceLabel(source: ProfileSource): String = when (source) {
             is ProfileSource.Aether -> "Aether"
+            is ProfileSource.Mihomo -> "Mihomo"
             is ProfileSource.Psiphon -> "Psiphon"
             is ProfileSource.DnsTunnel -> if (source.settings.isVaydns) "VayDNS" else "DNSTT"
             is ProfileSource.Tor -> "Tor"
