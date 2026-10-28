@@ -99,7 +99,6 @@ fun SettingsScreen(
 
     onDeepLinkBack: (() -> Unit)? = null,
 
-    onReplayTour: (() -> Unit)? = null,
 
     mtuHint: com.amyrmo.damavand.data.net.MtuServerHint? = null,
 
@@ -179,7 +178,6 @@ fun SettingsScreen(
                 modifier = modifier,
                 onOpen = { page = it },
                 onAbout = { showAbout = true },
-                onReplayTour = onReplayTour,
                 hasAi = ai != null,
             )
             SettingsPage.Ui -> UiPage(settings, contentPadding, modifier, onUpdate, onLanguage)
@@ -286,7 +284,6 @@ private fun RootPage(
     modifier: Modifier,
     onOpen: (SettingsPage) -> Unit,
     onAbout: () -> Unit,
-    onReplayTour: (() -> Unit)?,
 
     hasAi: Boolean,
 ) {
@@ -333,13 +330,6 @@ private fun RootPage(
                     stringResource(Res.string.ai_subtitle),
                     art = SettingsArts.Ai,
                 ) { onOpen(SettingsPage.Ai) }
-            }
-            if (onReplayTour != null) {
-                SettingsMenuRow(
-                    stringResource(Res.string.tour_replay_title),
-                    stringResource(Res.string.tour_replay_subtitle),
-                    art = SettingsArts.Tour,
-                ) { onReplayTour() }
             }
         }
 

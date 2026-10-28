@@ -91,6 +91,7 @@
                 <data android:scheme="socks" />
                 <data android:scheme="socks5" />
                 <data android:scheme="snispoof" />
+                <data android:scheme="aether" />
             </intent-filter>
         </activity>
 

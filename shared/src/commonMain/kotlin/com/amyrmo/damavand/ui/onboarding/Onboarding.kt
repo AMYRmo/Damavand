@@ -343,11 +343,11 @@ private fun TourOfferStep() {
         modifier = Modifier.fillMaxWidth(),
     ) {
         Column(Modifier.padding(20.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-            Text(
-                "Z",
-                style = MaterialTheme.typography.displayLargeEmphasized,
-                fontWeight = FontWeight.Bold,
-                color = MaterialTheme.colorScheme.primary,
+            androidx.compose.foundation.Image(
+                org.jetbrains.compose.resources.painterResource(Res.drawable.ic_zed_glyph),
+                contentDescription = null,
+                modifier = Modifier.padding(top = 8.dp).height(72.dp),
+                colorFilter = androidx.compose.ui.graphics.ColorFilter.tint(MaterialTheme.colorScheme.primary),
             )
             Spacer(Modifier.height(8.dp))
             Text(

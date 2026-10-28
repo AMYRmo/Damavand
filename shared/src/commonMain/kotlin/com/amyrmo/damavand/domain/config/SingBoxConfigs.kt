@@ -153,6 +153,7 @@ object SingBoxConfigs {
             if (ipv6) add(JsonPrimitive("fdfe:dcba:9876::1/126"))
         }
         put("auto_route", true)
+        put("udp_timeout", "1m")
 
         put("stack", device.stack.ifBlank { "mixed" })
         if (device.mtu > 0) put("mtu", device.mtu)

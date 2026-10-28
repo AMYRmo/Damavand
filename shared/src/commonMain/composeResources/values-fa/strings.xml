@@ -655,6 +655,14 @@
     <string name="aether_psiphon_region">منطقهٔ سایفون</string>
     <string name="aether_tor_only">فقط Tor</string>
     <string name="aether_ip">نسخهٔ IP</string>
+    <string name="aether_remarks">نام کانفیگ</string>
+    <string name="aether_psiphon_mode">حالت سایفون</string>
+    <string name="aether_cdn_sets">مجموعه‌های CDN</string>
+    <string name="aether_scan_endpoint">جست‌وجوی endpoint</string>
+    <string name="aether_other">تنظیمات دیگر</string>
+    <string name="aether_masque_transport">ترابرد MASQUE</string>
+    <string name="aether_share_link">اشتراک به‌صورت لینک aether://</string>
+    <string name="aether_link_copied">لینک اتر کپی شد</string>
     <string name="aether_extra">فلگ‌های اضافه (پیشرفته)</string>
     <string name="aether_on">روشن</string>
     <string name="aether_off">خاموش</string>
@@ -673,7 +681,7 @@
     <string name="dmv_expiry_3d">۳ روز</string>
     <string name="dmv_expiry_7d">۷ روز</string>
     <string name="dmv_expiry_never">هرگز</string>
-    <string name="dmv_size_cap">سقف حجم (کیلوبایت)</string>
+    <string name="dmv_size_cap">سقف حجم</string>
     <string name="dmv_size_hint">ایمپورت از کانفیگ بزرگ‌تر از این حد صرف‌نظر می‌کند</string>
     <string name="dmv_share_create">ساخت .dmv</string>
     <string name="dmv_import_title">ورود کانفیگ .dmv</string>

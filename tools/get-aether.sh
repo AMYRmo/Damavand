@@ -46,5 +46,12 @@ for abi in arm64-v8a armeabi-v7a x86_64; do
   untar_py "$tarball" "pt/psiphon-tunnel-core" "$jni/$abi/libpsiphon-tunnel-core.so"
   untar_py "$tarball" "pt/lyrebird" "$jni/$abi/liblyrebird.so"
   chmod +x "$jni/$abi/libaether.so" "$jni/$abi/libpsiphon-tunnel-core.so" "$jni/$abi/liblyrebird.so"
+  # size: strip debug info from the core binaries (llvm-strip from the NDK when present)
+  STRIP="$(ls -1 "$ANDROID_HOME/ndk"/*/toolchains/llvm/prebuilt/linux-x86_64/bin/llvm-strip 2>/dev/null | head -1 || true)"
+  if [ -n "$STRIP" ]; then
+    for f in "$jni/$abi/libaether.so" "$jni/$abi/libpsiphon-tunnel-core.so" "$jni/$abi/liblyrebird.so"; do
+      "$STRIP" --strip-debug "$f" || true
+    done
+  fi
 done
 echo "aether core staged for 3 ABIs"

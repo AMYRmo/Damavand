@@ -899,6 +899,11 @@ fun ServersScreen(
                                 ?.let { profile.name to it }
                         },
                         onShareDmv = { dmvTarget = profile },
+                        onShareAetherLink = {
+                            profile.aetherSettings()?.config?.let { cfg ->
+                                platform.shareText(cfg.toShareLink())
+                            }
+                        },
                         onRename = { renameTarget = profile },
                         onEdit = { editTarget = profile },
                         onMoveGroup = { moveTarget = profile },
@@ -1859,6 +1864,7 @@ private fun ServerCard(
     onShare: () -> Unit,
     onShareQr: () -> Unit,
     onShareDmv: () -> Unit = {},
+    onShareAetherLink: () -> Unit = {},
 
     shareLink: String?,
     onRename: () -> Unit,
@@ -2003,6 +2009,13 @@ private fun ServerCard(
                         enabled = shareLink != null,
                         onClick = { menuOpen = false; onShareDmv() },
                     )
+                    if (profile.isAether) {
+                        DropdownMenuItem(
+                            text = { Text(stringResource(Res.string.aether_share_link)) },
+                            leadingIcon = { Icon(painterResource(Res.drawable.ic_ios_share), null) },
+                            onClick = { menuOpen = false; onShareAetherLink() },
+                        )
+                    }
                     DropdownMenuItem(
                         text = { Text(stringResource(Res.string.action_edit)) },
                         leadingIcon = { Icon(painterResource(Res.drawable.ic_edit), null) },

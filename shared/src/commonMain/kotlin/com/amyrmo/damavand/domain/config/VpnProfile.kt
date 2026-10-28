@@ -78,20 +78,8 @@ sealed interface ProfileSource {
     data class Aether(
         val mode: String = "tunnel",
         val accessKey: String = "",
-        // adjustable config (PattNG-style screen); blank = defaults
-        val protocol: String = "wg",
-        val scanMode: String = "balanced",
-        val obfuscation: String = "automatic",
-        val exitNode: String = "freedom",
-        val exitMaskJson: String = "",
-        val exitDialMode: String = "",
-        val psiphon: String = "off",
-        val psiphonRegion: String = "",
-        val tor: String = "off",
-        val address: String = "",
-        val port: String = "",
-        val ipVersion: String = "v4",
-        val extraArgs: String = "",
+        // adjustable config (PattNG-style screen)
+        val config: AetherProfile = AetherProfile(),
     ) : ProfileSource
 }
 
@@ -488,29 +476,13 @@ data class VpnProfile(
             address = "aether",
             port = 0,
             transportLabel = when {
-                config.tor == "bridges-only" -> "Aether · Tor"
-                config.psiphon == "only" -> "Aether · Psiphon"
-                config.psiphon !in setOf("off", "") -> "Aether · Psiphon"
-                config.tor == "on" -> "Aether · Tor"
-                else -> "Aether"
+                config.tor == "only" -> "Aether · Tor only"
+                config.tor != "off" -> "Aether · Tor"
+                config.psiphon == "only" -> "Aether · Psiphon only"
+                config.psiphon != "off" -> "Aether · Psiphon"
+                else -> "Aether · ${config.protocol}"
             },
-            source = ProfileSource.Aether(
-                mode = "tunnel",
-                accessKey = "",
-                protocol = config.protocol,
-                scanMode = config.scanMode,
-                obfuscation = config.obfuscation,
-                exitNode = config.exitNode,
-                exitMaskJson = config.exitMaskJson,
-                exitDialMode = config.exitDialMode,
-                psiphon = config.psiphon,
-                psiphonRegion = config.psiphonRegion,
-                tor = config.tor,
-                address = config.address,
-                port = config.port,
-                ipVersion = config.ipVersion,
-                extraArgs = config.extraArgs,
-            ),
+            source = ProfileSource.Aether(mode = "tunnel", config = config),
             addedAt = addedAt,
         )
 

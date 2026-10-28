@@ -15,6 +15,7 @@ import com.amyrmo.damavand.crypto.ZsxSealRequest
 import com.amyrmo.damavand.domain.config.AmneziaLink
 import com.amyrmo.damavand.domain.config.AutoMember
 import com.amyrmo.damavand.domain.config.AutoSelectBuild
+import com.amyrmo.damavand.domain.config.AetherProfile
 import com.amyrmo.damavand.domain.config.AutoSelectIds
 import com.amyrmo.damavand.domain.config.AutoSelectTuning
 import com.amyrmo.damavand.domain.config.RuleGroup
@@ -101,6 +102,14 @@ class ConfigRepository(private val store: KeyValueStore) {
         }
 
         if (ZedLink.isZedLink(trimmed)) return@runCatching importZedLink(trimmed)
+
+        if (trimmed.startsWith("aether://")) {
+            val link = trimmed.lineSequence().firstOrNull { it.startsWith("aether://") } ?: trimmed
+            val cfg = AetherProfile.fromShareLink(link.trim())
+                ?: throw IllegalArgumentException("invalid aether:// link")
+            addAetherProfile(cfg)
+            return@runCatching 1
+        }
 
         if (SniSpoofLink.isSniSpoofLink(trimmed)) {
             val (nm, prof) = SniSpoofLink.parse(trimmed)
@@ -1435,7 +1444,7 @@ class ConfigRepository(private val store: KeyValueStore) {
             protocol = "LOCKED",
             address = "•••",
             port = 0,
-            transportLabel = "Locked · .zsx",
+            transportLabel = "Locked · .dmv",
             source = ProfileSource.Sealed(Base64.encode(resealed)),
             addedAt = currentTimeMillis(),
             isLocked = true,

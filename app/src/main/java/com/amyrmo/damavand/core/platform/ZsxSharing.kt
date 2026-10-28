@@ -14,7 +14,7 @@ object ZsxSharing {
     fun shareText(context: Context, fileName: String, text: String) {
         runCatching {
             val dir = File(context.cacheDir, "shared").apply { mkdirs() }
-            val file = File(dir, com.amyrmo.damavand.crypto.zsxFileName(fileName)).apply { writeText(text) }
+            val file = File(dir, com.amyrmo.damavand.crypto.dmvFileName(fileName)).apply { writeText(text) }
             val uri = FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", file)
             val intent = Intent(Intent.ACTION_SEND).apply {
                 type = "text/plain"
@@ -50,7 +50,7 @@ object ZsxSharing {
         val dir = File(context.cacheDir, "shared").apply { mkdirs() }
         val uris = ArrayList<Uri>()
         files.forEach { (name, bytes) ->
-            val file = File(dir, com.amyrmo.damavand.crypto.zsxFileName(name)).apply { writeBytes(bytes) }
+            val file = File(dir, com.amyrmo.damavand.crypto.dmvFileName(name)).apply { writeBytes(bytes) }
             uris += FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", file)
         }
         val intent = if (uris.size == 1) {

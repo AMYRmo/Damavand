@@ -663,6 +663,14 @@
     <string name="aether_psiphon_region">Psiphon region</string>
     <string name="aether_tor_only">Tor only</string>
     <string name="aether_ip">IP version</string>
+    <string name="aether_remarks">remarks</string>
+    <string name="aether_psiphon_mode">Psiphon mode</string>
+    <string name="aether_cdn_sets">CDN sets</string>
+    <string name="aether_scan_endpoint">Scan for an endpoint</string>
+    <string name="aether_other">Other settings</string>
+    <string name="aether_masque_transport">MASQUE transport</string>
+    <string name="aether_share_link">Share as aether:// link</string>
+    <string name="aether_link_copied">Aether link copied</string>
     <string name="aether_extra">Extra flags (advanced)</string>
     <string name="aether_on">On</string>
     <string name="aether_off">Off</string>
@@ -681,7 +689,7 @@
     <string name="dmv_expiry_3d">3 days</string>
     <string name="dmv_expiry_7d">7 days</string>
     <string name="dmv_expiry_never">Never</string>
-    <string name="dmv_size_cap">Max payload size (KiB)</string>
+    <string name="dmv_size_cap">Max payload size</string>
     <string name="dmv_size_hint">Import refuses payloads above this size</string>
     <string name="dmv_share_create">Create .dmv</string>
     <string name="dmv_import_title">Import .dmv config</string>

@@ -41,6 +41,7 @@ jobs:
         run: |
           bash tools/get-cores.sh android
           bash tools/get-aether.sh
+          bash tools/strip-cores.sh
 
       - name: Verify the cores
         run: |

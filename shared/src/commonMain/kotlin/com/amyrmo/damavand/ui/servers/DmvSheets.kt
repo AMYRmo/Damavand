@@ -7,6 +7,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.imePadding
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -44,7 +45,8 @@ fun DmvShareSheet(
     var password by remember { mutableStateOf("") }
     var password2 by remember { mutableStateOf("") }
     var expiry by remember { mutableStateOf("24") }   // hours; blank = never
-    var sizeCap by remember { mutableStateOf("64") }  // KiB; blank = unlimited
+    var sizeCap by remember { mutableStateOf("1") }   // MiB; blank = unlimited
+    var sizeUnit by remember { mutableStateOf("MiB") }
 
     val expiryMismatch = password2 != password
 
@@ -95,21 +97,35 @@ fun DmvShareSheet(
                 selected = expiry,
                 onSelect = { expiry = it },
             )
-            OutlinedTextField(
-                value = sizeCap,
-                onValueChange = { sizeCap = it.filter(Char::isDigit) },
-                label = { Text(stringResource(Res.string.dmv_size_cap)) },
-                supportingText = { Text(stringResource(Res.string.dmv_size_hint)) },
-                singleLine = true,
-                modifier = Modifier.fillMaxWidth(),
-            )
+            Row(verticalAlignment = androidx.compose.ui.Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                OutlinedTextField(
+                    value = sizeCap,
+                    onValueChange = { sizeCap = it.filter(Char::isDigit) },
+                    label = { Text(stringResource(Res.string.dmv_size_cap)) },
+                    supportingText = { Text(stringResource(Res.string.dmv_size_hint)) },
+                    singleLine = true,
+                    modifier = Modifier.weight(1f),
+                )
+                PickerField(
+                    label = " ",
+                    options = listOf("MiB" to "MB", "GiB" to "GB"),
+                    selected = sizeUnit,
+                    onSelect = { sizeUnit = it },
+                    modifier = Modifier.weight(1f),
+                )
+            }
 
             Button(
                 onClick = {
+                    val raw = sizeCap.toLongOrNull()?.takeIf { it > 0 } ?: 0L
+                    val bytes = when (sizeUnit) {
+                        "GiB" -> raw * 1024L * 1024L * 1024L
+                        else -> raw * 1024L * 1024L
+                    }
                     onShare(
                         password,
                         expiry.toIntOrNull()?.takeIf { it > 0 },
-                        sizeCap.toIntOrNull()?.takeIf { it > 0 },
+                        bytes.takeIf { it > 0L }?.let { kb -> (kb / 1024L).toInt().coerceAtLeast(1) },
                     )
                 },
                 enabled = !expiryMismatch,

@@ -267,11 +267,6 @@ fun MainScaffold(
                     },
                     dnsTunnelActive = activeProfile?.isDnsBasedTunnel == true,
 
-                    onReplayTour = {
-                        current = TopDestination.Home
-                        tourStep = 0
-                    },
-
                     mtuHint = mtuHint,
                     ai = aiBridge?.let { bridge ->
                         com.amyrmo.damavand.ui.settings.AiSection(

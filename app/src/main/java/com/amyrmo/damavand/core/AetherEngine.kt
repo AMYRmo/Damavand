@@ -37,6 +37,8 @@ class AetherEngine(
 
             val stateDir = File(context.filesDir, "aether").apply { mkdirs() }
             val cmd = mutableListOf(bin.absolutePath, "--bind", "127.0.0.1:$socksPort", "--log-level", "warn")
+            // battery: fewer reconnect scans (the official app default)
+            cmd += "--quick-reconnect"
             cmd += config.toFlags()
             if (psi.exists()) cmd += listOf("--psiphon-bin", psi.absolutePath)
 

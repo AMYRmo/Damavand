@@ -116,20 +116,4 @@ fun AppSettings.singBoxDeviceOptions(): SingBoxConfigs.DeviceOptions = SingBoxCo
 )
 
 /** Map a stored Aether profile source onto the engine's adjustable config. */
-fun com.amyrmo.damavand.domain.config.ProfileSource.Aether.toAetherProfile(): com.amyrmo.damavand.domain.config.AetherProfile =
-    com.amyrmo.damavand.domain.config.AetherProfile(
-        remarks = "",
-        protocol = protocol,
-        scanMode = scanMode,
-        obfuscation = obfuscation,
-        exitNode = exitNode,
-        exitMaskJson = exitMaskJson,
-        exitDialMode = exitDialMode,
-        psiphon = psiphon,
-        psiphonRegion = psiphonRegion,
-        tor = tor,
-        address = address,
-        port = port,
-        ipVersion = ipVersion,
-        extraArgs = extraArgs,
-    )
+fun com.amyrmo.damavand.domain.config.ProfileSource.Aether.toAetherProfile(): com.amyrmo.damavand.domain.config.AetherProfile = config
