@@ -1,3 +1,5 @@
+@file:OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
+
 package com.amyrmo.damavand.ui.servers
 
 import androidx.compose.foundation.layout.Arrangement
