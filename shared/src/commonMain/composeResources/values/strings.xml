@@ -594,6 +594,7 @@
     <string name="dns_tunnel_resolver_mode">Resolver mode</string>
     <string name="dns_tunnel_record_type">Record type</string>
     <string name="dns_tunnel_authoritative">Authoritative server</string>
+    <string name="dns_tunnel_noiz_stealth">NoizDNS stealth handshake</string>
     <string name="dns_tunnel_socks_user">SOCKS username (optional)</string>
     <string name="dns_tunnel_socks_pass">SOCKS password (optional)</string>
     <string name="dns_tunnel_transport">DNS transport</string>

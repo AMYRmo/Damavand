@@ -27,6 +27,12 @@ data class DnsTunnelProfile(
 
     val autoTune: Boolean = false,
 
+    /** NoizDNS device-spoof mode (noiz wire only). */
+    val noizMode: Boolean = true,
+
+    /** NoizDNS stealth handshake (noiz wire only). */
+    val noizStealth: Boolean = false,
+
     val dnsPayloadSize: Int = 100,
 
     val recordType: String = "txt",
@@ -57,6 +63,7 @@ data class DnsTunnelProfile(
     val forwardDnsThroughSsh: Boolean = false,
 ) {
     val isVaydns: Boolean get() = engine == ENGINE_VAYDNS
+    val isNoiz: Boolean get() = engine == ENGINE_NOIZ
 
     fun dnsAddress(): String {
         val list = resolvers.split(',', '\n').map { it.trim() }.filter { it.isNotEmpty() }
@@ -86,6 +93,7 @@ data class DnsTunnelProfile(
     companion object {
         const val ENGINE_DNSTT = "dnstt"
         const val ENGINE_VAYDNS = "vaydns"
+        const val ENGINE_NOIZ = "noiz"
 
         const val AUTH_PASSWORD = "password"
         const val AUTH_KEY = "key"

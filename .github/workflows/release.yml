@@ -38,6 +38,8 @@ jobs:
       - uses: gradle/actions/setup-gradle@v5
 
       - name: Fetch the cores
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           bash tools/get-cores.sh android
           bash tools/get-aether.sh

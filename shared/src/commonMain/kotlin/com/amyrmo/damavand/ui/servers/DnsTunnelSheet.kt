@@ -65,6 +65,7 @@ fun DnsTunnelSheet(
     var resolverMode by remember { mutableStateOf(initial?.resolverMode ?: DnsTunnelProfile.MODE_FANOUT) }
     var spread by remember { mutableStateOf(initial?.rrSpreadCount ?: 3) }
     var authoritative by remember { mutableStateOf(initial?.authoritative ?: false) }
+    var noizStealth by remember { mutableStateOf(initial?.noizStealth ?: false) }
     var autoTune by remember { mutableStateOf(initial?.autoTune ?: false) }
     var payloadSize by remember { mutableStateOf(initial?.dnsPayloadSize ?: 0) }
     var recordType by remember { mutableStateOf(initial?.recordType ?: "txt") }
@@ -117,6 +118,7 @@ fun DnsTunnelSheet(
                 options = listOf(
                     DnsTunnelProfile.ENGINE_DNSTT to "DNSTT",
                     DnsTunnelProfile.ENGINE_VAYDNS to "VayDNS",
+                    DnsTunnelProfile.ENGINE_NOIZ to "NoizDNS",
                 ),
                 selected = engine,
                 onSelect = { engine = it },
@@ -171,9 +173,13 @@ fun DnsTunnelSheet(
                 }
             }
 
-            if (!isVaydns) {
+            if (!isVaydns && engine != DnsTunnelProfile.ENGINE_NOIZ) {
                 SwitchRow(Res.string.dns_tunnel_authoritative, authoritative) { authoritative = it }
                 if (authoritative) Warn(Res.string.dns_tunnel_authoritative_warn)
+            }
+
+            if (engine == DnsTunnelProfile.ENGINE_NOIZ) {
+                SwitchRow(Res.string.dns_tunnel_noiz_stealth, noizStealth) { noizStealth = it }
             }
 
             if (isVaydns) {
@@ -293,6 +299,8 @@ fun DnsTunnelSheet(
                             rrSpreadCount = spread,
                             authoritative = authoritative,
                             autoTune = autoTune,
+                            noizMode = engine == DnsTunnelProfile.ENGINE_NOIZ,
+                            noizStealth = noizStealth,
                             dnsPayloadSize = payloadSize,
                             recordType = recordType,
                             maxQnameLen = qnameLen,

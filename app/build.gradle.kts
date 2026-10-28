@@ -158,6 +158,8 @@ dependencies {
     implementation(libs.bouncycastle)
 
     implementation(files("libs/zedcore.aar"))
+    implementation(files("libs/vendor/dnstt.aar"))
+    implementation(files("libs/vendor/vaydns.aar"))
 
     debugImplementation(libs.androidx.compose.ui.tooling)
     debugImplementation(libs.androidx.compose.ui.test.manifest)

@@ -51,6 +51,7 @@ class DamavandVpnService : VpnService() {
         com.amyrmo.damavand.domain.model.NotifChip.Speed
     private var psiphon: PsiphonController? = null
     private var dnsTunnel: DnsTunnelController? = null
+    private var noizTunnel: NoizDnsController? = null
     private var masterDns: MasterDnsController? = null
     private var tor: com.amyrmo.damavand.core.tor.TorController? = null
     private var ssh: SshController? = null
@@ -474,17 +475,34 @@ class DamavandVpnService : VpnService() {
             appSettings.dnsPoolText.split('\n', ',').map { it.trim() }
                 .filter { it.isNotEmpty() && !it.startsWith("#") }
         } else emptyList()
-        val controller = DnsTunnelController(
-            dnsProfile,
-            listenPort = LocalPorts.DNS_TUNNEL,
-            maxListenPort = LocalPorts.DNS_TUNNEL_MAX,
-            pool = pool,
-            poolFullVerification = appSettings.dnsPoolFullVerification,
-        )
-        dnsTunnel = controller
-        val port = controller.start()
+        val controller = if (dnsProfile.isNoiz) {
+            null
+        } else {
+            DnsTunnelController(
+                dnsProfile,
+                listenPort = LocalPorts.DNS_TUNNEL,
+                maxListenPort = LocalPorts.DNS_TUNNEL_MAX,
+                pool = pool,
+                poolFullVerification = appSettings.dnsPoolFullVerification,
+            )
+        }
+        val noiz = if (dnsProfile.isNoiz) {
+            NoizDnsController(
+                dnsProfile,
+                listenPort = LocalPorts.DNS_TUNNEL,
+                maxListenPort = LocalPorts.DNS_TUNNEL_MAX,
+            )
+        } else null
+        val started = if (noiz != null) {
+            noizTunnel = noiz
+            noiz.start()
+        } else {
+            dnsTunnel = controller
+            controller!!.start()
+        }
+        val port = started
         if (port < 0) {
-            VpnManager.onError(engineFailed(R.string.engine_failed_dnstunnel, controller.lastError))
+            VpnManager.onError(engineFailed(R.string.engine_failed_dnstunnel, noiz?.lastError ?: controller?.lastError))
             stopEverything(); return
         }
 
@@ -1158,7 +1176,7 @@ class DamavandVpnService : VpnService() {
                 delay(waited)
                 val running = when (kind) {
                     VpnManager.KIND_PSIPHON -> psiphon?.isRunning == true
-                    VpnManager.KIND_DNS_TUNNEL -> dnsTunnel?.isRunning == true
+                    VpnManager.KIND_DNS_TUNNEL -> dnsTunnel?.isRunning == true || noizTunnel?.isRunning == true
                     VpnManager.KIND_MASTERDNS -> masterDns?.isRunning == true
                     VpnManager.KIND_TOR -> tor?.isRunning == true
                     VpnManager.KIND_SSH -> ssh?.isRunning == true
@@ -1377,6 +1395,7 @@ class DamavandVpnService : VpnService() {
         stopAutoSelectSession()
         psiphon?.stop(); psiphon = null
         dnsTunnel?.stop(); dnsTunnel = null
+        noizTunnel?.stop(); noizTunnel = null
         masterDns?.stop(); masterDns = null
         tor?.stop(); tor = null
         ssh?.stop(); ssh = null

@@ -11,3 +11,4 @@ release.keystore
 *.jks
 *.p12
 refs/
+app/src/main/jniLibs/*/libmihomo.so

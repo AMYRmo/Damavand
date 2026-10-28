@@ -587,6 +587,7 @@
     <string name="dns_tunnel_resolver_mode">حالت رزالور</string>
     <string name="dns_tunnel_record_type">نوع رکورد</string>
     <string name="dns_tunnel_authoritative">سرور معتبر (authoritative)</string>
+    <string name="dns_tunnel_noiz_stealth">دست‌دادن مخفی NoizDNS</string>
     <string name="dns_tunnel_socks_user">نام کاربری SOCKS (اختیاری)</string>
     <string name="dns_tunnel_socks_pass">رمز SOCKS (اختیاری)</string>
     <string name="dns_tunnel_transport">ترنسپورت DNS</string>
