@@ -38,7 +38,6 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LifecycleEventEffect
 import com.amyrmo.damavand.ui.platform.AutomaticRendering
 import com.amyrmo.damavand.ui.platform.LocalPlatform
-import com.amyrmo.damavand.ui.theme.applyThemeProfile
 import com.amyrmo.damavand.domain.model.AppLanguage
 import com.amyrmo.damavand.data.update.Distribution
 import com.amyrmo.damavand.domain.model.AppSettings
@@ -896,23 +895,6 @@ private fun UiPage(
             )
         }
 
-        SettingsGroup {
-            SettingsSegment {
-                ThemeProfileRow(
-                    label = stringResource(Res.string.theme_profile_title),
-                    subtitle = stringResource(Res.string.theme_profile_sub),
-                    defaultLabel = stringResource(Res.string.theme_profile_none),
-                    selectedId = s.themeProfileId,
-                    onSelect = { profile ->
-                        onUpdate {
-                            if (profile == null) it.resetPersonalization()
-                            else it.applyThemeProfile(profile)
-                        }
-                    },
-                )
-            }
-        }
-
         SettingsGroup(title = stringResource(Res.string.settings_group_display)) {
             SettingsListRow(
                 title = stringResource(Res.string.settings_language),
@@ -965,16 +947,6 @@ private fun UiPage(
                             else -> Res.string.rendering_sub_auto_gpu
                         },
                     ),
-                )
-            }
-        }
-
-        SettingsGroup {
-            SettingsSegment {
-                TransitionPicker(
-                    selected = s.screenTransition,
-                    reduceMotion = s.reduceMotion,
-                    onSelect = { style -> onUpdate { it.copy(screenTransition = style) } },
                 )
             }
         }
