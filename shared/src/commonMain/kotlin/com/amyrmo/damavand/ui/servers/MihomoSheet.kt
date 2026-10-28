@@ -39,6 +39,9 @@ fun MihomoSheet(
 ) {
     var remarks by remember { mutableStateOf(initial?.remarks ?: "") }
     var yaml by remember { mutableStateOf(initial?.yaml ?: "") }
+    var subUrl by remember { mutableStateOf(initial?.subUrl ?: "") }
+    val urlValid = subUrl.trim().startsWith("http")
+    val canSave = MihomoProfile.looksLikeMihomo(yaml) || urlValid
 
     ModalBottomSheet(
         onDismissRequest = onDismiss,
@@ -58,6 +61,14 @@ fun MihomoSheet(
                 modifier = Modifier.fillMaxWidth(),
             )
             OutlinedTextField(
+                value = subUrl,
+                onValueChange = { subUrl = it },
+                label = { Text(stringResource(Res.string.mihomo_sub_hint)) },
+                placeholder = { Text("https://…/mihomo.yaml") },
+                singleLine = true,
+                modifier = Modifier.fillMaxWidth(),
+            )
+            OutlinedTextField(
                 value = yaml,
                 onValueChange = { yaml = it },
                 label = { Text(stringResource(Res.string.mihomo_yaml_hint)) },
@@ -71,10 +82,11 @@ fun MihomoSheet(
                         MihomoProfile(
                             remarks = remarks.trim(),
                             yaml = yaml.trim().trimStart('-'),
+                            subUrl = subUrl.trim(),
                         ),
                     )
                 },
-                enabled = MihomoProfile.looksLikeMihomo(yaml),
+                enabled = canSave,
                 shape = RoundedCornerShape(18.dp),
                 modifier = Modifier.fillMaxWidth().padding(vertical = 2.dp),
             ) { Text(stringResource(Res.string.action_save), fontWeight = FontWeight.SemiBold) }

@@ -724,6 +724,7 @@
     <string name="engine_aether_missing">Aether core is not available for this device</string>
     <string name="mihomo_add_title">Add Mihomo</string>
     <string name="mihomo_yaml_hint">Clash / mihomo YAML config</string>
+    <string name="mihomo_sub_hint">Subscription URL (optional)</string>
     <string name="engine_mihomo_missing">Mihomo core is not available for this device</string>
     <string name="ssh_add_title">Add SSH tunnel</string>
     <string name="ssh_host">SSH host</string>
@@ -1049,7 +1050,7 @@
 
     <string name="add_group_import">Import</string>
     <string name="add_free_badge">Free</string>
-    <string name="add_free_hint">Psiphon and Tor are free and need no server of your own. Everything else connects to your own server or subscription.</string>
+    <string name="add_free_hint">Psiphon, Tor, Aether and Mihomo are free and need no server of your own. Everything else connects to your own server or subscription.</string>
     <string name="add_group_tunnels">Tunnels</string>
     <string name="add_group_dns">DNS tunnels</string>
     <string name="add_group_vpn">VPN protocols</string>

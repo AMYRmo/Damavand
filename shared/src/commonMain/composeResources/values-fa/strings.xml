@@ -643,6 +643,7 @@
     <string name="aether_add_title">افزودن اتر</string>
     <string name="mihomo_add_title">افزودن می‌همو</string>
     <string name="mihomo_yaml_hint">کانفیگ YAML کلش / می‌همو</string>
+    <string name="mihomo_sub_hint">آدرس اشتراک (اختیاری)</string>
     <string name="engine_mihomo_missing">هستهٔ می‌همو برای این دستگاه موجود نیست</string>
     <string name="aether_edit_title">ویرایش اتر</string>
     <string name="aether_protocol">پروتکل</string>
@@ -1039,7 +1040,7 @@
 
     <string name="add_group_import">افزودن</string>
     <string name="add_free_badge">رایگان</string>
-    <string name="add_free_hint">سایفون و Tor رایگان هستند و سرور شخصی لازم ندارند. بقیهٔ روش‌ها به سرور یا اشتراک خودتان وصل می‌شوند.</string>
+    <string name="add_free_hint">سایفون، Tor، اتر و می‌همو رایگان هستند و سرور شخصی لازم ندارند. بقیهٔ روش‌ها به سرور یا اشتراک خودتان وصل می‌شوند.</string>
     <string name="add_group_tunnels">تونل‌ها</string>
     <string name="add_group_dns">تونل‌های DNS</string>
     <string name="add_group_vpn">پروتکل‌های VPN</string>

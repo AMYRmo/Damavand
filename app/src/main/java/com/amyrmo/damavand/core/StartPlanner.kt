@@ -151,6 +151,10 @@ class StartPlanner(context: Context) {
             }.toString()
         }
         if (profile.isTor) return "tor"
+        // The aether/mihomo engines read their settings from the active profile
+        // themselves (startAether/startMihomo); the config payload is unused.
+        if (profile.isAether) return "{}"
+        if (profile.isMihomo) return "{}"
         (profile.source as? com.amyrmo.damavand.domain.config.ProfileSource.SingBoxConfig)?.let { src ->
 
             val s = settingsRepository.settings.value

@@ -930,10 +930,15 @@ class ConfigRepository(private val store: KeyValueStore) {
 
     fun addMihomoProfile(config: com.amyrmo.damavand.domain.config.MihomoProfile, id: String? = null): VpnProfile {
         val existing = id?.let { profile(it) }
+        // Free mode: an empty profile gets the bundled public subscription so it
+        // connects out of the box — no server of your own needed.
+        val effective = if (config.yaml.isBlank() && config.subUrl.isBlank()) {
+            config.copy(subUrl = com.amyrmo.damavand.domain.config.MihomoProfile.DEFAULT_SUB)
+        } else config
         val profile = VpnProfile.fromMihomoConfig(
             id = existing?.id ?: newId(),
             addedAt = existing?.addedAt ?: currentTimeMillis(),
-            config = config.copy(remarks = config.remarks.ifBlank { existing?.name ?: "" }),
+            config = effective.copy(remarks = effective.remarks.ifBlank { existing?.name ?: "" }),
         ).let { carryOver(existing, it) }
         _profiles.value = if (existing != null) {
             _profiles.value.map { if (it.id == profile.id) profile else it }

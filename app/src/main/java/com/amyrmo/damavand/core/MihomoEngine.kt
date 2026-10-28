@@ -37,17 +37,7 @@ class MihomoEngine(
 
             val workDir = File(context.filesDir, "mihomo").apply { mkdirs() }
             val configFile = File(workDir, "config.yaml")
-            configFile.writeText(
-                config.yaml +
-                    "\n\nmixed-port: $mixedPort" +
-                    "\nallow-lan: false" +
-                    "\nbind-address: 127.0.0.1" +
-                    "\nmode: rule" +
-                    "\nlog-level: ${config.logLevel.ifBlank { "warning" }}" +
-                    "\nexternal-controller: \"\"" +
-                    "\nipv6: true" +
-                    "\n",
-            )
+            configFile.writeText(buildConfig())
 
             val cmd = listOf(bin.absolutePath, "-d", workDir.absolutePath, "-f", configFile.absolutePath)
             val proc = ProcessBuilder(cmd)
@@ -83,6 +73,65 @@ class MihomoEngine(
         runCatching { process?.destroy() }
         watcher = null
         process = null
+    }
+
+    /**
+     * The final YAML: the user's document verbatim, or — when a subscription
+     * URL is set with no YAML — a provider-based config that fetches the
+     * subscription's proxies with a health-checked auto group.
+     */
+    private fun buildConfig(): String {
+        val base = config.yaml.trim()
+        val doc = if (base.isNotEmpty()) {
+            base + "\n"
+        } else {
+            val url = config.subUrl.trim()
+            require(url.isNotEmpty()) { "mihomo profile has neither yaml nor subUrl" }
+            //providers:
+  proxy-providers:
+    sub:
+      url: <url>
+...
+            buildString {
+                appendLine("proxy-providers:")
+                appendLine("  sub:")
+                appendLine("    type: http")
+                appendLine("    url: \"$url\"")
+                appendLine("    interval: 3600")
+                appendLine("    path: ./providers/sub.yaml")
+                appendLine("    health-check:")
+                appendLine("      enable: true")
+                appendLine("      url: https://www.gstatic.com/generate_204")
+                appendLine("      interval: 300")
+            }
+        }
+        val groupName = if (base.isNotEmpty()) "PROXY" else "Auto"
+        val providerSection = if (base.isEmpty()) {
+            "\nproxy-groups:\n" +
+                "  - name: $groupName\n" +
+                "    type: url-test\n" +
+                "    use:\n" +
+                "      - sub\n" +
+                "    url: https://www.gstatic.com/generate_204\n" +
+                "    interval: 300\n"
+        } else ""
+        return doc +
+            providerSection +
+            "\nmixed-port: $mixedPort" +
+            "\nallow-lan: false" +
+            "\nbind-address: 127.0.0.1" +
+            "\nmode: rule" +
+            "\nlog-level: ${config.logLevel.ifBlank { "warning" }}" +
+            "\nexternal-controller: \"\"" +
+            "\nipv6: true" +
+            "\nunified-delay: true" +
+            "\ntcp-concurrent: true" +
+            "\n" +
+            "\nrules:" +
+            "\n  - GEOIP,IR,DIRECT" +
+            "\n  - GEOIP,private,DIRECT" +
+            "\n  - MATCH,$groupName" +
+            "\n"
     }
 
     companion object {

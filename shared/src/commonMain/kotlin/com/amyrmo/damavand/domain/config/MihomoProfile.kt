@@ -16,8 +16,14 @@ data class MihomoProfile(
     val mixedPort: Int = 0,
     /** Override log-level: silent/error/warning/info/debug */
     val logLevel: String = "warning",
+    /** Clash subscription URL; when set and [yaml] blank the engine builds a
+     *  provider-based config pulling proxies from this URL. */
+    val subUrl: String = "",
 ) {
     companion object {
+        /** Free public mihomo subscription used when adding Mihomo with nothing filled. */
+        const val DEFAULT_SUB = "https://raw.githubusercontent.com/iampedii/whitedns-sub/refs/heads/main/mihomo.yaml"
+
         /** True when the text looks like a Clash/mihomo YAML document. */
         fun looksLikeMihomo(text: String): Boolean {
             val t = text.trim()
