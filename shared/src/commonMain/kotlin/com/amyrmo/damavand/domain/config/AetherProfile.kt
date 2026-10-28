@@ -3,165 +3,253 @@ package com.amyrmo.damavand.domain.config
 import kotlinx.serialization.Serializable
 
 /**
- * One adjustable Aether profile — architecture mirrors PattNG's Aether screen.
- * Every field maps 1:1 onto a flag of the patterniha/Aether core binary.
- * Lives in shared so profiles, links and the app-side engine all speak it.
+ * One adjustable Aether profile — field-for-field PattNG's Aether profile
+ * (ProfileItem's aether* columns), so links, forms and the core agree.
  */
 @Serializable
 data class AetherProfile(
     val remarks: String = "",
-    /** masque | wg | gool | mim */
-    val protocol: String = "masque",
-    /** turbo | balanced | thorough | verified | ironclad */
-    val scanMode: String = "balanced",
-    /** off | light | firewall | balanced | gfw | aggressive */
-    val noize: String = "",
-    /** v4 | v6 | both */
-    val ipVersion: String = "v4",
-    /** off | chain | reverse | only */
-    val psiphon: String = "off",
-    /** auto | cdn | direct */
-    val psiphonMode: String = "auto",
-    /** comma list of built-in fronting sets (cloudflare, fastly, ...) */
-    val psiphonCdnSets: String = "",
-    /** psiphon exit country code, e.g. US */
-    val psiphonRegion: String = "",
-    /** off | chain | reverse | only */
-    val tor: String = "off",
-    /** custom endpoint ip:port (blank = scan) */
+    /** AetherProtocol.type */
+    val protocol: String = AetherProtocol.WIREGUARD.type,
+    /** AetherTransport.type (MASQUE only) */
+    val transport: String = AetherTransport.HTTP3.type,
+    /** AetherScanMode.type */
+    val scanMode: String = AetherScanMode.BALANCED.type,
+    /** AetherObfuscation.type */
+    val obfuscation: String = AetherObfuscation.AUTO.type,
+    /** AetherIpVersion.type */
+    val ipVersion: String = AetherIpVersion.V4.type,
+    /** custom DNS of the tunnel (blank = core default) */
+    val dns: String = "",
+    /** exit-node location (blank = core default) */
+    val exitLoc: String = "",
+    /** MASQUE ClientHello SNI (blank = default) */
+    val masqueSni: String = "",
+    /** fragment the MASQUE-over-HTTP/2 ClientHello */
+    val fragment: Boolean = false,
+    val fragmentSize: String = "",
+    val fragmentDelay: String = "",
+    /** Encrypted Client Hello on the MASQUE handshakes */
+    val ech: Boolean = false,
+    val echDns: String = "",
+    val echDomain: String = "",
+    /** AetherFingerprint.type (over-MASQUE only) */
+    val fingerprint: String = AetherFingerprint.CHROME.type,
+    /** outer/inner hop endpoints of the two-hop protocols (blank = scan) */
+    val wiwOuter: String = "",
+    val wiwInner: String = "",
+    /** single-endpoint protocols: host and port (blank = scan) */
     val address: String = "",
     val port: String = "",
-    /** MASQUE transport: blank(auto) | h2 | h3 */
-    val masqueTransport: String = "",
-    /** exit-node location spec, e.g. freedom / !IR,DE (blank = core default) */
-    val exitNode: String = "",
-    /** raw finalMask JSON for the exit node (optional, newer cores) */
-    val exitMaskJson: String = "",
-    /** dial mode for the exit node (optional) */
-    val exitDialMode: String = "",
+    /** AetherPsiphon.type */
+    val psiphon: String = AetherPsiphon.OFF.type,
+    /** AetherPsiphonMode.type */
+    val psiphonMode: String = AetherPsiphonMode.AUTO.type,
+    val psiphonCdnIps: String = "",
+    val psiphonCdnSni: String = "",
+    val psiphonCdnSets: String = "",
+    val psiphonRegion: String = "",
+    /** false = Psiphon fetches a fresh server list before dialing */
+    val psiphonBundledList: Boolean = true,
+    /** AetherTor.type */
+    val tor: String = AetherTor.OFF.type,
+    /** AetherTorBridges.type */
+    val torBridges: String = AetherTorBridges.AUTO.type,
+    /** AetherTorRelays.type */
+    val torRelays: String = AetherTorRelays.AUTO.type,
+    /** one bridge line per line */
+    val torBridgeLines: String = "",
+    /** the exit-node's finalMask JSON and dialMode (newer cores) */
+    val finalMask: String = "",
+    val dialMode: String = "",
     /** extra raw flags appended verbatim (advanced) */
     val extraArgs: String = "",
 ) {
-    /** Flatten into core command-line flags (excluding --bind/--log-level/--psiphon-bin). */
+    /** Whether the core should scan instead of dialing a named endpoint. */
+    val scanning: Boolean
+        get() = AetherProtocol.fromString(protocol).twoHops
+            ? wiwOuter.isBlank() || wiwInner.isBlank()
+            : address.isBlank()
+
+    /**
+     * The core's arguments, following PattNG's AetherCoreManager.buildArguments
+     * flag-for-flag (minus the multi-port loopback plumbing, which Damavand's
+     * single --bind bridge replaces).
+     */
     fun toFlags(): List<String> {
-        val flags = mutableListOf<String>()
-        flags += when (protocol) {
-            "wg" -> "--wg"
-            "gool" -> "--gool"
-            "mim" -> "--mim"
-            else -> "--masque"
+        val proto = AetherProtocol.fromString(protocol)
+        val transportEnum = AetherTransport.fromString(transport)
+        val torEnum = AetherTor.fromString(tor)
+        val psiphonEnum = AetherPsiphon.fromString(psiphon)
+        return buildList {
+            if (psiphonEnum != AetherPsiphon.ONLY && torEnum != AetherTor.ONLY) {
+                addAll(listOf("--protocol", proto.core))
+                if (proto == AetherProtocol.GOOL) add("--gool-classic")
+                addAll(listOf("--scan", AetherScanMode.fromString(scanMode).type))
+                val overHttp2 = masqueOverHttp2(proto, transportEnum, torEnum, psiphonEnum)
+                AetherObfuscation.fromString(obfuscation)
+                    .takeUnless { it == AetherObfuscation.AUTO || overHttp2 }
+                    ?.let { addAll(listOf("--noize", it.type)) }
+                addAll(listOf("--ip", AetherIpVersion.fromString(ipVersion).type))
+                dns.trim().takeIf { it.isNotEmpty() }?.let { addAll(listOf("--dns", it)) }
+                exitLoc.trim().takeIf { it.isNotEmpty() }?.let { addAll(listOf("--exit-loc", it)) }
+
+                if (proto.overMasque) {
+                    addAll(listOf("--masque-sni", masqueSni.trim().ifEmpty { AETHER_MASQUE_SNI }))
+                }
+                if (proto.overMasque && transportEnum == AetherTransport.HTTP2) {
+                    add("--h2")
+                    if (fragment) {
+                        add("--fragment")
+                        AetherRange.parse(fragmentSize, AetherRange.FRAGMENT_SIZE)
+                            ?.let { addAll(listOf("--fragment-size", it.toString())) }
+                        AetherRange.parse(fragmentDelay, AetherRange.FRAGMENT_DELAY)
+                            ?.let { addAll(listOf("--fragment-delay", it.toString())) }
+                    }
+                }
+                if (proto.overMasque && ech) {
+                    addAll(listOf("--ech", "auto"))
+                    addAll(listOf("--ech-dns", echDns.trim().ifEmpty { AETHER_ECH_DNS }))
+                    addAll(listOf("--ech-domain", echDomain.trim().ifEmpty { AETHER_ECH_DOMAIN }))
+                }
+                if (proto.overMasque) addAll(AetherFingerprint.fromString(fingerprint).arguments)
+
+                if (proto == AetherProtocol.WG_OVER_MASQUE) {
+                    AetherEndpoint.parse(wiwOuter).takeUnless { scanning }?.let { addAll(listOf("--peer", it.toString())) }
+                    AetherEndpoint.parse(wiwInner)?.let { addAll(listOf("--gool-peer", it.toString())) }
+                } else if (proto.twoHops) {
+                    val hop = if (proto == AetherProtocol.MIM) "--mim" else "--wiw"
+                    val outer = AetherEndpoint.parse(wiwOuter).takeUnless { scanning }
+                    val inner = AetherEndpoint.parse(wiwInner).takeUnless { scanning }
+                    outer?.let { addAll(listOf("$hop-outer", it.toString())) }
+                    inner?.let { addAll(listOf("$hop-inner", it.toString())) }
+                    if (outer == null && inner == null) add("$hop-scan")
+                } else if (!scanning) {
+                    AetherEndpoint.of(address, port)?.let { addAll(listOf("--peer", it.toString())) }
+                }
+
+                add(if (scanning) "--no-quick-reconnect" else "--quick-reconnect")
+            }
+
+            when (torEnum) {
+                AetherTor.OFF -> {}
+                AetherTor.CHAIN -> add("--tor")
+                AetherTor.REVERSE -> add("--tor-reverse")
+                AetherTor.ONLY -> add("--tor-only")
+            }
+            if (torEnum != AetherTor.OFF) {
+                when (AetherTorBridges.fromString(torBridges)) {
+                    AetherTorBridges.AUTO -> {}
+                    AetherTorBridges.FIRST -> add("--tor-bridges")
+                    AetherTorBridges.NEVER -> add("--no-tor-bridges")
+                    AetherTorBridges.OWN ->
+                        torBridgeLines.lines()
+                            .map { it.trim() }
+                            .filter { it.isNotEmpty() }
+                            .forEach { addAll(listOf("--tor-bridge", it)) }
+                }
+                val bridges = AetherTorBridges.fromString(torBridges)
+                if (bridges == AetherTorBridges.AUTO || bridges == AetherTorBridges.FIRST) {
+                    AetherTorRelays.fromString(torRelays).takeUnless { it == AetherTorRelays.AUTO }
+                        ?.let { addAll(listOf("--tor-relays", it.type)) }
+                }
+            }
+
+            when (psiphonEnum) {
+                AetherPsiphon.OFF -> {}
+                AetherPsiphon.CHAIN -> add("--psiphon")
+                AetherPsiphon.REVERSE -> add("--psiphon-reverse")
+                AetherPsiphon.ONLY -> add("--psiphon-only")
+            }
+            if (psiphonEnum != AetherPsiphon.OFF) {
+                val shape = AetherPsiphonMode.fromString(psiphonMode)
+                addAll(listOf("--psiphon-mode", shape.type))
+                val cdnIps = psiphonCdnIps.trim().takeIf { it.isNotEmpty() && shape != AetherPsiphonMode.DIRECT }
+                cdnIps?.let { addAll(listOf("--psiphon-cdn-ips", it)) }
+                if (cdnIps != null) psiphonCdnSni.trim().takeIf { it.isNotEmpty() }?.let { addAll(listOf("--psiphon-cdn-sni", it)) }
+                if (shape != AetherPsiphonMode.DIRECT) {
+                    AetherPsiphonCdnSet.join(AetherPsiphonCdnSet.parse(psiphonCdnSets))
+                        ?.let { addAll(listOf("--psiphon-cdn-sets", it)) }
+                }
+                psiphonRegion.trim().takeIf { it.isNotEmpty() }?.let { addAll(listOf("--psiphon-region", it)) }
+            }
+            extraArgs.trim().takeIf { it.isNotEmpty() }?.let { addAll(it.split(Regex("\\s+"))) }
         }
-        if (scanMode != "balanced") flags += listOf("--scan", scanMode)
-        when (noize) {
-            "off" -> flags += listOf("--noize", "off")
-            "light", "firewall", "balanced", "gfw", "aggressive" -> flags += listOf("--noize", noize)
-            else -> {}
-        }
-        when (ipVersion) {
-            "v6" -> flags += "-6"
-            "both" -> flags += "--dual"
-            else -> flags += "-4"
-        }
-        if (address.isNotBlank()) {
-            val endpoint = if (port.isNotBlank()) "$address:$port" else address
-            flags += listOf("--peer", endpoint)
-        }
-        when (masqueTransport) {
-            "h2" -> flags += "--h2"
-            "h3" -> flags += "--h3"
-            else -> {}
-        }
-        when (psiphon) {
-            "chain" -> flags += "--psiphon"
-            "reverse" -> flags += "--psiphon-reverse"
-            "only" -> flags += "--psiphon-only"
-            else -> {}
-        }
-        if (psiphon != "off") {
-            if (psiphonMode == "cdn") flags += listOf("--psiphon-mode", "cdn")
-            if (psiphonMode == "direct") flags += listOf("--psiphon-mode", "direct")
-            if (psiphonCdnSets.isNotBlank()) flags += listOf("--psiphon-cdn-sets", psiphonCdnSets)
-            if (psiphonRegion.isNotBlank()) flags += listOf("--psiphon-region", psiphonRegion)
-        }
-        when (tor) {
-            "chain" -> flags += "--tor"
-            "reverse" -> flags += "--tor-reverse"
-            "only" -> flags += "--tor-only"
-            else -> {}
-        }
-        if (exitNode.isNotBlank()) flags += listOf("--exit-loc", exitNode)
-        // finalMask/dialMode are newer-core fields; v2.4.0 does not know them,
-        // so they travel in the profile/link but are not passed to this core.
-        extraArgs.trim().takeIf { it.isNotEmpty() }?.let { flags += it.split(Regex("\\s+")) }
-        return flags
     }
 
     /** The "Aether command" preview line, like PattNG shows. */
     fun commandPreview(bindPort: Int): String =
-        (listOf("aether", "--bind", "127.0.0.1:$bindPort") + toFlags()).joinToString(" ")
+        (listOf("aether", "--bind", "127.0.0.1:$bindPort") + toFlags() + listOf("--log-level", "warn")).joinToString(" ")
 
-    /** PattNG-style `aether://host:port?query` share link. */
+    /** PattNG-style `aether://host:port?query#label` share link (AetherFmt.toUri). */
     fun toShareLink(): String {
-        val hostPart = if (address.isNotBlank()) {
-            if (port.isNotBlank()) "$address:$port" else address
-        } else {
-            "scan"
-        }
-        val q = buildList {
-            add("protocol=$protocol")
-            add("scan=$scanMode")
-            if (noize.isNotBlank()) add("noize=$noize")
-            add("ip=$ipVersion")
-            if (psiphon != "off") {
-                add("psiphon=$psiphon")
-                add("psiphon_mode=$psiphonMode")
-                if (psiphonCdnSets.isNotBlank()) add("cdn_sets=${urlEncode(psiphonCdnSets)}")
-                if (psiphonRegion.isNotBlank()) add("region=${urlEncode(psiphonRegion)}")
+        val proto = AetherProtocol.fromString(protocol)
+        val transportEnum = AetherTransport.fromString(transport)
+        val torEnum = AetherTor.fromString(tor)
+        val psiphonEnum = AetherPsiphon.fromString(psiphon)
+        val query = linkedMapOf<String, String>(
+            "protocol" to proto.type,
+            "scan" to AetherScanMode.fromString(scanMode).type,
+        )
+        val overHttp2 = masqueOverHttp2(proto, transportEnum, torEnum, psiphonEnum)
+        AetherObfuscation.fromString(obfuscation)
+            .takeUnless { it == AetherObfuscation.AUTO || overHttp2 }
+            ?.let { query["noize"] = it.type }
+        query["ip"] = AetherIpVersion.fromString(ipVersion).type
+        dns.trim().takeIf { it.isNotEmpty() }?.let { query["dns"] = it }
+        exitLoc.trim().takeIf { it.isNotEmpty() }?.let { query["exit_loc"] = it }
+        if (proto.overMasque) {
+            query["transport"] = transportEnum.type
+            masqueSni.trim().takeIf { it != AETHER_MASQUE_SNI && it.isNotEmpty() }?.let { query["sni"] = it }
+            if (fragment) {
+                query["fragment"] = "1"
+                AetherRange.parse(fragmentSize, AetherRange.FRAGMENT_SIZE)?.let { query["fragment_size"] = it.toString() }
+                AetherRange.parse(fragmentDelay, AetherRange.FRAGMENT_DELAY)?.let { query["fragment_delay"] = it.toString() }
             }
-            if (tor != "off") add("tor=$tor")
-            if (exitNode.isNotBlank()) add("exit=${urlEncode(exitNode)}")
-            if (exitMaskJson.isNotBlank()) add("final_mask=${urlEncode(exitMaskJson)}")
-            if (exitDialMode.isNotBlank()) add("dial=${urlEncode(exitDialMode)}")
-        }.joinToString("&")
-        val label = remarks.takeIf { it.isNotBlank() }?.let { "#" + urlEncode(it) } ?: ""
-        return "aether://$hostPart?$q$label"
+            val warpUsed = psiphonEnum != AetherPsiphon.ONLY && torEnum != AetherTor.ONLY
+            if (ech && warpUsed) {
+                query["ech"] = "1"
+                echDns.trim().takeIf { it.isNotEmpty() }?.let { query["ech_dns"] = it }
+                echDomain.trim().takeIf { it.isNotEmpty() }?.let { query["ech_domain"] = it }
+            }
+            AetherFingerprint.fromString(fingerprint)
+                .takeUnless { it == AetherFingerprint.CHROME }
+                ?.let { query["fingerprint"] = it.type }
+        }
+        if (proto.twoHops) {
+            AetherEndpoint.parse(wiwOuter)?.let { query["outer"] = it.toString() }
+            AetherEndpoint.parse(wiwInner)?.let { query["inner"] = it.toString() }
+        }
+        if (psiphonEnum != AetherPsiphon.OFF) {
+            query["psiphon"] = psiphonEnum.type
+            query["psiphon_mode"] = AetherPsiphonMode.fromString(psiphonMode).type
+            psiphonCdnIps.trim().takeIf { it.isNotEmpty() }?.let { query["cdn_ips"] = it }
+            psiphonCdnSni.trim().takeIf { it.isNotEmpty() }?.let { query["cdn_sni"] = it }
+            psiphonCdnSets.trim().takeIf { it.isNotEmpty() }?.let { query["cdn_sets"] = it }
+            psiphonRegion.trim().takeIf { it.isNotEmpty() }?.let { query["region"] = it }
+            if (!psiphonBundledList) query["psiphon_bundled"] = "0"
+        }
+        if (torEnum != AetherTor.OFF) {
+            query["tor"] = torEnum.type
+            query["tor_bridges"] = AetherTorBridges.fromString(torBridges).type
+            query["tor_relays"] = AetherTorRelays.fromString(torRelays).type
+            val lines = torBridgeLines.lines().map { it.trim() }.filter { it.isNotEmpty() }
+            if (lines.isNotEmpty()) query["bridges"] = lines.joinToString(";")
+        }
+        finalMask.trim().takeIf { it.isNotEmpty() }?.let { query["fm"] = it }
+        dialMode.trim().takeIf { it.isNotEmpty() }?.let { query["dialMode"] = it }
+
+        val endpoint = if (!proto.twoHops) {
+            AetherEndpoint.of(address, port)?.let { "aether://" + it.toString() } ?: "aether://"
+        } else {
+            "aether://"
+        }
+        val queryText = query.entries.joinToString("&") { "${it.key}=${uriEncode(it.value)}" }
+        val label = remarks.takeIf { it.isNotBlank() }?.let { "#" + uriEncode(it) } ?: ""
+        return "$endpoint?$queryText$label"
     }
 
     companion object {
-        private fun urlEncode(v: String): String =
-            buildString {
-                for (b in v.encodeToByteArray()) {
-                    val c = b.toInt() and 0xff
-                    if (c in '0'.code..'9'.code || c in 'a'.code..'z'.code || c in 'A'.code..'Z'.code ||
-                        c == '-'.code || c == '_'.code || c == '.'.code || c == '~'.code || c == ','.code
-                    ) {
-                        append(c.toChar())
-                    } else {
-                        append('%')
-                        append(c.toString(16).uppercase().padStart(2, '0'))
-                    }
-                }
-            }
-
-        private fun urlDecode(v: String): String {
-            val bytes = ArrayList<Byte>(v.length)
-            var i = 0
-            while (i < v.length) {
-                val c = v[i]
-                if (c == '%' && i + 2 < v.length) {
-                    val b = v.substring(i + 1, i + 3).toIntOrNull(16)
-                    if (b != null) {
-                        bytes.add(b.toByte())
-                        i += 3
-                        continue
-                    }
-                }
-                bytes.add(c.code.toByte())
-                i++
-            }
-            return String(bytes.toByteArray(), Charsets.UTF_8)
-        }
-
         /** Accepts a pasted raw `aether --flag value ...` command line. */
         fun fromCommandLine(text: String): AetherProfile {
             val parts = text.trim().split(Regex("\\s+"))
@@ -172,43 +260,55 @@ data class AetherProfile(
             while (i < parts.size) {
                 val p = parts[i]
                 when (p) {
-                    "--protocol" -> pick(i)?.let { cfg = cfg.copy(protocol = normalizeProtocol(it)); i++ }
-                    "--masque" -> cfg = cfg.copy(protocol = "masque")
-                    "--wg", "--wireguard", "--warp" -> cfg = cfg.copy(protocol = "wg")
-                    "--gool", "--wiw" -> cfg = cfg.copy(protocol = "gool")
-                    "--mim", "--masque-in-masque" -> cfg = cfg.copy(protocol = "mim")
-                    "--scan" -> pick(i)?.let { cfg = cfg.copy(scanMode = it); i++ }
-                    "--turbo" -> cfg = cfg.copy(scanMode = "turbo")
-                    "--balanced" -> cfg = cfg.copy(scanMode = "balanced")
-                    "--thorough" -> cfg = cfg.copy(scanMode = "thorough")
-                    "--verified" -> cfg = cfg.copy(scanMode = "verified")
-                    "--ironclad" -> cfg = cfg.copy(scanMode = "ironclad")
-                    "--noize" -> pick(i)?.let { cfg = cfg.copy(noize = it); i++ }
-                    "-4", "--ip" -> { if (p == "--ip") { pick(i)?.let { cfg = cfg.copy(ipVersion = normalizeIp(it)) ; i++ } } else cfg = cfg.copy(ipVersion = "v4") }
-                    "-6" -> cfg = cfg.copy(ipVersion = "v6")
-                    "--dual" -> cfg = cfg.copy(ipVersion = "both")
+                    "--protocol" -> pick(i)?.let { cfg = cfg.copy(protocol = AetherProtocol.fromString(it).type); i++ }
+                    "--masque" -> cfg = cfg.copy(protocol = AetherProtocol.MASQUE.type)
+                    "--wg", "--wireguard", "--warp" -> cfg = cfg.copy(protocol = AetherProtocol.WIREGUARD.type)
+                    "--gool-classic", "--wiw" -> cfg = cfg.copy(protocol = AetherProtocol.GOOL.type)
+                    "--gool" -> cfg = cfg.copy(protocol = AetherProtocol.WG_OVER_MASQUE.type)
+                    "--mim", "--masque-in-masque" -> cfg = cfg.copy(protocol = AetherProtocol.MIM.type)
+                    "--h2", "--http2" -> cfg = cfg.copy(transport = AetherTransport.HTTP2.type)
+                    "--h3", "--quic" -> cfg = cfg.copy(transport = AetherTransport.HTTP3.type)
+                    "--scan" -> pick(i)?.let { cfg = cfg.copy(scanMode = AetherScanMode.fromString(it).type); i++ }
+                    "--noize" -> pick(i)?.let { cfg = cfg.copy(obfuscation = AetherObfuscation.fromString(it).type); i++ }
+                    "--ip" -> pick(i)?.let { cfg = cfg.copy(ipVersion = AetherIpVersion.fromString(it).type); i++ }
+                    "-4" -> cfg = cfg.copy(ipVersion = AetherIpVersion.V4.type)
+                    "-6" -> cfg = cfg.copy(ipVersion = AetherIpVersion.V6.type)
+                    "--dual" -> cfg = cfg.copy(ipVersion = AetherIpVersion.DUAL.type)
+                    "--dns" -> pick(i)?.let { cfg = cfg.copy(dns = it); i++ }
+                    "--exit-loc" -> pick(i)?.let { cfg = cfg.copy(exitLoc = it); i++ }
+                    "--masque-sni" -> pick(i)?.let { cfg = cfg.copy(masqueSni = it); i++ }
+                    "--fragment" -> cfg = cfg.copy(fragment = true)
+                    "--fragment-size" -> pick(i)?.let { cfg = cfg.copy(fragmentSize = it); i++ }
+                    "--fragment-delay" -> pick(i)?.let { cfg = cfg.copy(fragmentDelay = it); i++ }
+                    "--ech" -> cfg = cfg.copy(ech = true)
+                    "--ech-dns" -> pick(i)?.let { cfg = cfg.copy(echDns = it); i++ }
+                    "--ech-domain" -> pick(i)?.let { cfg = cfg.copy(echDomain = it); i++ }
                     "--peer", "--endpoint" -> pick(i)?.let {
-                        cfg = cfg.copy(
-                            address = it.substringBeforeLast(':'),
-                            port = it.substringAfterLast(':', ""),
-                        )
+                        val ep = AetherEndpoint.parse(it)
+                        if (ep != null) cfg = cfg.copy(address = ep.host, port = ep.port.toString())
                         i++
                     }
-                    "--h2", "--http2" -> cfg = cfg.copy(masqueTransport = "h2")
-                    "--h3", "--quic" -> cfg = cfg.copy(masqueTransport = "h3")
-                    "--psiphon" -> cfg = cfg.copy(psiphon = "chain")
-                    "--psiphon-reverse" -> cfg = cfg.copy(psiphon = "reverse")
-                    "--psiphon-only" -> cfg = cfg.copy(psiphon = "only")
-                    "--psiphon-mode" -> pick(i)?.let { cfg = cfg.copy(psiphonMode = it); i++ }
+                    "--wiw-outer", "--mim-outer" -> pick(i)?.let { cfg = cfg.copy(wiwOuter = it); i++ }
+                    "--wiw-inner", "--mim-inner", "--gool-peer" -> pick(i)?.let { cfg = cfg.copy(wiwInner = it); i++ }
+                    "--psiphon" -> cfg = cfg.copy(psiphon = AetherPsiphon.CHAIN.type)
+                    "--psiphon-reverse" -> cfg = cfg.copy(psiphon = AetherPsiphon.REVERSE.type)
+                    "--psiphon-only" -> cfg = cfg.copy(psiphon = AetherPsiphon.ONLY.type)
+                    "--psiphon-mode" -> pick(i)?.let { cfg = cfg.copy(psiphonMode = AetherPsiphonMode.fromString(it).type); i++ }
+                    "--psiphon-cdn-ips" -> pick(i)?.let { cfg = cfg.copy(psiphonCdnIps = it); i++ }
+                    "--psiphon-cdn-sni" -> pick(i)?.let { cfg = cfg.copy(psiphonCdnSni = it); i++ }
                     "--psiphon-cdn-sets" -> pick(i)?.let { cfg = cfg.copy(psiphonCdnSets = it); i++ }
                     "--psiphon-region" -> pick(i)?.let { cfg = cfg.copy(psiphonRegion = it); i++ }
-                    "--tor" -> cfg = cfg.copy(tor = "chain")
-                    "--tor-reverse" -> cfg = cfg.copy(tor = "reverse")
-                    "--tor-only" -> cfg = cfg.copy(tor = "only")
-                    "--exit-loc" -> pick(i)?.let { cfg = cfg.copy(exitNode = it); i++ }
-                    "--final-mask" -> pick(i)?.let { cfg = cfg.copy(exitMaskJson = it); i++ }
-                    "--dial-mode" -> pick(i)?.let { cfg = cfg.copy(exitDialMode = it); i++ }
-                    "--bind", "--log-level", "--psiphon-bin", "--config", "--quick-reconnect", "--no-quick-reconnect" -> i++
+                    "--tor" -> cfg = cfg.copy(tor = AetherTor.CHAIN.type)
+                    "--tor-reverse" -> cfg = cfg.copy(tor = AetherTor.REVERSE.type)
+                    "--tor-only" -> cfg = cfg.copy(tor = AetherTor.ONLY.type)
+                    "--tor-bridges" -> cfg = cfg.copy(torBridges = AetherTorBridges.FIRST.type)
+                    "--no-tor-bridges" -> cfg = cfg.copy(torBridges = AetherTorBridges.NEVER.type)
+                    "--tor-bridge" -> pick(i)?.let {
+                        cfg = cfg.copy(torBridges = AetherTorBridges.OWN.type, torBridgeLines = (cfg.torBridgeLines + "\n" + it).trim())
+                        i++
+                    }
+                    "--tor-relays" -> pick(i)?.let { cfg = cfg.copy(torRelays = AetherTorRelays.fromString(it).type); i++ }
+                    "--register" -> { i++ } // a key-registration command carries no session flags
                     else -> if (p.startsWith("--")) extras += p
                 }
                 i++
@@ -217,7 +317,7 @@ data class AetherProfile(
             return cfg
         }
 
-        /** PattNG-style `aether://host:port?query#label` link. */
+        /** PattNG-style `aether://host:port?query#label` link (AetherFmt.parse). */
         fun fromShareLink(link: String): AetherProfile? {
             val trimmed = link.trim()
             if (!trimmed.startsWith("aether://")) return null
@@ -237,56 +337,100 @@ data class AetherProfile(
             val hIdx = queryPart.indexOf('#')
             if (hIdx >= 0) {
                 query = queryPart.substring(0, hIdx)
-                label = urlDecode(queryPart.substring(hIdx + 1))
+                label = uriDecode(queryPart.substring(hIdx + 1))
             } else {
                 query = queryPart
                 label = ""
             }
-            var cfg = AetherProfile(remarks = label)
-            for (pair in query.split("&")) {
-                if (pair.isBlank()) continue
-                val idx = pair.indexOf('=')
-                val key = if (idx >= 0) pair.substring(0, idx) else pair
-                val value = if (idx >= 0) urlDecode(pair.substring(idx + 1)) else ""
-                cfg = when (key) {
-                    "protocol" -> cfg.copy(protocol = normalizeProtocol(value))
-                    "scan" -> cfg.copy(scanMode = value.ifBlank { "balanced" })
-                    "noize" -> cfg.copy(noize = value)
-                    "obfuscation" -> cfg.copy(noize = value)
-                    "ip" -> cfg.copy(ipVersion = normalizeIp(value))
-                    "psiphon" -> cfg.copy(psiphon = value.ifBlank { "off" })
-                    "psiphon_mode" -> cfg.copy(psiphonMode = value.ifBlank { "auto" })
-                    "cdn_sets" -> cfg.copy(psiphonCdnSets = value)
-                    "region" -> cfg.copy(psiphonRegion = value)
-                    "tor" -> cfg.copy(tor = value.ifBlank { "off" })
-                    "exit" -> cfg.copy(exitNode = value)
-                    "final_mask" -> cfg.copy(exitMaskJson = value)
-                    "dial" -> cfg.copy(exitDialMode = value)
-                    else -> cfg
+            val q = buildMap {
+                for (pair in query.split('&')) {
+                    if (pair.isBlank()) continue
+                    val idx = pair.indexOf('=')
+                    val key = if (idx >= 0) pair.substring(0, idx) else pair
+                    val value = if (idx >= 0) uriDecode(pair.substring(idx + 1)) else ""
+                    put(key, value)
                 }
             }
-            if (hostPart != "scan" && hostPart.isNotBlank()) {
-                cfg = cfg.copy(
-                    address = hostPart.substringBeforeLast(':'),
-                    port = hostPart.substringAfterLast(':', ""),
-                )
+            val proto = AetherProtocol.fromString(q["protocol"])
+            var cfg = AetherProfile(
+                remarks = label.ifBlank { "Aether" },
+                protocol = proto.type,
+                transport = AetherTransport.fromString(q["transport"]).type,
+                masqueSni = q["sni"]?.trim().orEmpty(),
+                scanMode = AetherScanMode.fromString(q["scan"]).type,
+                obfuscation = AetherObfuscation.fromString(q["noize"]).type,
+                ipVersion = AetherIpVersion.fromString(q["ip"]).type,
+                fragment = q["fragment"] == "1",
+                fragmentSize = q["fragment_size"].orEmpty(),
+                fragmentDelay = q["fragment_delay"].orEmpty(),
+                ech = q["ech"] == "1",
+                echDns = q["ech_dns"]?.trim().orEmpty(),
+                echDomain = q["ech_domain"]?.trim().orEmpty(),
+                fingerprint = q["fingerprint"]?.let { AetherFingerprint.fromString(it).type }
+                    ?: AetherFingerprint.CHROME.type,
+                dns = q["dns"].orEmpty(),
+                exitLoc = q["exit_loc"].orEmpty(),
+                psiphon = AetherPsiphon.fromString(q["psiphon"]).type,
+                psiphonMode = q["psiphon_mode"]?.let { AetherPsiphonMode.fromString(it).type }
+                    ?: AetherPsiphonMode.AUTO.type,
+                psiphonCdnIps = q["cdn_ips"].orEmpty(),
+                psiphonCdnSni = q["cdn_sni"].orEmpty(),
+                psiphonCdnSets = q["cdn_sets"].orEmpty(),
+                psiphonRegion = q["region"].orEmpty(),
+                psiphonBundledList = q["psiphon_bundled"] != "0",
+                tor = AetherTor.fromString(q["tor"]).type,
+                torBridges = q["tor_bridges"]?.let { AetherTorBridges.fromString(it).type }
+                    ?: AetherTorBridges.AUTO.type,
+                torRelays = q["tor_relays"]?.let { AetherTorRelays.fromString(it).type }
+                    ?: AetherTorRelays.AUTO.type,
+                torBridgeLines = q["bridges"]?.split(';')?.joinToString("\n").orEmpty(),
+                finalMask = q["fm"].orEmpty(),
+                dialMode = q["dialMode"].orEmpty(),
+            )
+            if (proto.twoHops) {
+                cfg = cfg.copy(wiwOuter = q["outer"].orEmpty(), wiwInner = q["inner"].orEmpty())
+            } else if (hostPart.isNotBlank()) {
+                val endpoint = AetherEndpoint.parse(hostPart.removePrefix("aether://"))
+                if (endpoint != null) {
+                    cfg = cfg.copy(address = endpoint.host, port = endpoint.port.toString())
+                }
             }
             return cfg
         }
 
-        private fun normalizeProtocol(v: String): String = when (v.lowercase()) {
-            "wg", "wireguard", "warp" -> "wg"
-            "gool", "wiw", "warp-in-warp" -> "gool"
-            "mim", "masque-in-masque" -> "mim"
-            "masque" -> "masque"
-            else -> v.lowercase().ifBlank { "masque" }
-        }
+        private fun uriEncode(v: String): String =
+            buildString {
+                for (b in v.encodeToByteArray()) {
+                    val c = b.toInt() and 0xff
+                    if (c in '0'.code..'9'.code || c in 'a'.code..'z'.code || c in 'A'.code..'Z'.code ||
+                        c == '-'.code || c == '_'.code || c == '.'.code || c == '~'.code || c == ','.code ||
+                        c == ';'.code || c == ':'.code || c == '['.code || c == ']'.code || c == '@'.code
+                    ) {
+                        append(c.toChar())
+                    } else {
+                        append('%')
+                        append(c.toString(16).uppercase().padStart(2, '0'))
+                    }
+                }
+            }
 
-        private fun normalizeIp(v: String): String = when (v.lowercase()) {
-            "v4", "4", "ipv4" -> "v4"
-            "v6", "6", "ipv6" -> "v6"
-            "both", "dual" -> "both"
-            else -> "v4"
+        private fun uriDecode(v: String): String {
+            val bytes = ArrayList<Byte>(v.length)
+            var i = 0
+            while (i < v.length) {
+                val c = v[i]
+                if (c == '%' && i + 2 < v.length) {
+                    val b = v.substring(i + 1, i + 3).toIntOrNull(16)
+                    if (b != null) {
+                        bytes.add(b.toByte())
+                        i += 3
+                        continue
+                    }
+                }
+                bytes.add(c.code.toByte())
+                i++
+            }
+            return String(bytes.toByteArray(), Charsets.UTF_8)
         }
     }
 }
