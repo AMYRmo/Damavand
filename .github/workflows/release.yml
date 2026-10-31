@@ -101,11 +101,6 @@ jobs:
           PYEOF
           ABI=$(basename "$APK" | sed -E 's/app-(.*)-release.apk/\1/')
           cp "$APK" "Damavand_${{ steps.v.outputs.name }}_${ABI}.apk"
-          for other in app/build/outputs/apk/release/*.apk; do
-            [ "$other" = "$APK" ] && continue
-            OABI=$(basename "$other" | sed -E 's/app-(.*)-release.apk/\1/')
-            cp "$other" "Damavand_${{ steps.v.outputs.name }}_${OABI}.apk"
-          done
           ls -la Damavand_*.apk
 
       - name: Upload the artifact
