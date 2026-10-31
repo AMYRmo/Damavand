@@ -176,6 +176,8 @@ data class AetherProfile(
                         ?.let { addAll(listOf("--psiphon-cdn-sets", it)) }
                 }
                 psiphonRegion.trim().takeIf { it.isNotEmpty() }?.let { addAll(listOf("--psiphon-region", it)) }
+                // The bundled list, unless the profile wants Psiphon to fetch a fresh one before it dials anything.
+                if (psiphonBundledList) addAll(listOf(PSIPHON_SERVER_ENTRIES, SHIPPED_LIST))
             }
             upstream.trim().takeIf { it.isNotEmpty() }?.let { addAll(listOf("--upstream", it)) }
             extraArgs.trim().takeIf { it.isNotEmpty() }?.let { addAll(it.split(Regex("\\s+"))) }
@@ -255,6 +257,12 @@ data class AetherProfile(
     }
 
     companion object {
+        /** The core's flag naming the file of server entries the Psiphon client starts with. */
+        const val PSIPHON_SERVER_ENTRIES = "--psiphon-server-entries"
+
+        /** The word a command names the app's own list by; the real file takes its place when the core starts. */
+        const val SHIPPED_LIST = "shipped-list"
+
         /** Accepts a pasted raw `aether --flag value ...` command line. */
         fun fromCommandLine(text: String): AetherProfile {
             val parts = text.trim().split(Regex("\\s+"))
@@ -314,7 +322,31 @@ data class AetherProfile(
                     }
                     "--tor-relays" -> pick(i)?.let { cfg = cfg.copy(torRelays = AetherTorRelays.fromString(it).type); i++ }
                     "--register" -> { i++ } // a key-registration command carries no session flags
-                    else -> if (p.startsWith("--")) extras += p
+                    else -> {
+                        // Unknown input is kept whole, never silently
+                        // dropped (D5): an unknown flag keeps the token
+                        // after it when that token is not another flag
+                        // (its value), and any other stray token is kept
+                        // as-is. Everything lands in extraArgs, which
+                        // toFlags() re-emits verbatim and the editor
+                        // shows for review, so a pasted command line
+                        // round-trips token-for-token. The one exception
+                        // is the first token when it is not a flag: that
+                        // is the pasted program name (`aether ...`),
+                        // which is not an argument.
+                        if (i == 0 && !p.startsWith("-")) {
+                            // program name, not an argument
+                        } else {
+                            extras += p
+                            if (p.startsWith("--")) {
+                                val v = parts.getOrNull(i + 1)
+                                if (v != null && !v.startsWith("--")) {
+                                    extras += v
+                                    i++
+                                }
+                            }
+                        }
+                    }
                 }
                 i++
             }
@@ -327,26 +359,18 @@ data class AetherProfile(
             val trimmed = link.trim()
             if (!trimmed.startsWith("aether://")) return null
             val rest = trimmed.removePrefix("aether://")
-            val hostPart: String
-            val queryPart: String
-            val qIdx = rest.indexOf('?')
-            if (qIdx >= 0) {
-                hostPart = rest.substring(0, qIdx)
-                queryPart = rest.substring(qIdx + 1)
-            } else {
-                hostPart = rest
-                queryPart = ""
-            }
-            val query: String
-            val label: String
-            val hIdx = queryPart.indexOf('#')
-            if (hIdx >= 0) {
-                query = queryPart.substring(0, hIdx)
-                label = uriDecode(queryPart.substring(hIdx + 1))
-            } else {
-                query = queryPart
-                label = ""
-            }
+            // The label is the URI fragment — everything after the first
+            // '#', whether or not a query precedes it (PattNG takes remarks
+            // from uri.fragment). Taking it off first keeps it out of the
+            // endpoint when the link has no query: aether://host:port#Name
+            // used to leave '#Name' inside the host part, losing the label
+            // and the endpoint with it.
+            val hIdx = rest.indexOf('#')
+            val label = if (hIdx >= 0) uriDecode(rest.substring(hIdx + 1)) else ""
+            val beforeFragment = if (hIdx >= 0) rest.substring(0, hIdx) else rest
+            val qIdx = beforeFragment.indexOf('?')
+            val hostPart = if (qIdx >= 0) beforeFragment.substring(0, qIdx) else beforeFragment
+            val query = if (qIdx >= 0) beforeFragment.substring(qIdx + 1) else ""
             val q = buildMap {
                 for (pair in query.split('&')) {
                     if (pair.isBlank()) continue
@@ -395,7 +419,7 @@ data class AetherProfile(
             if (proto.twoHops) {
                 cfg = cfg.copy(wiwOuter = q["outer"].orEmpty(), wiwInner = q["inner"].orEmpty())
             } else if (hostPart.isNotBlank()) {
-                val endpoint = AetherEndpoint.parse(hostPart.removePrefix("aether://"))
+                val endpoint = AetherEndpoint.parse(hostPart)
                 if (endpoint != null) {
                     cfg = cfg.copy(address = endpoint.host, port = endpoint.port.toString())
                 }
