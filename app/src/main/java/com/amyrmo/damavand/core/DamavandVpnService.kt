@@ -671,7 +671,7 @@ class DamavandVpnService : VpnService() {
                 ready = engine.awaitReady(AETHER_READY_SLICE_MS)
             }
             if (aether !== engine || !ready) return@launch
-            startSingBox(bridgeJson, appSettings)
+            startSingBox(preparedBridge(bridgeJson, appSettings), appSettings)
         }
     }
 
@@ -718,8 +718,23 @@ class DamavandVpnService : VpnService() {
             engine.mixedPort,
             appSettings.singBoxDeviceOptions(),
         )
-        startSingBox(bridgeJson, appSettings)
+        startSingBox(preparedBridge(bridgeJson, appSettings), appSettings)
     }
+
+    // The Aether/Mihomo bridge JSON carries only the TUN inbound, and the
+    // engine runs whatever it is given verbatim — so without this step the
+    // session has no local listener at all, while startSingBox below still
+    // advertises the prepared config's local port (10808) as the session's
+    // proxy port, and the health probe and the geo lookup dial a port
+    // nothing listens on (a false "connection refused" banner on a healthy
+    // tunnel). Preparing the bridge here adds that local mixed inbound for
+    // real, so the advertised port names a live listener whose traffic
+    // leaves through the bridged core just like the TUN's does.
+    private fun preparedBridge(bridgeJson: String, appSettings: AppSettings): String =
+        com.amyrmo.damavand.domain.config.SingBoxConfigs.prepareForDevice(
+            bridgeJson,
+            device = appSettings.singBoxDeviceOptions(),
+        ).json
 
     private fun startSingBox(configJson: String, appSettings: AppSettings) {
         VpnManager.setActiveKind(kind)
