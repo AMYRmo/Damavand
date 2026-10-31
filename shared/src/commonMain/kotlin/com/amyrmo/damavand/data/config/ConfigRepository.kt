@@ -583,15 +583,19 @@ class ConfigRepository(private val store: KeyValueStore) {
         val inner = profile(innerId) ?: run { missing += innerId.take(8); null }
         val outer = profile(outerId) ?: run { missing += outerId.take(8); null }
         if (missing.isNotEmpty()) throw ProxyChainMemberMissingException(missing)
-        inner!!; outer!!
-        if (!outer.canCarryChain) {
-            throw CrossChainUnsupportedException(CrossChainUnsupportedException.CARRIER, outer.name)
+        // Both lookups succeeded (a miss would have thrown above); rebind
+        // instead of force-unwrapping so a future change to the missing
+        // bookkeeping fails with the same exception, not an NPE.
+        val innerProfile = inner ?: throw ProxyChainMemberMissingException(missing)
+        val outerProfile = outer ?: throw ProxyChainMemberMissingException(missing)
+        if (!outerProfile.canCarryChain) {
+            throw CrossChainUnsupportedException(CrossChainUnsupportedException.CARRIER, outerProfile.name)
         }
-        if (!inner.canDialThroughProxy) {
-            throw CrossChainUnsupportedException(CrossChainUnsupportedException.DIALER, inner.name)
+        if (!innerProfile.canDialThroughProxy) {
+            throw CrossChainUnsupportedException(CrossChainUnsupportedException.DIALER, innerProfile.name)
         }
-        udpMismatch(inner, outer)?.let { throw it }
-        return inner to outer
+        udpMismatch(innerProfile, outerProfile)?.let { throw it }
+        return innerProfile to outerProfile
     }
 
     fun udpMismatch(inner: VpnProfile, outer: VpnProfile): CrossChainUdpUnsupportedException? {
@@ -807,7 +811,7 @@ class ConfigRepository(private val store: KeyValueStore) {
     }
 
     private fun fastestOf(members: List<VpnProfile>): String? =
-        members.filter { (it.lastPingMs ?: -1) > 0 }.minByOrNull { it.lastPingMs!! }?.id
+        members.filter { (it.lastPingMs ?: -1) > 0 }.minByOrNull { it.lastPingMs ?: Int.MAX_VALUE }?.id
 
     fun resolveRuleGroups(
         rulesets: List<com.amyrmo.damavand.domain.model.RulesetItem>,
