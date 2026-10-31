@@ -32,14 +32,16 @@ class DnsTunnelController(
     fun start(): Int {
         lastError = null
         if (settings.domain.isBlank() || settings.publicKey.isBlank()) {
-            lastError = "domain and public key are required"
-            Log.e(TAG, lastError!!)
+            val error = "domain and public key are required"
+            lastError = error
+            Log.e(TAG, error)
             return -1
         }
         val port = firstFreePort(listenPort)
         if (port < 0) {
-            lastError = "no free local port near $listenPort"
-            Log.e(TAG, lastError!!)
+            val error = "no free local port near $listenPort"
+            lastError = error
+            Log.e(TAG, error)
             return -1
         }
         val listenAddr = "$listenHost:$port"
