@@ -202,8 +202,18 @@ object SingBoxConfigs {
      * The Aether bridge: a sing-box config whose only outbound dials the Aether
      * core's local SOCKS listener, with the TUN inbound on top. Traffic entering
      * the TUN leaves through the Aether core (tunnel, plain Psiphon or plain Tor).
+     *
+     * The DNS section is load-bearing, not decoration: without it sing-box falls
+     * back to its "local" server, and with no platform local-DNS transport that
+     * resolver dials [::1]:53 and every hijacked TUN query is refused — apps see
+     * a tunnel that is up but cannot resolve any name. DNS therefore rides the
+     * tunnel itself (TCP, so it also works when the core's exit is Psiphon,
+     * which carries no UDP): the profile's own DNS when one is set (a bare IP
+     * means plain UDP, anything else is used as the server address as-is),
+     * otherwise Cloudflare DoH, always detoured through the core outbound.
      */
-    fun aetherBridge(aetherSocksPort: Int, device: DeviceOptions): String {
+    fun aetherBridge(aetherSocksPort: Int, device: DeviceOptions, dns: String = ""): String {
+        val dnsAddress = dns.trim().ifEmpty { "https://cloudflare-dns.com/dns-query" }
         val config = buildJsonObject {
             put("inbounds", buildJsonArray { add(tunInbound(true, device)) })
             put("outbounds", buildJsonArray {
@@ -213,6 +223,16 @@ object SingBoxConfigs {
                     put("server", "127.0.0.1")
                     put("server_port", aetherSocksPort)
                 })
+            })
+            put("dns", buildJsonObject {
+                put("servers", buildJsonArray {
+                    add(buildJsonObject {
+                        put("tag", "bridge-dns")
+                        put("address", dnsAddress)
+                        put("detour", "aether")
+                    })
+                })
+                put("final", "bridge-dns")
             })
             put("route", routeForAddedTun(null))
         }
