@@ -172,7 +172,7 @@ fun AetherSheet(
         ) {
             Text(stringResource(Res.string.aether_add_title), style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
 
-            F(remarks, Res.string.aether_remarks)
+            F(remarks, Res.string.aether_remarks) { remarks = it }
             PickerField(
                 label = stringResource(Res.string.aether_protocol),
                 options = listOf(
@@ -232,7 +232,7 @@ fun AetherSheet(
                 selected = ipVersion,
                 onSelect = { ipVersion = it },
             )
-            F(dns, Res.string.aether_dns, placeholder = "1.1.1.1")
+            F(dns, Res.string.aether_dns, placeholder = "1.1.1.1") { dns = it }
 
             PickerField(
                 label = stringResource(Res.string.aether_exit_node),
@@ -248,13 +248,13 @@ fun AetherSheet(
                 onSelect = { exitLoc = it },
             )
             if (exitLoc.isNotBlank()) {
-                F(finalMask, Res.string.aether_exit_mask, minLines = 2)
-                F(dialMode, Res.string.aether_exit_dial)
+                F(finalMask, Res.string.aether_exit_mask, minLines = 2) { finalMask = it }
+                F(dialMode, Res.string.aether_exit_dial) { dialMode = it }
             }
 
             if (protoEnum.overMasque) {
                 Text(stringResource(Res.string.aether_masque_section), style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
-                F(masqueSni, Res.string.aether_masque_sni)
+                F(masqueSni, Res.string.aether_masque_sni) { masqueSni = it }
                 if (transport == AetherTransport.HTTP2.type) {
                     PickerField(
                         label = stringResource(Res.string.aether_fragment),
@@ -264,8 +264,8 @@ fun AetherSheet(
                     )
                     if (fragment) {
                         Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                            F(fragmentSize, Res.string.aether_fragment_size, modifier = Modifier.weight(1f))
-                            F(fragmentDelay, Res.string.aether_fragment_delay, modifier = Modifier.weight(1f))
+                            F(fragmentSize, Res.string.aether_fragment_size, modifier = Modifier.weight(1f)) { fragmentSize = it }
+                            F(fragmentDelay, Res.string.aether_fragment_delay, modifier = Modifier.weight(1f)) { fragmentDelay = it }
                         }
                     }
                 }
@@ -276,8 +276,8 @@ fun AetherSheet(
                     onSelect = { ech = it == "on" },
                 )
                 if (ech) {
-                    F(echDns, Res.string.aether_ech_dns)
-                    F(echDomain, Res.string.aether_ech_domain)
+                    F(echDns, Res.string.aether_ech_dns) { echDns = it }
+                    F(echDomain, Res.string.aether_ech_domain) { echDomain = it }
                 }
                 PickerField(
                     label = stringResource(Res.string.aether_fingerprint),
@@ -295,12 +295,12 @@ fun AetherSheet(
 
             if (protoEnum.twoHops) {
                 Text(stringResource(Res.string.aether_hops_title), style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
-                F(wiwOuter, Res.string.aether_outer, placeholder = "1.2.3.4:443 (blank = scan)")
-                F(wiwInner, Res.string.aether_inner, placeholder = "5.6.7.8:443 (blank = scan)")
+                F(wiwOuter, Res.string.aether_outer, placeholder = "1.2.3.4:443 (blank = scan)") { wiwOuter = it }
+                F(wiwInner, Res.string.aether_inner, placeholder = "5.6.7.8:443 (blank = scan)") { wiwInner = it }
             } else {
                 Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                    F(address, Res.string.manual_address, modifier = Modifier.weight(1f))
-                    F(port, Res.string.ssh_port, numeric = true, modifier = Modifier.weight(1f))
+                    F(address, Res.string.manual_address, modifier = Modifier.weight(1f)) { address = it }
+                    F(port, Res.string.ssh_port, numeric = true, modifier = Modifier.weight(1f)) { port = it }
                 }
                 OutlinedButton(
                     onClick = { address = ""; port = "" },
@@ -332,16 +332,16 @@ fun AetherSheet(
                     onSelect = { psiphonMode = it },
                 )
                 if (psiphonMode != AetherPsiphonMode.DIRECT.type) {
-                    F(psiphonCdnIps, Res.string.aether_cdn_ips, placeholder = " IPs")
-                    F(psiphonCdnSni, Res.string.aether_cdn_sni)
-                    F(psiphonCdnSets, Res.string.aether_cdn_sets, placeholder = "cloudflare,fastly,...")
+                    F(psiphonCdnIps, Res.string.aether_cdn_ips, placeholder = " IPs") { psiphonCdnIps = it }
+                    F(psiphonCdnSni, Res.string.aether_cdn_sni) { psiphonCdnSni = it }
+                    F(psiphonCdnSets, Res.string.aether_cdn_sets, placeholder = "cloudflare,fastly,...") { psiphonCdnSets = it }
                     OutlinedButton(
                         onClick = { psiphonCdnSets = AetherPsiphonCdnSet.entries.joinToString(",") { it.type } },
                         shape = RoundedCornerShape(18.dp),
                         modifier = Modifier.fillMaxWidth().padding(vertical = 2.dp),
                     ) { Text(stringResource(Res.string.aether_cdn_all)) }
                 }
-                F(psiphonRegion, Res.string.aether_psiphon_region, placeholder = "US")
+                F(psiphonRegion, Res.string.aether_psiphon_region, placeholder = "US") { psiphonRegion = it }
             }
 
             PickerField(
@@ -368,7 +368,7 @@ fun AetherSheet(
                     onSelect = { torBridges = it },
                 )
                 if (torBridges == AetherTorBridges.OWN.type) {
-                    F(torBridgeLines, Res.string.aether_bridge_lines, minLines = 3)
+                    F(torBridgeLines, Res.string.aether_bridge_lines, minLines = 3) { torBridgeLines = it }
                 }
                 if (torBridges == AetherTorBridges.AUTO.type || torBridges == AetherTorBridges.FIRST.type) {
                     PickerField(
@@ -392,12 +392,12 @@ fun AetherSheet(
                 ) { Text(stringResource(Res.string.aether_other)) }
             }
             if (showOther) {
-                F(extraArgs, Res.string.aether_extra, minLines = 2)
+                F(extraArgs, Res.string.aether_extra, minLines = 2) { extraArgs = it }
             }
 
             Text(stringResource(Res.string.aether_command_title), style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
             Text(preview, style = MaterialTheme.typography.bodySmall)
-            F(rawCommand, Res.string.aether_command_hint, minLines = 2)
+            F(rawCommand, Res.string.aether_command_hint, minLines = 2) { rawCommand = it }
             OutlinedButton(
                 onClick = { applyCommand() },
                 shape = RoundedCornerShape(18.dp),
@@ -459,7 +459,7 @@ private fun F(
     minLines: Int = 1,
     numeric: Boolean = false,
     modifier: Modifier = Modifier.fillMaxWidth(),
-    onChange: (String) -> Unit = {},
+    onChange: (String) -> Unit,
 ) {
     OutlinedTextField(
         value = value,
