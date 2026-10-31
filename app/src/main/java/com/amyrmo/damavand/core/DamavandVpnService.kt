@@ -616,7 +616,7 @@ class DamavandVpnService : VpnService() {
             stopEverything()
             return
         }
-        val settings = activeAetherSettings ?: run {
+        val settings = activeAetherSettings() ?: run {
             VpnManager.onError(getString(R.string.engine_aether_missing))
             stopEverything()
             return
@@ -629,6 +629,24 @@ class DamavandVpnService : VpnService() {
             onStopped = { reason -> onTunnelFailed(reason) },
         )
         aether = engine
+        if (engine.missingKeyFiles().isEmpty()) {
+            startAetherEngine(engine, appSettings)
+        } else {
+            // Keys first, PattNG's identity flow: the profile's keys are
+            // registered — into the staging folder, settled atomically over
+            // the keys in use — before the session core starts. A failed
+            // registration does not stop the start: the core provisions
+            // missing identities on its own as a last resort, and the
+            // readiness gate reports how the start actually went.
+            engine.registerKeys(engine.registrationKind().register) { ok, error ->
+                if (aether !== engine) return@registerKeys
+                if (!ok) LogBus.append("W/Aether key registration failed (${error ?: "unknown"}); the core will try on its own")
+                startAetherEngine(engine, appSettings)
+            }
+        }
+    }
+
+    private fun startAetherEngine(engine: AetherEngine, appSettings: AppSettings) {
         engine.start()
         if (!engine.isRunning) {
             VpnManager.onError(engineFailed(R.string.engine_singbox_failed, "aether core did not start"))
@@ -636,18 +654,35 @@ class DamavandVpnService : VpnService() {
             return
         }
 
-        // Bridge the core's SOCKS listener into the TUN via sing-box.
+        // Bridge the core's SOCKS listener into the TUN via sing-box, but
+        // only once the core actually serves its listener: it may still be
+        // scanning for endpoints or registering its identity for a while,
+        // or die a moment later, and reporting Connected before that would
+        // be a lie. Like PattNG's warm-up, the wait repeats in slices while
+        // the core runs; a core that dies is reported by its watcher
+        // through onTunnelFailed, and whichever comes first stops the start.
         val bridgeJson = com.amyrmo.damavand.domain.config.SingBoxConfigs.aetherBridge(
             engine.socksPort,
             appSettings.singBoxDeviceOptions(),
         )
-        startSingBox(bridgeJson, appSettings)
+        scope.launch(kotlinx.coroutines.Dispatchers.IO) {
+            var ready = false
+            while (aether === engine && engine.isRunning && !ready) {
+                ready = engine.awaitReady(AETHER_READY_SLICE_MS)
+            }
+            if (aether !== engine || !ready) return@launch
+            startSingBox(bridgeJson, appSettings)
+        }
     }
 
-    private val activeAetherSettings: com.amyrmo.damavand.domain.config.ProfileSource.Aether? by lazy {
+    // Read fresh on every Aether start, the way the cross-chain paths
+    // already re-read the repository per start. This used to be `by lazy`
+    // (D3): the first profile read was pinned for the service instance's
+    // whole life, so a reused service instance connected with stale
+    // settings after the user switched profiles.
+    private fun activeAetherSettings(): com.amyrmo.damavand.domain.config.ProfileSource.Aether? =
         (application as com.amyrmo.damavand.DamavandApp).container
             .configRepository.activeProfile()?.aetherSettings()
-    }
 
     private fun startMihomo(appSettings: AppSettings) {
         VpnManager.setActiveKind(kind)
@@ -1139,6 +1174,32 @@ class DamavandVpnService : VpnService() {
         return delta
     }
 
+    private var lastUidSampleSec = -1
+    private var uidRateDown = 0L
+    private var uidRateUp = 0L
+
+    /**
+     * [uidTrafficDelta] coalesced to the notification repaint cadence
+     * (E3): the TrafficStats counters are cumulative, so sampling every
+     * few seconds keeps the session totals exact; the per-second rate is
+     * computed over the sample window and held between samples. Returns
+     * the byte delta to add to the totals — 0 on ticks that do not
+     * sample — and refreshes [uidRateDown]/[uidRateUp] when it samples.
+     */
+    private fun uidTrafficSampled(elapsedSec: Int, intervalSec: Int): Pair<Long, Long> {
+        if (lastUidSampleSec >= 0 && elapsedSec - lastUidSampleSec < intervalSec) return 0L to 0L
+        val window = if (lastUidSampleSec >= 0) {
+            (elapsedSec - lastUidSampleSec).coerceAtLeast(1)
+        } else {
+            1
+        }
+        val delta = uidTrafficDelta()
+        lastUidSampleSec = elapsedSec
+        uidRateDown = delta.first / window
+        uidRateUp = delta.second / window
+        return delta
+    }
+
     private val powerManager by lazy { getSystemService(POWER_SERVICE) as android.os.PowerManager }
 
     private fun startStatsLoop() {
@@ -1153,6 +1214,10 @@ class DamavandVpnService : VpnService() {
             var waitMs = com.amyrmo.damavand.domain.power.PowerPolicy.cadence(screenOn = true).tickMs
             var lastPollSec = 0
             var lastNotifySec = 0
+            var lastWidgetSec = -60
+            lastUidSampleSec = -1
+            uidRateDown = 0L
+            uidRateUp = 0L
             while (isActive) {
                 val waited = waitMs
                 delay(waited)
@@ -1184,10 +1249,16 @@ class DamavandVpnService : VpnService() {
                     pollAutoSelect()
                 }
 
-                val (down, up) = if (FrontCore.isRunning) FrontCore.readTrafficDelta() else when (kind) {
+                // Aether/Psiphon have no engine counters of their own;
+                // their UID traffic is sampled at the repaint cadence
+                // (E3) and their reported speed is the held sample rate.
+                val frontCore = FrontCore.isRunning
+                val uidSampled = !frontCore &&
+                    (kind == VpnManager.KIND_PSIPHON || kind == VpnManager.KIND_AETHER)
+                val (down, up) = if (frontCore) FrontCore.readTrafficDelta() else when (kind) {
                     VpnManager.KIND_XRAY, VpnManager.KIND_SNISPOOF -> XrayController.readTrafficDelta()
 
-                    VpnManager.KIND_PSIPHON -> uidTrafficDelta()
+                    VpnManager.KIND_PSIPHON -> uidTrafficSampled(elapsed, cadence.notifySeconds)
                     VpnManager.KIND_OPENCONNECT -> { openConnect?.pokeStats(); openConnect?.trafficDelta() ?: (0L to 0L) }
 
                     VpnManager.KIND_SINGBOX -> singBox?.let { engine ->
@@ -1198,7 +1269,7 @@ class DamavandVpnService : VpnService() {
                         down to up
                     } ?: (0L to 0L)
 
-                    VpnManager.KIND_AETHER -> uidTrafficDelta()
+                    VpnManager.KIND_AETHER -> uidTrafficSampled(elapsed, cadence.notifySeconds)
 
                     else -> XrayController.readTrafficDelta()
                 }
@@ -1206,13 +1277,22 @@ class DamavandVpnService : VpnService() {
                 totalUp += up
 
                 val seconds = (waited / 1000L).coerceAtLeast(1L)
-                VpnManager.onMetrics(elapsed, down / seconds, up / seconds, totalDown, totalUp)
+                val rateDown = if (uidSampled) uidRateDown else down / seconds
+                val rateUp = if (uidSampled) uidRateUp else up / seconds
+                VpnManager.onMetrics(elapsed, rateDown, rateUp, totalDown, totalUp)
 
                 val repaint = elapsed - lastNotifySec >= cadence.notifySeconds
                 if (repaint) {
                     lastNotifySec = elapsed
-                    if (showSpeed) notify(connectedNotification(down / seconds, up / seconds, totalDown, totalUp))
-                    DamavandWidgetProvider.refresh(this@DamavandVpnService)
+                    if (showSpeed) notify(connectedNotification(rateDown, rateUp, totalDown, totalUp))
+                    // The widget shows connection state and session
+                    // totals, and state changes already force-refresh it
+                    // at the transitions; the loop only tops it up on the
+                    // widget cadence (E1), not on every repaint.
+                    if (elapsed - lastWidgetSec >= cadence.widgetSeconds) {
+                        lastWidgetSec = elapsed
+                        DamavandWidgetProvider.refresh(this@DamavandVpnService)
+                    }
                 }
             }
         }
@@ -1943,6 +2023,9 @@ class DamavandVpnService : VpnService() {
 
     companion object {
         private const val TAG = "DamavandVpnService"
+
+        /** One slice of the wait for the Aether core to serve its listener; the wait repeats while the core runs. */
+        private const val AETHER_READY_SLICE_MS = 30_000L
 
         private const val ZEPTUN_PROOF_MS = 6_000L
 
