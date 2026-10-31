@@ -664,6 +664,7 @@ class DamavandVpnService : VpnService() {
         val bridgeJson = com.amyrmo.damavand.domain.config.SingBoxConfigs.aetherBridge(
             engine.socksPort,
             appSettings.singBoxDeviceOptions(),
+            dns = activeAetherSettings()?.config?.dns.orEmpty(),
         )
         scope.launch(kotlinx.coroutines.Dispatchers.IO) {
             var ready = false
