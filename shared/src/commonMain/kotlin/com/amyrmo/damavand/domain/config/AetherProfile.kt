@@ -66,6 +66,13 @@ data class AetherProfile(
     val extraArgs: String = "",
     /** SOCKS5 upstream the core dials through (cross-chain carrier), socks5://127.0.0.1:port */
     val upstream: String = "",
+    /**
+     * A custom command line that runs verbatim instead of the field-derived
+     * flags — Narcic Gateway's model (AetherCommands). Blank = the settings
+     * generate the command. The editor stores it only when it differs from
+     * what the settings generate, so it can never drift stale against them.
+     */
+    val command: String = "",
 ) {
     /** Whether the core should scan instead of dialing a named endpoint. */
     val scanning: Boolean
@@ -118,13 +125,17 @@ data class AetherProfile(
                 }
                 if (proto.overMasque) addAll(AetherFingerprint.fromString(fingerprint).arguments)
 
+                // Hops are gated per hop, not by the shared `scanning` flag:
+                // setting only the outer hop is a legitimate "dial this one,
+                // scan the other" shape, and coupling them discarded the set
+                // hop entirely (Narcic gates each hop on its own emptiness).
                 if (proto == AetherProtocol.WG_OVER_MASQUE) {
-                    AetherEndpoint.parse(wiwOuter).takeUnless { scanning }?.let { addAll(listOf("--peer", it.toString())) }
+                    AetherEndpoint.parse(wiwOuter)?.let { addAll(listOf("--peer", it.toString())) }
                     AetherEndpoint.parse(wiwInner)?.let { addAll(listOf("--gool-peer", it.toString())) }
                 } else if (proto.twoHops) {
                     val hop = if (proto == AetherProtocol.MIM) "--mim" else "--wiw"
-                    val outer = AetherEndpoint.parse(wiwOuter).takeUnless { scanning }
-                    val inner = AetherEndpoint.parse(wiwInner).takeUnless { scanning }
+                    val outer = AetherEndpoint.parse(wiwOuter)
+                    val inner = AetherEndpoint.parse(wiwInner)
                     outer?.let { addAll(listOf("$hop-outer", it.toString())) }
                     inner?.let { addAll(listOf("$hop-inner", it.toString())) }
                     if (outer == null && inner == null) add("$hop-scan")
@@ -245,6 +256,7 @@ data class AetherProfile(
         }
         finalMask.trim().takeIf { it.isNotEmpty() }?.let { query["fm"] = it }
         dialMode.trim().takeIf { it.isNotEmpty() }?.let { query["dialMode"] = it }
+        command.trim().takeIf { it.isNotEmpty() }?.let { query["cmd"] = it }
 
         val endpoint = if (!proto.twoHops) {
             AetherEndpoint.of(address, port)?.let { "aether://" + it.toString() } ?: "aether://"
@@ -262,97 +274,6 @@ data class AetherProfile(
 
         /** The word a command names the app's own list by; the real file takes its place when the core starts. */
         const val SHIPPED_LIST = "shipped-list"
-
-        /** Accepts a pasted raw `aether --flag value ...` command line. */
-        fun fromCommandLine(text: String): AetherProfile {
-            val parts = text.trim().split(Regex("\\s+"))
-            var cfg = AetherProfile()
-            val extras = mutableListOf<String>()
-            var i = 0
-            fun pick(n: Int): String? = parts.getOrNull(n + 1)?.takeIf { !it.startsWith("--") }
-            while (i < parts.size) {
-                val p = parts[i]
-                when (p) {
-                    "--protocol" -> pick(i)?.let { cfg = cfg.copy(protocol = AetherProtocol.fromString(it).type); i++ }
-                    "--masque" -> cfg = cfg.copy(protocol = AetherProtocol.MASQUE.type)
-                    "--wg", "--wireguard", "--warp" -> cfg = cfg.copy(protocol = AetherProtocol.WIREGUARD.type)
-                    "--gool-classic", "--wiw" -> cfg = cfg.copy(protocol = AetherProtocol.GOOL.type)
-                    "--gool" -> cfg = cfg.copy(protocol = AetherProtocol.WG_OVER_MASQUE.type)
-                    "--mim", "--masque-in-masque" -> cfg = cfg.copy(protocol = AetherProtocol.MIM.type)
-                    "--h2", "--http2" -> cfg = cfg.copy(transport = AetherTransport.HTTP2.type)
-                    "--h3", "--quic" -> cfg = cfg.copy(transport = AetherTransport.HTTP3.type)
-                    "--scan" -> pick(i)?.let { cfg = cfg.copy(scanMode = AetherScanMode.fromString(it).type); i++ }
-                    "--noize" -> pick(i)?.let { cfg = cfg.copy(obfuscation = AetherObfuscation.fromString(it).type); i++ }
-                    "--ip" -> pick(i)?.let { cfg = cfg.copy(ipVersion = AetherIpVersion.fromString(it).type); i++ }
-                    "-4" -> cfg = cfg.copy(ipVersion = AetherIpVersion.V4.type)
-                    "-6" -> cfg = cfg.copy(ipVersion = AetherIpVersion.V6.type)
-                    "--dual" -> cfg = cfg.copy(ipVersion = AetherIpVersion.DUAL.type)
-                    "--dns" -> pick(i)?.let { cfg = cfg.copy(dns = it); i++ }
-                    "--exit-loc" -> pick(i)?.let { cfg = cfg.copy(exitLoc = it); i++ }
-                    "--masque-sni" -> pick(i)?.let { cfg = cfg.copy(masqueSni = it); i++ }
-                    "--fragment" -> cfg = cfg.copy(fragment = true)
-                    "--fragment-size" -> pick(i)?.let { cfg = cfg.copy(fragmentSize = it); i++ }
-                    "--fragment-delay" -> pick(i)?.let { cfg = cfg.copy(fragmentDelay = it); i++ }
-                    "--ech" -> cfg = cfg.copy(ech = true)
-                    "--ech-dns" -> pick(i)?.let { cfg = cfg.copy(echDns = it); i++ }
-                    "--ech-domain" -> pick(i)?.let { cfg = cfg.copy(echDomain = it); i++ }
-                    "--peer", "--endpoint" -> pick(i)?.let {
-                        val ep = AetherEndpoint.parse(it)
-                        if (ep != null) cfg = cfg.copy(address = ep.host, port = ep.port.toString())
-                        i++
-                    }
-                    "--wiw-outer", "--mim-outer" -> pick(i)?.let { cfg = cfg.copy(wiwOuter = it); i++ }
-                    "--wiw-inner", "--mim-inner", "--gool-peer" -> pick(i)?.let { cfg = cfg.copy(wiwInner = it); i++ }
-                    "--psiphon" -> cfg = cfg.copy(psiphon = AetherPsiphon.CHAIN.type)
-                    "--psiphon-reverse" -> cfg = cfg.copy(psiphon = AetherPsiphon.REVERSE.type)
-                    "--psiphon-only" -> cfg = cfg.copy(psiphon = AetherPsiphon.ONLY.type)
-                    "--psiphon-mode" -> pick(i)?.let { cfg = cfg.copy(psiphonMode = AetherPsiphonMode.fromString(it).type); i++ }
-                    "--psiphon-cdn-ips" -> pick(i)?.let { cfg = cfg.copy(psiphonCdnIps = it); i++ }
-                    "--psiphon-cdn-sni" -> pick(i)?.let { cfg = cfg.copy(psiphonCdnSni = it); i++ }
-                    "--psiphon-cdn-sets" -> pick(i)?.let { cfg = cfg.copy(psiphonCdnSets = it); i++ }
-                    "--psiphon-region" -> pick(i)?.let { cfg = cfg.copy(psiphonRegion = it); i++ }
-                    "--tor" -> cfg = cfg.copy(tor = AetherTor.CHAIN.type)
-                    "--tor-reverse" -> cfg = cfg.copy(tor = AetherTor.REVERSE.type)
-                    "--tor-only" -> cfg = cfg.copy(tor = AetherTor.ONLY.type)
-                    "--tor-bridges" -> cfg = cfg.copy(torBridges = AetherTorBridges.FIRST.type)
-                    "--no-tor-bridges" -> cfg = cfg.copy(torBridges = AetherTorBridges.NEVER.type)
-                    "--tor-bridge" -> pick(i)?.let {
-                        cfg = cfg.copy(torBridges = AetherTorBridges.OWN.type, torBridgeLines = (cfg.torBridgeLines + "\n" + it).trim())
-                        i++
-                    }
-                    "--tor-relays" -> pick(i)?.let { cfg = cfg.copy(torRelays = AetherTorRelays.fromString(it).type); i++ }
-                    "--register" -> { i++ } // a key-registration command carries no session flags
-                    else -> {
-                        // Unknown input is kept whole, never silently
-                        // dropped (D5): an unknown flag keeps the token
-                        // after it when that token is not another flag
-                        // (its value), and any other stray token is kept
-                        // as-is. Everything lands in extraArgs, which
-                        // toFlags() re-emits verbatim and the editor
-                        // shows for review, so a pasted command line
-                        // round-trips token-for-token. The one exception
-                        // is the first token when it is not a flag: that
-                        // is the pasted program name (`aether ...`),
-                        // which is not an argument.
-                        if (i == 0 && !p.startsWith("-")) {
-                            // program name, not an argument
-                        } else {
-                            extras += p
-                            if (p.startsWith("--")) {
-                                val v = parts.getOrNull(i + 1)
-                                if (v != null && !v.startsWith("--")) {
-                                    extras += v
-                                    i++
-                                }
-                            }
-                        }
-                    }
-                }
-                i++
-            }
-            if (extras.isNotEmpty()) cfg = cfg.copy(extraArgs = extras.joinToString(" "))
-            return cfg
-        }
 
         /** PattNG-style `aether://host:port?query#label` link (AetherFmt.parse). */
         fun fromShareLink(link: String): AetherProfile? {
@@ -415,6 +336,7 @@ data class AetherProfile(
                 torBridgeLines = q["bridges"]?.split(';')?.joinToString("\n").orEmpty(),
                 finalMask = q["fm"].orEmpty(),
                 dialMode = q["dialMode"].orEmpty(),
+                command = q["cmd"].orEmpty(),
             )
             if (proto.twoHops) {
                 cfg = cfg.copy(wiwOuter = q["outer"].orEmpty(), wiwInner = q["inner"].orEmpty())
