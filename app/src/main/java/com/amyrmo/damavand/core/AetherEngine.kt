@@ -98,8 +98,11 @@ class AetherEngine(
             } else {
                 cmd += listOf("--bind", "127.0.0.1:$socksPort")
                 cmd += withShippedList(arguments, shippedEntries(arguments, workDir))
-                // The ready word is an info line; a quieter setting must not leave a Psiphon session waiting for it.
-                cmd += listOf("--log-level", if (needsReadyWord) "info" else "warn")
+                // Sessions run at info, as in PattNG/Narcic: the ready word
+                // a Psiphon session waits on is an info line, and at warn a
+                // scanning session is silent — no hunt progress, no chosen
+                // endpoint, nothing to diagnose when it never comes up.
+                cmd += listOf("--log-level", "info")
             }
             if (psi.exists() && "--psiphon-bin" !in cmd) cmd += listOf("--psiphon-bin", psi.absolutePath)
 
