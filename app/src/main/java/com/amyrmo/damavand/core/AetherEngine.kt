@@ -2,6 +2,7 @@ package com.amyrmo.damavand.core
 
 import android.content.Context
 import android.os.Build
+import com.amyrmo.damavand.domain.config.AetherCommands
 import com.amyrmo.damavand.domain.config.AetherKeyKind
 import com.amyrmo.damavand.domain.config.AetherProfile
 import com.amyrmo.damavand.domain.config.AetherProtocol
@@ -46,13 +47,19 @@ class AetherEngine(
      * has a tunnel. PattNG: AetherCoreManager.readyNeedsWord, read off the
      * profile instead of the arguments.
      */
-    private val needsReadyWord: Boolean = when {
+    @Volatile private var needsReadyWord: Boolean = when {
         AetherTor.fromString(config.tor) == AetherTor.ONLY -> false
         AetherPsiphon.fromString(config.psiphon) == AetherPsiphon.ONLY -> true
         else -> AetherPsiphon.fromString(config.psiphon) == AetherPsiphon.CHAIN
     }
 
-    val socksPort: Int = 18190 + Random.nextInt(1, 2000)
+    /**
+     * The loopback port the bridge dials. Chosen at random for field-built
+     * profiles; a custom command may name its own listener, and [start] then
+     * adopts the port it names (Narcic's listenerPortOf model).
+     */
+    @Volatile var socksPort: Int = 18190 + Random.nextInt(1, 2000)
+        private set
 
     val isRunning: Boolean get() = active.get() && process?.isAlive == true
 
@@ -70,13 +77,31 @@ class AetherEngine(
             val workDir = File(context.filesDir, WORK_DIR).apply { mkdirs() }
             // A renewal stopped while it moved its new keys into place is finished before a core reads them.
             settle()
+            val custom = AetherCommands.isCustom(config)
+            var arguments = if (custom) {
+                // The profile's command runs as written; the engine adds no
+                // --bind or --log-level of its own (they are repaired inside
+                // customArguments), and adopts the listener port it names.
+                AetherCommands.customArguments(config, socksPort)
+            } else {
+                config.toFlags()
+            }
+            arguments = normalizeShippedWord(arguments)
+            if (custom) {
+                AetherCommands.listenerPortOf(arguments)?.let { socksPort = it }
+                needsReadyWord = AetherCommands.readyNeedsWord(arguments)
+            }
             reapStale(bin, "127.0.0.1:$socksPort")
-            val arguments = config.toFlags()
-            val cmd = mutableListOf(bin.absolutePath, "--bind", "127.0.0.1:$socksPort")
-            cmd += withShippedList(arguments, shippedEntries(arguments, workDir))
-            // The ready word is an info line; a quieter setting must not leave a Psiphon session waiting for it.
-            cmd += listOf("--log-level", if (needsReadyWord) "info" else "warn")
-            if (psi.exists()) cmd += listOf("--psiphon-bin", psi.absolutePath)
+            val cmd = mutableListOf(bin.absolutePath)
+            if (custom) {
+                cmd += withShippedList(arguments, shippedEntries(arguments, workDir))
+            } else {
+                cmd += listOf("--bind", "127.0.0.1:$socksPort")
+                cmd += withShippedList(arguments, shippedEntries(arguments, workDir))
+                // The ready word is an info line; a quieter setting must not leave a Psiphon session waiting for it.
+                cmd += listOf("--log-level", if (needsReadyWord) "info" else "warn")
+            }
+            if (psi.exists() && "--psiphon-bin" !in cmd) cmd += listOf("--psiphon-bin", psi.absolutePath)
 
             val builder = ProcessBuilder(cmd)
                 .directory(workDir)
@@ -87,7 +112,7 @@ class AetherEngine(
             val proc = builder.start()
             process = proc
             onLog("aether core started (socks=127.0.0.1:$socksPort)")
-            onLog(config.commandPreview(socksPort))
+            onLog(if (custom) (listOf("aether") + cmd.drop(1)).joinToString(" ") else config.commandPreview(socksPort))
 
             watcher = Thread({
                 val out = proc.inputStream.bufferedReader()
@@ -321,6 +346,18 @@ class AetherEngine(
      * there is no such file. A file of the command's own is left as written.
      * PattNG: AetherCoreManager.withShippedList.
      */
+    /**
+     * PattNG-style commands name the bundled Psiphon list "shipped"; Damavand's
+     * word is [AetherProfile.SHIPPED_LIST]. Normalized before [withShippedList]
+     * so a pasted PattNG command gets the app's unpacked list, not a file
+     * literally called "shipped".
+     */
+    private fun normalizeShippedWord(arguments: List<String>): List<String> {
+        val at = arguments.indexOf(AetherProfile.PSIPHON_SERVER_ENTRIES)
+        if (at < 0 || arguments.getOrNull(at + 1) != "shipped") return arguments
+        return arguments.toMutableList().also { it[at + 1] = AetherProfile.SHIPPED_LIST }
+    }
+
     private fun withShippedList(arguments: List<String>, entries: File?): List<String> {
         val at = arguments.indexOf(AetherProfile.PSIPHON_SERVER_ENTRIES)
         if (at < 0 || arguments.getOrNull(at + 1) != AetherProfile.SHIPPED_LIST) return arguments
