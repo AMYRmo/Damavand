@@ -143,7 +143,16 @@ data class AetherProfile(
                     AetherEndpoint.of(address, port)?.let { addAll(listOf("--peer", it.toString())) }
                 }
 
-                add(if (scanning) "--no-quick-reconnect" else "--quick-reconnect")
+                // A session always quick-reconnects. In PattNG and Narcic
+                // the scan flag is a property of the *run*, not of the
+                // profile: only a throwaway endpoint-scan run (which serves
+                // no session) gets --no-quick-reconnect. Keying the flag
+                // off a blank endpoint, as this used to, made every
+                // scan-mode session ignore the core's saved last-working
+                // gateway and re-hunt from scratch — and where a fresh
+                // hunt finds no data-plane endpoint, the session never
+                // came up at all.
+                add("--quick-reconnect")
             }
 
             when (torEnum) {
@@ -195,9 +204,9 @@ data class AetherProfile(
         }
     }
 
-    /** The "Aether command" preview line, like PattNG shows. */
+    /** The "Aether command" preview line, like PattNG shows. The log level matches the session's (info). */
     fun commandPreview(bindPort: Int): String =
-        (listOf("aether", "--bind", "127.0.0.1:$bindPort") + toFlags() + listOf("--log-level", "warn")).joinToString(" ")
+        (listOf("aether", "--bind", "127.0.0.1:$bindPort") + toFlags() + listOf("--log-level", "info")).joinToString(" ")
 
     /** PattNG-style `aether://host:port?query#label` share link (AetherFmt.toUri). */
     fun toShareLink(): String {
