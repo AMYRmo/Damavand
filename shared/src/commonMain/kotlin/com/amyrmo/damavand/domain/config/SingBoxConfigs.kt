@@ -207,13 +207,18 @@ object SingBoxConfigs {
      * back to its "local" server, and with no platform local-DNS transport that
      * resolver dials [::1]:53 and every hijacked TUN query is refused — apps see
      * a tunnel that is up but cannot resolve any name. DNS therefore rides the
-     * tunnel itself (TCP, so it also works when the core's exit is Psiphon,
-     * which carries no UDP): the profile's own DNS when one is set (a bare IP
-     * means plain UDP, anything else is used as the server address as-is),
-     * otherwise Cloudflare DoH, always detoured through the core outbound.
+     * tunnel itself as DoH (TCP, so it also works when the core's exit is
+     * Psiphon, which carries no UDP), detoured through the core outbound.
+     *
+     * Format matters: the bundled libbox is sing-box 1.14+, where the legacy
+     * DNS server format ("address"/"detour" objects) was REMOVED — a legacy
+     * entry fails the whole config decode and sing-box refuses to start at all
+     * (seen on device with build #76). Only the new typed format is used here.
+     * The profile's own DNS is honoured when set: an https:// URL contributes
+     * its host and path, a bare IP or host becomes the DoH server itself, and
+     * anything unparseable falls back to Cloudflare's 1.1.1.1.
      */
     fun aetherBridge(aetherSocksPort: Int, device: DeviceOptions, dns: String = ""): String {
-        val dnsAddress = dns.trim().ifEmpty { "https://cloudflare-dns.com/dns-query" }
         val config = buildJsonObject {
             put("inbounds", buildJsonArray { add(tunInbound(true, device)) })
             put("outbounds", buildJsonArray {
@@ -225,18 +230,39 @@ object SingBoxConfigs {
                 })
             })
             put("dns", buildJsonObject {
-                put("servers", buildJsonArray {
-                    add(buildJsonObject {
-                        put("tag", "bridge-dns")
-                        put("address", dnsAddress)
-                        put("detour", "aether")
-                    })
-                })
+                put("servers", buildJsonArray { add(bridgeDnsServer(dns)) })
                 put("final", "bridge-dns")
             })
             put("route", routeForAddedTun(null))
         }
         return SingBoxJson.encode(config)
+    }
+
+    /** One new-format (sing-box ≥1.12) DoH server entry for the bridge. */
+    private fun bridgeDnsServer(dns: String): JsonObject {
+        var server = "1.1.1.1"
+        var path = "/dns-query"
+        val value = dns.trim()
+        if (value.isNotEmpty()) {
+            if (value.startsWith("https://", ignoreCase = true)) {
+                val rest = value.removePrefix("https://").removePrefix("HTTPS://")
+                val host = rest.substringBefore("/").substringBefore(":")
+                if (host.isNotBlank()) {
+                    server = host
+                    val slash = rest.indexOf('/')
+                    if (slash >= 0) path = rest.substring(slash)
+                }
+            } else if (!value.contains(" ") && !value.contains("://")) {
+                server = value.substringBefore(":")
+            }
+        }
+        return buildJsonObject {
+            put("type", "https")
+            put("tag", "bridge-dns")
+            put("server", server)
+            put("path", path)
+            put("detour", "aether")
+        }
     }
 
     private fun routeForAddedTun(route: JsonObject?): JsonObject {
