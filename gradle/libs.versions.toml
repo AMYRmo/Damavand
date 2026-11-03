@@ -5,7 +5,11 @@
 # Maven Central / Google Maven at first CI run.
 [versions]
 agp = "9.3.2"
-kotlin = "2.2.10"
+# 2.4.21 (newest stable): Haze 2.1.0 and the resolved stdlib carry Kotlin 2.4
+# metadata, which the 2.2 compiler cannot read (CI run 41613463403). JetBrains'
+# tested AGP range for KGP 2.4.20-2.4.21 tops at 9.3.1 and the docs explicitly
+# allow newer AGP patch releases; AGP itself only enforces a minimum KGP.
+kotlin = "2.4.21"
 
 composeBom = "2026.09.00"
 material3Expressive = "1.5.0-beta01" # as in v1; architecture §1.3 wants Material 3 Expressive
