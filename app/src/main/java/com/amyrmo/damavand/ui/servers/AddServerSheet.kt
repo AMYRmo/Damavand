@@ -2,16 +2,21 @@ package com.amyrmo.damavand.ui.servers
 
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -26,7 +31,9 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
@@ -35,7 +42,6 @@ import com.amyrmo.damavand.model.CoreKind
 import com.amyrmo.damavand.ui.AppViewModel
 import com.amyrmo.damavand.ui.components.FormTextField
 import com.amyrmo.damavand.ui.components.SectionHeader
-import com.amyrmo.damavand.ui.theme.StateColors
 import com.amyrmo.damavand.ui.theme.accent
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -53,8 +59,10 @@ private val BLANK_KINDS = listOf(
 /**
  * Add-a-server (§5.2): paste a link (parsed by the :model cascade in
  * [com.amyrmo.damavand.data.profiles.ProfileFactory.fromText]), import a
- * file with the same cascade, add a subscription by URL, or start a
- * blank per-core editor.
+ * file with the same cascade, add a subscription by URL, start a
+ * blank per-core editor, or open the Cloudflare WARP entry (free, as
+ * in ZedSecure's Add sheet; registration itself is backend-pending —
+ * see [WarpDialog]).
  */
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
@@ -70,6 +78,7 @@ fun AddServerSheet(
     var subUrl by remember { mutableStateOf("") }
     var subName by remember { mutableStateOf("") }
     var subError by remember { mutableStateOf(false) }
+    var showWarp by remember { mutableStateOf(false) }
 
     val fileLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.OpenDocument(),
@@ -128,7 +137,7 @@ fun AddServerSheet(
                 Text(
                     text = stringResource(R.string.add_invalid_link),
                     style = MaterialTheme.typography.bodySmall,
-                    color = StateColors.Error,
+                    color = MaterialTheme.colorScheme.error,
                 )
             }
             Button(
@@ -187,7 +196,34 @@ fun AddServerSheet(
                     }
                 }
             }
+
+            SectionHeader(title = stringResource(R.string.warp_add_title))
+            OutlinedButton(
+                onClick = { showWarp = true },
+                modifier = Modifier.fillMaxWidth(),
+            ) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(stringResource(R.string.warp_add_title))
+                    Spacer(Modifier.width(8.dp))
+                    Box(
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(6.dp))
+                            .background(MaterialTheme.colorScheme.tertiaryContainer)
+                            .padding(horizontal = 6.dp, vertical = 2.dp),
+                    ) {
+                        Text(
+                            text = "Free",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onTertiaryContainer,
+                        )
+                    }
+                }
+            }
             Spacer(Modifier.height(4.dp))
         }
+    }
+
+    if (showWarp) {
+        WarpDialog(onDismiss = { showWarp = false })
     }
 }

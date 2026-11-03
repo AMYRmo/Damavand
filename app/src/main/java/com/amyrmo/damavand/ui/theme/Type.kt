@@ -1,9 +1,11 @@
 package com.amyrmo.damavand.ui.theme
 
 import androidx.compose.material3.Typography
+import androidx.compose.ui.text.ExperimentalTextApi
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.Font
 import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.text.font.FontVariation
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.sp
 import com.amyrmo.damavand.R
@@ -17,10 +19,11 @@ import com.amyrmo.damavand.R
  * res/font/vazirmatn.ttf), so the showcase Persian locale never depends on
  * device fonts.
  *
- * TODO(fonts): the bundled files are *variable* fonts registered here at four
- * static weights. Android selects the nearest declared instance, but exact
- * variation-axis rendering per weight should be verified on device at the
- * first CI build; if weights render flat, ship static instances instead.
+ * The bundled files are *variable* fonts; they are registered with explicit
+ * FontVariation.Settings per weight (see [variableFontFamily] — the previous
+ * static-weight registration was the prime suspect for the Persian-locale
+ * crash). Exact variation-axis rendering per weight should still be verified
+ * on device; if weights render flat, ship static instances instead.
  * The scale follows M3 (Expressive metrics) with the *Emphasized* headline
  * variants exposed separately in [DamavandTextStyles] — the beta
  * Typography(…Emphasized) constructor slots are deliberately not used
@@ -29,19 +32,45 @@ import com.amyrmo.damavand.R
  * Persian line heights are raised vs Latin (Narcic fa scale: body 14/24),
  * because Vazirmatn's ascenders/diacritics clip at Latin line heights.
  */
-val InterFontFamily: FontFamily = FontFamily(
-    Font(R.font.inter, FontWeight.Normal),
-    Font(R.font.inter, FontWeight.Medium),
-    Font(R.font.inter, FontWeight.SemiBold),
-    Font(R.font.inter, FontWeight.Bold),
+/**
+ * PERSIAN-CRASH FIX (audit prime suspect, 2026-11-03): both bundled fonts
+ * are VARIABLE fonts with a single `wght` axis (Vazirmatn 100–900, Inter
+ * likewise). Registering one variable file as four static weights with no
+ * variation settings can fail font resolution when the family is selected
+ * (Persian → Vazirmatn). Both families are therefore registered the
+ * documented Android variable-font way: each weight entry carries
+ * [FontVariation.Settings] pinning `wght` to that weight. Do NOT revert to
+ * plain `Font(resId, weight)` entries for these files.
+ */
+@OptIn(ExperimentalTextApi::class)
+private fun variableFontFamily(resId: Int): FontFamily = FontFamily(
+    Font(
+        resId,
+        FontWeight.Normal,
+        variationSettings = FontVariation.Settings(FontVariation.weight(400)),
+    ),
+    Font(
+        resId,
+        FontWeight.Medium,
+        variationSettings = FontVariation.Settings(FontVariation.weight(500)),
+    ),
+    Font(
+        resId,
+        FontWeight.SemiBold,
+        variationSettings = FontVariation.Settings(FontVariation.weight(600)),
+    ),
+    Font(
+        resId,
+        FontWeight.Bold,
+        variationSettings = FontVariation.Settings(FontVariation.weight(700)),
+    ),
 )
 
-val VazirmatnFontFamily: FontFamily = FontFamily(
-    Font(R.font.vazirmatn, FontWeight.Normal),
-    Font(R.font.vazirmatn, FontWeight.Medium),
-    Font(R.font.vazirmatn, FontWeight.SemiBold),
-    Font(R.font.vazirmatn, FontWeight.Bold),
-)
+@OptIn(ExperimentalTextApi::class)
+val InterFontFamily: FontFamily = variableFontFamily(R.font.inter)
+
+@OptIn(ExperimentalTextApi::class)
+val VazirmatnFontFamily: FontFamily = variableFontFamily(R.font.vazirmatn)
 
 private fun style(
     family: FontFamily,

@@ -20,6 +20,7 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.amyrmo.damavand.R
 import com.amyrmo.damavand.core.session.SessionState
+import com.amyrmo.damavand.data.settings.AppDesign
 import com.amyrmo.damavand.data.settings.ConnectStyle
 import com.amyrmo.damavand.model.Profile
 import com.amyrmo.damavand.ui.AppViewModel
@@ -30,12 +31,59 @@ import com.amyrmo.damavand.ui.components.SlideConnect
 import com.amyrmo.damavand.ui.theme.Dimens
 
 /**
- * Home (§5.2): BrandHeader → FaultBanner → ActiveConfigCard → connect
- * control (pill or slide per Appearance) → stage indicator while
- * connecting → DashboardCard when connected → subscription health.
+ * Home design dispatcher: reads [com.amyrmo.damavand.data.settings.UiSettings.design]
+ * and routes to the selected home — PORTAL (v1 Damavand's Portal, the
+ * default), BENTO (ZedSecure v3.1.8's default design, in ui.bento),
+ * PIXEL (ZedSecure's Pixel home), CLASSIC (the previous v2 home, kept
+ * verbatim as [ClassicHome] below).
  */
 @Composable
 fun HomeScreen(
+    vm: AppViewModel,
+    onConnect: (Profile) -> Unit,
+    onOpenServers: () -> Unit,
+    onOpenSubscriptions: () -> Unit,
+) {
+    val ui by vm.uiSettings.collectAsStateWithLifecycle()
+    when (ui.design) {
+        AppDesign.PORTAL -> PortalHome(
+            vm = vm,
+            onConnect = onConnect,
+            onOpenServers = onOpenServers,
+            onOpenSubscriptions = onOpenSubscriptions,
+        )
+
+        AppDesign.BENTO -> com.amyrmo.damavand.ui.bento.BentoHome(
+            vm = vm,
+            onConnect = onConnect,
+            onOpenServers = onOpenServers,
+            onOpenSubscriptions = onOpenSubscriptions,
+        )
+
+        AppDesign.PIXEL -> PixelHome(
+            vm = vm,
+            onConnect = onConnect,
+            onOpenServers = onOpenServers,
+            onOpenSubscriptions = onOpenSubscriptions,
+        )
+
+        AppDesign.CLASSIC -> ClassicHome(
+            vm = vm,
+            onConnect = onConnect,
+            onOpenServers = onOpenServers,
+            onOpenSubscriptions = onOpenSubscriptions,
+        )
+    }
+}
+
+/**
+ * The Classic home (the previous v2 HomeScreen body, moved verbatim):
+ * BrandHeader → FaultBanner → ActiveConfigCard → connect control (pill
+ * or slide per Appearance) → stage indicator while connecting →
+ * DashboardCard when connected → subscription health.
+ */
+@Composable
+fun ClassicHome(
     vm: AppViewModel,
     onConnect: (Profile) -> Unit,
     onOpenServers: () -> Unit,

@@ -17,12 +17,10 @@ import com.amyrmo.damavand.data.settings.SettingsRepository
 import com.amyrmo.damavand.data.settings.UiSettings
 import com.amyrmo.damavand.data.subscriptions.SubscriptionRepository
 import com.amyrmo.damavand.data.subscriptions.SubscriptionService
-import com.amyrmo.damavand.model.AetherProfile
 import com.amyrmo.damavand.model.AutoSelectProfile
 import com.amyrmo.damavand.model.MihomoProfile
 import com.amyrmo.damavand.model.Profile
 import com.amyrmo.damavand.model.ProfileJson
-import com.amyrmo.damavand.model.PsiphonProfile
 import com.amyrmo.damavand.model.Subscription
 import com.amyrmo.damavand.platform.GeoInfo
 import com.amyrmo.damavand.platform.GeoLookup
@@ -128,10 +126,8 @@ class AppViewModel(private val appContext: Context) : ViewModel() {
             profileRepo.load()
             subscriptionRepo.load()
             val ui = settingsRepo.currentUi()
-            if (!ui.startersSeeded) {
-                seedStarters()
-                settingsRepo.updateUi { it.copy(startersSeeded = true) }
-            }
+            // No seeded starter profiles (owner directive, ZedSecure
+            // revision): a fresh install starts with zero profiles.
             _selectedProfileId.value = ui.lastProfileId
                 ?.takeIf { id -> profiles.value.any { it.id == id } }
                 ?: profiles.value.firstOrNull()?.id
@@ -417,28 +413,6 @@ class AppViewModel(private val appContext: Context) : ViewModel() {
                 _notes.emit(UiNote(R.string.backup_failed))
             }
         }
-    }
-
-    // -- first run ----------------------------------------------------------------------
-
-    /**
-     * Zero-config starters (§5.2): a Psiphon profile (the core finds its
-     * own servers from the bundled list) and a scan-mode Aether profile
-     * (the core scans for a WARP endpoint) — both connect with no import.
-     */
-    private fun seedStarters() {
-        profileRepo.upsert(
-            PsiphonProfile(
-                id = UUID.randomUUID().toString(),
-                name = "Psiphon",
-            ),
-        )
-        profileRepo.upsert(
-            AetherProfile(
-                id = UUID.randomUUID().toString(),
-                name = "Aether",
-            ),
-        )
     }
 }
 

@@ -27,6 +27,14 @@ enum class AppLanguage { SYSTEM, FA, EN }
 enum class ConnectStyle { PILL, SLIDE }
 
 /**
+ * Home design (ZedSecure-wholesale revision): PORTAL is v1 Damavand's
+ * Portal interface and the default; BENTO is ZedSecure v3.1.8's default
+ * design; PIXEL is ZedSecure's Pixel home; CLASSIC is the previous v2
+ * home. Persisted in [UiSettings.design].
+ */
+enum class AppDesign { PORTAL, BENTO, PIXEL, CLASSIC }
+
+/**
  * The UI-facing settings slice (§5.2 Settings pages): appearance, language,
  * the connect-control style, and shell bookkeeping (the last profile the
  * user connected — the Home selection and the QS tile's target).
@@ -40,10 +48,12 @@ data class UiSettings(
     val glassBlur: Boolean = true,
     val language: AppLanguage = AppLanguage.SYSTEM,
     val connectStyle: ConnectStyle = ConnectStyle.PILL,
+    /** Home design; PORTAL (v1 Damavand's interface) is the default. */
+    val design: AppDesign = AppDesign.PORTAL,
+    /** Selected ZedSecure theme profile id (see ui/theme/ThemeProfiles). */
+    val themeProfileId: String = "damavand",
     /** Last profile connected (or chosen on Home); null before first use. */
     val lastProfileId: String? = null,
-    /** The zero-config starter profiles have been seeded (§5.2). */
-    val startersSeeded: Boolean = false,
 )
 
 /** The app settings the session layer consumes (architecture §3.3). */
@@ -96,8 +106,9 @@ class SettingsRepository(private val context: Context) {
             prefs[UI_GLASS_BLUR] = next.glassBlur
             prefs[UI_LANGUAGE] = next.language.name
             prefs[UI_CONNECT_STYLE] = next.connectStyle.name
+            prefs[UI_DESIGN] = next.design.name
+            prefs[UI_THEME_PROFILE] = next.themeProfileId
             next.lastProfileId?.let { prefs[UI_LAST_PROFILE] = it } ?: prefs.remove(UI_LAST_PROFILE)
-            prefs[UI_STARTERS_SEEDED] = next.startersSeeded
         }
     }
 
@@ -111,8 +122,10 @@ class SettingsRepository(private val context: Context) {
             .getOrDefault(AppLanguage.SYSTEM),
         connectStyle = runCatching { ConnectStyle.valueOf(this[UI_CONNECT_STYLE].orEmpty()) }
             .getOrDefault(ConnectStyle.PILL),
+        design = runCatching { AppDesign.valueOf(this[UI_DESIGN].orEmpty()) }
+            .getOrDefault(AppDesign.PORTAL),
+        themeProfileId = this[UI_THEME_PROFILE]?.takeIf { it.isNotBlank() } ?: "damavand",
         lastProfileId = this[UI_LAST_PROFILE],
-        startersSeeded = this[UI_STARTERS_SEEDED] ?: false,
     )
 
     suspend fun update(transform: (AppSettings) -> AppSettings) {
@@ -187,7 +200,8 @@ class SettingsRepository(private val context: Context) {
         private val UI_LANGUAGE = stringPreferencesKey("ui_language")
         private val UI_CONNECT_STYLE = stringPreferencesKey("ui_connect_style")
         private val UI_LAST_PROFILE = stringPreferencesKey("ui_last_profile")
-        private val UI_STARTERS_SEEDED = booleanPreferencesKey("ui_starters_seeded")
+        private val UI_DESIGN = stringPreferencesKey("ui_design")
+        private val UI_THEME_PROFILE = stringPreferencesKey("ui_theme_profile")
 
         private const val MODE_ALL = "all"
         private const val MODE_INCLUDE = "include"

@@ -166,7 +166,13 @@ fun SubscriptionsScreen(
                         deleting = null
                     },
                 ) {
-                    Text(stringResource(R.string.sub_delete_members), color = StateColors.Error)
+                    Text(
+                        stringResource(
+                            R.string.sub_delete_members,
+                            profiles.count { it.subscriptionId == sub.id },
+                        ),
+                        color = StateColors.Error,
+                    )
                 }
             },
             dismissButton = {

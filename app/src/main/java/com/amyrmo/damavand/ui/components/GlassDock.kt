@@ -42,7 +42,9 @@ import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.unit.IntOffset
+import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.amyrmo.damavand.ui.components.glass.GlassBackdrop
@@ -153,7 +155,15 @@ private fun DockItems(
             },
             label = "dock-slot",
         )
-        val indicatorX = (tabWidth * animatedSlot) + 5.dp
+        // Direction-aware indicator (fa-crash audit): the item row lays out
+        // start→end, so in RTL slot 0 sits at the RIGHT edge; a physical
+        // left offset would highlight the wrong tab. Mirror the offset.
+        val layoutDirection = LocalLayoutDirection.current
+        val indicatorX = if (layoutDirection == LayoutDirection.Rtl) {
+            maxWidth - (tabWidth * (animatedSlot + 1f)) + 5.dp
+        } else {
+            (tabWidth * animatedSlot) + 5.dp
+        }
         val indicatorWidth = (tabWidth - 10.dp).coerceAtLeast(10.dp)
         val indicatorShape = RoundedCornerShape(26.dp)
 

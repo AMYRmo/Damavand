@@ -46,7 +46,6 @@ import com.amyrmo.damavand.ui.components.DamavandIconKind
 import com.amyrmo.damavand.ui.components.ProfileRow
 import com.amyrmo.damavand.ui.editors.ProfileEditorSheet
 import com.amyrmo.damavand.ui.theme.Dimens
-import com.amyrmo.damavand.ui.theme.StateColors
 import java.util.UUID
 
 /**
@@ -235,7 +234,7 @@ fun ServersScreen(
                 ) {
                     Text(
                         text = stringResource(R.string.common_delete),
-                        color = StateColors.Error,
+                        color = MaterialTheme.colorScheme.error,
                     )
                 }
             },
@@ -285,7 +284,7 @@ private fun ServerCard(
                         Text(
                             text = "${daysLeft}d",
                             style = MaterialTheme.typography.labelSmall,
-                            color = StateColors.Connecting,
+                            color = MaterialTheme.colorScheme.tertiary,
                         )
                     }
                 }
@@ -350,23 +349,24 @@ private fun ServerCard(
 /** The measured-delay chip: a real number or nothing — never a guess. */
 @Composable
 fun PingChip(ping: PingOutcome) {
+    val scheme = MaterialTheme.colorScheme
     when (ping) {
         is PingOutcome.Ms -> Text(
             text = "${ping.value} ms",
             style = MaterialTheme.typography.labelMedium,
-            color = if (ping.value < 300) StateColors.Connected else StateColors.Connecting,
+            color = if (ping.value < 300) scheme.primary else scheme.tertiary,
         )
 
         PingOutcome.Measuring -> Text(
             text = "…",
             style = MaterialTheme.typography.labelMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            color = scheme.onSurfaceVariant,
         )
 
         PingOutcome.Unreachable -> Text(
             text = "✕",
             style = MaterialTheme.typography.labelMedium,
-            color = StateColors.Error,
+            color = scheme.error,
         )
 
         PingOutcome.Unknown, PingOutcome.NotApplicable -> Spacer(Modifier.height(0.dp))

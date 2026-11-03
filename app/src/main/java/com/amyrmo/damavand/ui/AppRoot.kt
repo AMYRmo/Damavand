@@ -94,6 +94,7 @@ fun DamavandApp() {
             amoled = ui.amoled,
             persian = persian,
             reduceTransparency = ui.reduceTransparency,
+            profileId = ui.themeProfileId,
         ) {
             Surface(modifier = Modifier.fillMaxSize()) {
                 AppShell(vm)

@@ -15,12 +15,18 @@ import androidx.compose.ui.unit.dp
  * chips. Content (cards, rows, sheets) never uses it; that reservation is
  * what makes the glass surfaces read as a separate layer.
  */
+// Adapted from ZedSecure by CluvexStudio (AGPL-3.0); Damavand is the owner's
+// own fork lineage of that codebase. DamavandShapes below adopts ZedSecure's
+// ZedShapes scale verbatim (8/12/18/26/32/36/44/52 dp).
 val DamavandShapes: Shapes = Shapes(
-    extraSmall = RoundedCornerShape(10.dp),
-    small = RoundedCornerShape(14.dp),
-    medium = RoundedCornerShape(22.dp),
-    large = RoundedCornerShape(30.dp),
-    extraLarge = RoundedCornerShape(40.dp),
+    extraSmall = RoundedCornerShape(8.dp),
+    small = RoundedCornerShape(12.dp),
+    medium = RoundedCornerShape(18.dp),
+    large = RoundedCornerShape(26.dp),
+    largeIncreased = RoundedCornerShape(32.dp),
+    extraLarge = RoundedCornerShape(36.dp),
+    extraLargeIncreased = RoundedCornerShape(44.dp),
+    extraExtraLarge = RoundedCornerShape(52.dp),
 )
 
 object DamavandShapeTokens {

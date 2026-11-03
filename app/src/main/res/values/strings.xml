@@ -353,4 +353,33 @@
     <string name="sub_none">No subscriptions yet</string>
     <string name="sub_refresh">Refresh</string>
     <string name="sub_keep_members">Keep servers</string>
+
+    <!-- Home design + theme profiles (ZedSecure-wholesale revision) -->
+    <string name="design_home">Home design</string>
+    <string name="design_portal">Portal</string>
+    <string name="design_bento">Bento</string>
+    <string name="design_pixel">Pixel</string>
+    <string name="design_classic">Classic</string>
+    <string name="appearance_theme_profile">Theme profile</string>
+
+    <!-- WARP / MASQUE (ported from ZedSecure) -->
+    <string name="warp_add_title">Cloudflare WARP</string>
+    <string name="warp_add_body">Registers a free WARP device with Cloudflare and adds it as a MASQUE server. If you are connected, registration goes through the current connection.</string>
+    <string name="warp_add_terms">By adding WARP you accept Cloudflare\'s terms of service (cloudflare.com/application/terms).</string>
+    <string name="warp_registering">Registering with Cloudflare…</string>
+    <string name="warp_failed">Registration failed: %1$s</string>
+    <string name="warp_add_action">Register</string>
+    <string name="warp_added">Cloudflare WARP added</string>
+    <string name="warp_backend_pending">WARP registration arrives with the MASQUE backend wiring.</string>
+    <string name="manual_masque_warp">Cloudflare WARP</string>
+    <string name="manual_masque_warp_hint">WARP uses a registered device key instead of a username and password. Add one from Servers › Add › Cloudflare WARP.</string>
+    <string name="manual_masque_warp_private_key">Device private key (ECDSA P-256)</string>
+    <string name="manual_masque_warp_public_key">Endpoint public key</string>
+    <string name="manual_masque_http">HTTP version</string>
+    <string name="manual_masque_path">Path (empty = /.well-known/masque/ip/*/*/)</string>
+    <string name="manual_masque_authority">Authority host (optional)</string>
+    <string name="manual_masque_headers">Extra headers (Name: value; Name: value)</string>
+    <string name="manual_masque_dns">DNS inside the tunnel (IP addresses)</string>
+    <string name="manual_masque_extra">Extra masqueSettings JSON (optional)</string>
+    <string name="masque_surface_note">In Damavand, MASQUE links currently run through the Aether core.</string>
 </resources>

@@ -7,15 +7,19 @@ import androidx.compose.ui.graphics.Color
 import com.amyrmo.damavand.model.CoreKind
 
 /**
- * Colour tokens for Damavand v2 (architecture §5.3; design-research §4.1,
- * adopted verbatim). Tokens are code and are reviewed like code: composables
- * outside this file never hard-code a palette value — they read
- * [MaterialTheme.colorScheme][androidx.compose.material3.MaterialTheme], the
- * brand/state objects below, or [CoreAccents].
+ * Adapted from ZedSecure by CluvexStudio (AGPL-3.0); Damavand is the owner's
+ * own fork lineage of that codebase.
  *
- * The base family is Narcic-Getway's "Night-Ice" blue, tokenised (Narcic
- * itself hard-codes these values inside composables — the mistake this file
- * exists to prevent).
+ * Colour tokens for Damavand v2. The ENTIRE theme is remapped from
+ * ZedSecure green to Damavand RED: any colour with hue ~100°–190°
+ * (green/teal/cyan-green/lime) is rotated to ~350°–10° (red), preserving
+ * saturation/lightness. Property/object names are kept from v2 so existing
+ * call sites compile unchanged; where a name says "Cyan"/"Teal"/"Lime" the
+ * VALUE is now the red-family replacement and the mapping is noted inline.
+ *
+ * Tokens are code: composables outside this file never hard-code a palette
+ * value — they read [androidx.compose.material3.MaterialTheme.colorScheme],
+ * the brand/state objects below, or [CoreAccents].
  */
 
 // ---------------------------------------------------------------------------
@@ -23,22 +27,55 @@ import com.amyrmo.damavand.model.CoreKind
 // ---------------------------------------------------------------------------
 
 object Brand {
-    val Primary = Color(0xFF2E6BE6)
-    val Violet = Color(0xFF3D7BFF)
-    val Cyan = Color(0xFF4ED9E0)
-    val Ice = Color(0xFF7DD8FF)
-    val Deep = Color(0xFF0A1830)
+    /** Was Night-Ice blue 0xFF2E6BE6 / Zed connect teal 0xFF12A594 → Damavand red. */
+    val Primary = Color(0xFFE5484D)
+
+    /** ZedSecure connected violet, kept (non-green). Was 0xFF3D7BFF. */
+    val Violet = Color(0xFF7C5CFF)
+
+    /** Name kept for compatibility; value was cyan 0xFF4ED9E0 → warm red-orange. */
+    val Cyan = Color(0xFFFF6B5E)
+
+    /** Was ice blue 0xFF7DD8FF → light rose. */
+    val Ice = Color(0xFFFFB3AB)
+
+    /** Was deep blue 0xFF0A1830 → deep dark red. */
+    val Deep = Color(0xFF30060A)
 }
 
+// ZedSecure colour constants (from ZedSecure Color.kt), remapped:
+//   BrandIris  0xFF5646D6 → kept (violet)
+//   BrandTeal  0xFF00897E → ZedTealAsRed 0xFFC0362C (teal → crimson red)
+//   BrandRose  0xFFC4326B → kept (rose)
+//   ZedLime    0xFFC7F24E → DamavandLime 0xFFFF5A4E (lime → red)
+//   ZedOnLime  0xFF1A2200 → DamavandOnLime 0xFF2B0703 (dark green-black → dark red-black)
+//   ZedHotPink 0xFFFF5FA2 → DamavandHotPink, kept (pink)
+//   ZedViolet  0xFF7A5CFF → DamavandViolet, kept (violet)
+//   ZedDeepViolet 0xFF2A1361 → DamavandDeepViolet, kept (violet)
+//   ZedCyan    0xFF37E0D8 → DamavandWarm 0xFFFF8A5C (cyan → warm red-orange)
+val BrandIris = Color(0xFF5646D6)
+val ZedTealAsRed = Color(0xFFC0362C)
+val BrandRose = Color(0xFFC4326B)
+val DamavandLime = Color(0xFFFF5A4E)
+val DamavandOnLime = Color(0xFF2B0703)
+val DamavandHotPink = Color(0xFFFF5FA2)
+val DamavandViolet = Color(0xFF7A5CFF)
+val DamavandDeepViolet = Color(0xFF2A1361)
+val DamavandWarm = Color(0xFFFF8A5C)
+
 object StateColors {
-    val Connected = Color(0xFF27A468)
+    /** Was green 0xFF27A468 → Damavand red (connected reads red + violet gradient). */
+    val Connected = Color(0xFFE5484D)
     val Connecting = Color(0xFFFF9500)
     val Error = Color(0xFFFF3B30)
 }
 
 object TrafficColors {
-    val Down = Color(0xFF007AFF)
-    val Up = Color(0xFF34C759)
+    /** Was blue 0xFF007AFF → red-family warm (matches profile download). */
+    val Down = Color(0xFFFF6B5E)
+
+    /** Was green 0xFF34C759 → Zed upload violet. */
+    val Up = Color(0xFFB49BFF)
 }
 
 /** Dock item colours for the unselected state (Narcic tab-bar values). */
@@ -47,31 +84,32 @@ object DockColors {
     val InactiveLight = Color(0xFF64748B)
 }
 
-/** Narcic `pingColor()` semantics, split by theme (design-research §4.1). */
+/**
+ * Ping colours, split by theme. Remapped off green: the <150 ms branch was
+ * green 0xFF1B7A3C (light) / ice 0xFF7DD8FF (dark) → deep red 0xFFC0362C
+ * (light) / lightened connect red 0xFFFF7A72 (dark). Amber and error stay.
+ */
 fun pingColor(ms: Long, darkTheme: Boolean): Color = when {
     ms < 0 -> Color(0xFFD1453B) // unreachable / timed out
-    ms < 150 -> if (darkTheme) Color(0xFF7DD8FF) else Color(0xFF1B7A3C)
+    ms < 150 -> if (darkTheme) Color(0xFFFF7A72) else Color(0xFFC0362C)
     ms < 350 -> if (darkTheme) Color(0xFFFFC46B) else Color(0xFF8A5A00)
     else -> Color(0xFFD1453B)
 }
 
 // ---------------------------------------------------------------------------
-// Gradients (design-research §4.1). Returned as colour stops; callers build
-// the Brush so direction stays a layout decision.
+// Gradients. Returned as colour stops; callers build the Brush so direction
+// stays a layout decision. With the remapped Brand values these are now
+// violet → warm-red → rose stops; the two hard-coded blue mid-stops were
+// rotated to dark reds (0xFF1E4A9E → 0xFF7A1622, 0xFF173B7C → 0xFF5C1218).
 // ---------------------------------------------------------------------------
 
 object Gradients {
     val Connected: List<Color> = listOf(Brand.Violet, Brand.Cyan, Brand.Ice)
 
-    val Connecting: List<Color> = listOf(Brand.Deep, Color(0xFF1E4A9E), Brand.Cyan)
+    val Connecting: List<Color> = listOf(Brand.Deep, Color(0xFF7A1622), Brand.Cyan)
 
-    val Idle: List<Color> = listOf(Brand.Deep, Color(0xFF173B7C), Brand.Violet.copy(alpha = 0.75f))
+    val Idle: List<Color> = listOf(Brand.Deep, Color(0xFF5C1218), Brand.Violet.copy(alpha = 0.75f))
 
-    /**
-     * 3–5 per-session variants of the connected gradient, rotated by session
-     * id (Narcic pattern). All variants stay inside the brand family so the
-     * connected state reads identically; only the stop order/weights move.
-     */
     val ConnectedVariants: List<List<Color>> = listOf(
         Connected,
         listOf(Brand.Cyan, Brand.Violet, Brand.Ice),
@@ -84,16 +122,22 @@ object Gradients {
 }
 
 // ---------------------------------------------------------------------------
-// Per-core accents (architecture §5.3). One hue per core so server-card
-// rails, chain chips and editor headers read at a glance.
+// Per-core accents. One hue per core so server-card rails, chain chips and
+// editor headers read at a glance. Remap choices (no green/teal accents):
+//   XRAY     violet 0xFF7C5CFF (Brand.Violet, kept)
+//   AETHER   was cyan 0xFF4ED9E0 (hue ~183°, in remap band) → orange-red 0xFFFF8A5C
+//   MIHOMO   was 0xFFFF8A5C → shifted to amber 0xFFFFB020 so it does not
+//            collide with Aether's new accent
+//   PSIPHON  was 0xFF7C6FF0 → light violet 0xFF9D7BFF (distinct from Xray)
+//   WHITEDNS was teal 0xFF20D8C0 → Damavand red 0xFFE5484D
 // ---------------------------------------------------------------------------
 
 object CoreAccents {
     val Xray: Color = Brand.Violet
-    val Aether: Color = Brand.Cyan
-    val Mihomo: Color = Color(0xFFFF8A5C)
-    val Psiphon: Color = Color(0xFF7C6FF0)
-    val Whitedns: Color = Color(0xFF20D8C0)
+    val Aether: Color = Color(0xFFFF8A5C)
+    val Mihomo: Color = Color(0xFFFFB020)
+    val Psiphon: Color = Color(0xFF9D7BFF)
+    val Whitedns: Color = Color(0xFFE5484D)
     val SingBox: Color = Color(0xFF8D9199) // = dark outline token
     val Chain: Color = Brand.Primary
     val Auto: Color = Brand.Ice
@@ -111,18 +155,21 @@ fun CoreKind.accent(): Color = when (this) {
 }
 
 // ---------------------------------------------------------------------------
-// Schemes (design-research §4.1, verbatim values)
+// Schemes — rebuilt around red primary. Surfaces keep v2's near-black
+// blue-grey values; primary/secondary containers move off blue/teal to the
+// red tonal family (dark primary is the M3 red tonal 0xFFFFB3AB; secondary
+// was teal 0xFF87D5DB → rose tonal; tertiary orange stays).
 // ---------------------------------------------------------------------------
 
 val DarkColorScheme: ColorScheme = darkColorScheme(
-    primary = Color(0xFFAAC7FF),
-    onPrimary = Color(0xFF002E69),
-    primaryContainer = Color(0xFF1E4A9E),
-    onPrimaryContainer = Color(0xFFD8E2FF),
-    secondary = Color(0xFF87D5DB),
-    onSecondary = Color(0xFF00363A),
-    secondaryContainer = Color(0xFF004F54),
-    onSecondaryContainer = Color(0xFFB4EBEF),
+    primary = Color(0xFFFFB3AB),
+    onPrimary = Color(0xFF601410),
+    primaryContainer = Color(0xFF7A1C22),
+    onPrimaryContainer = Color(0xFFFFDAD6),
+    secondary = Color(0xFFE7BDB7),
+    onSecondary = Color(0xFF442926),
+    secondaryContainer = Color(0xFF5D3F3B),
+    onSecondaryContainer = Color(0xFFFFDAD6),
     tertiary = Color(0xFFFFB68F),
     onTertiary = Color(0xFF552400),
     tertiaryContainer = Color(0xFF7A3800),
@@ -161,12 +208,12 @@ val AmoledColorScheme: ColorScheme = DarkColorScheme.copy(
 val LightColorScheme: ColorScheme = lightColorScheme(
     primary = Brand.Primary,
     onPrimary = Color(0xFFFFFFFF),
-    primaryContainer = Color(0xFFD8E2FF),
-    onPrimaryContainer = Color(0xFF001945),
-    secondary = Color(0xFF00696E),
+    primaryContainer = Color(0xFFFFDAD6),
+    onPrimaryContainer = Color(0xFF5F1410),
+    secondary = Color(0xFF775652),
     onSecondary = Color(0xFFFFFFFF),
-    secondaryContainer = Color(0xFFB4EBEF),
-    onSecondaryContainer = Color(0xFF00363A),
+    secondaryContainer = Color(0xFFF5DDD9),
+    onSecondaryContainer = Color(0xFF2C1512),
     tertiary = Color(0xFFB4551B),
     onTertiary = Color(0xFFFFFFFF),
     tertiaryContainer = Color(0xFFFFDCC7),

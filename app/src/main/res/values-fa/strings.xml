@@ -353,4 +353,33 @@
     <string name="sub_none">هنوز اشتراکی نیست</string>
     <string name="sub_refresh">به‌روزرسانی</string>
     <string name="sub_keep_members">نگه داشتن سرورها</string>
+
+    <!-- Home design + theme profiles (ZedSecure-wholesale revision) -->
+    <string name="design_home">طرح خانه</string>
+    <string name="design_portal">درگاه</string>
+    <string name="design_bento">بنتو</string>
+    <string name="design_pixel">پیکسل</string>
+    <string name="design_classic">کلاسیک</string>
+    <string name="appearance_theme_profile">پروفایل تم</string>
+
+    <!-- WARP / MASQUE (ported from ZedSecure) -->
+    <string name="warp_add_title">Cloudflare WARP</string>
+    <string name="warp_add_body">یک دستگاه رایگان WARP در Cloudflare ثبت می‌کند و آن را به‌صورت سرور MASQUE اضافه می‌کند. اگر وصل هستید، ثبت از راه همان اتصال انجام می‌شود.</string>
+    <string name="warp_add_terms">با افزودن WARP شرایط استفادهٔ Cloudflare را می‌پذیرید (cloudflare.com/application/terms).</string>
+    <string name="warp_registering">در حال ثبت در Cloudflare…</string>
+    <string name="warp_failed">ثبت ناموفق بود: %1$s</string>
+    <string name="warp_add_action">ثبت</string>
+    <string name="warp_added">Cloudflare WARP اضافه شد</string>
+    <string name="warp_backend_pending">ثبت WARP با اتصال بک‌اند MASQUE ارائه خواهد شد.</string>
+    <string name="manual_masque_warp">Cloudflare WARP</string>
+    <string name="manual_masque_warp_hint">WARP به‌جای نام کاربری و رمز از کلید دستگاه ثبت‌شده استفاده می‌کند. از سرورها › افزودن › Cloudflare WARP یکی بسازید.</string>
+    <string name="manual_masque_warp_private_key">کلید خصوصی دستگاه (ECDSA P-256)</string>
+    <string name="manual_masque_warp_public_key">کلید عمومی سرور</string>
+    <string name="manual_masque_http">نسخهٔ HTTP</string>
+    <string name="manual_masque_path">مسیر (خالی = /.well-known/masque/ip/*/*/)</string>
+    <string name="manual_masque_authority">میزبان Authority (اختیاری)</string>
+    <string name="manual_masque_headers">هدرهای اضافه (Name: value; Name: value)</string>
+    <string name="manual_masque_dns">DNS داخل تونل (آدرس IP)</string>
+    <string name="manual_masque_extra">JSON اضافهٔ masqueSettings (اختیاری)</string>
+    <string name="masque_surface_note">در دماوند، لینک‌های MASQUE در حال حاضر از راه هستهٔ Aether اجرا می‌شوند.</string>
 </resources>

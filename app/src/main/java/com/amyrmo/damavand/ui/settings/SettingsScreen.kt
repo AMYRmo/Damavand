@@ -2,8 +2,10 @@ package com.amyrmo.damavand.ui.settings
 
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -11,7 +13,9 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
 import androidx.compose.material3.IconButton
@@ -26,6 +30,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
@@ -48,6 +53,8 @@ import com.amyrmo.damavand.ui.components.SectionHeader
 import com.amyrmo.damavand.ui.editors.PickerRow
 import com.amyrmo.damavand.ui.editors.SwitchRow
 import com.amyrmo.damavand.ui.theme.Dimens
+import com.amyrmo.damavand.ui.theme.ThemeProfile
+import com.amyrmo.damavand.ui.theme.ThemeProfiles
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -187,6 +194,21 @@ private fun SettingsRow(label: String, onClick: () -> Unit) {
 
 @Composable
 private fun AppearancePage(vm: AppViewModel, ui: UiSettings) {
+    SectionHeader(title = stringResource(R.string.design_home))
+    AppDesignPicker(
+        current = ui.design,
+        onPick = { value -> vm.updateUiSettings { it.copy(design = value) } },
+    )
+    SectionHeader(title = stringResource(R.string.appearance_theme_profile))
+    ThemeProfiles.forEach { profile ->
+        ThemeProfileRow(
+            profile = profile,
+            selected = profile.id == ui.themeProfileId,
+            onClick = {
+                vm.updateUiSettings { it.copy(themeProfileId = profile.id) }
+            },
+        )
+    }
     PickerRow(
         label = stringResource(R.string.appearance_theme),
         value = ui.themeMode,
@@ -231,6 +253,51 @@ private fun AppearancePage(vm: AppViewModel, ui: UiSettings) {
         },
         onPick = { style -> vm.updateUiSettings { it.copy(connectStyle = style) } },
     )
+}
+
+/** One theme-profile row: name, the profile's swatch dots, a check when active. */
+@Composable
+private fun ThemeProfileRow(
+    profile: ThemeProfile,
+    selected: Boolean,
+    onClick: () -> Unit,
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onClick)
+            .padding(vertical = 10.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(
+            text = profile.name,
+            style = MaterialTheme.typography.bodyLarge,
+            color = if (selected) {
+                MaterialTheme.colorScheme.primary
+            } else {
+                MaterialTheme.colorScheme.onSurface
+            },
+            modifier = Modifier.weight(1f),
+        )
+        Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+            profile.swatches.forEach { swatch ->
+                Box(
+                    modifier = Modifier
+                        .size(14.dp)
+                        .clip(CircleShape)
+                        .background(swatch),
+                )
+            }
+        }
+        if (selected) {
+            Spacer(Modifier.size(8.dp))
+            DamavandIcon(
+                kind = DamavandIconKind.Check,
+                tint = MaterialTheme.colorScheme.primary,
+                size = 18.dp,
+            )
+        }
+    }
 }
 
 @Composable
