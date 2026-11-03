@@ -21,7 +21,21 @@
             </intent-filter>
         </activity>
 
-        <!-- DamavandVpnService, QS tile and the home widget land in Phase 3
+        <!-- The VPN service (architecture §2.1): foreground type
+             systemExempted matches the FOREGROUND_SERVICE_SYSTEM_EXEMPTED
+             permission above (the VPN-service exemption). -->
+        <service
+            android:name=".core.service.DamavandVpnService"
+            android:exported="false"
+            android:foregroundServiceType="systemExempted"
+            android:label="Damavand VPN"
+            android:permission="android.permission.BIND_VPN_SERVICE">
+            <intent-filter>
+                <action android:name="android.net.VpnService" />
+            </intent-filter>
+        </service>
+
+        <!-- QS tile and the home widget land in a later phase
              (architecture §7); the manifest grows with them. -->
     </application>
 </manifest>

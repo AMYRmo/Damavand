@@ -77,6 +77,14 @@ dependencies {
     implementation(project(":model"))
     implementation(project(":logic"))
 
+    // The runtime layer (session orchestration, process supervision, the
+    // data stores) is coroutine-based; declare it instead of relying on
+    // the transitive copy lifecycle brings.
+    implementation(libs.kotlinx.coroutines.android)
+
+    // Adapters post-process core JSON (Psiphon splice/data-dir rewrite).
+    implementation(libs.kotlinx.serialization.json)
+
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.activity.compose)
     implementation(libs.androidx.lifecycle.runtime.compose)
