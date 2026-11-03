@@ -13,12 +13,13 @@ import androidx.compose.ui.unit.dp
 import com.amyrmo.damavand.ui.theme.GlassTokens
 import com.amyrmo.damavand.ui.theme.LocalGlassCapabilities
 import com.amyrmo.damavand.ui.theme.glassBorderBrush
+import dev.chrisbanes.haze.HazeInput
 import dev.chrisbanes.haze.HazeState
-import dev.chrisbanes.haze.HazeStyle
-import dev.chrisbanes.haze.HazeTint
-import dev.chrisbanes.haze.hazeEffect
 import dev.chrisbanes.haze.hazeSource
 import dev.chrisbanes.haze.rememberHazeState
+import dev.chrisbanes.haze.blur.HazeBlurStyle
+import dev.chrisbanes.haze.blur.HazeColorEffect
+import dev.chrisbanes.haze.blur.hazeBlur
 
 /**
  * ============================================================
@@ -30,9 +31,11 @@ import dev.chrisbanes.haze.rememberHazeState
  * is funnelled through [HazeGlassBackdrop], which implements the
  * [GlassBackdrop] seam from `FakeGlass.kt`:
  *
- *  - If the 2.1.0 artifacts / API differ at the first CI run, the fix is
- *    confined to THIS file (four symbols: [rememberHazeState],
- *    [hazeSource], [hazeEffect], [HazeStyle]/[HazeTint]).
+ *  - The 2.1.0 API was verified against the published sources on
+ *    2026-11-03 (the 1.x-style hazeEffect/HazeStyle API is gone; 2.1 uses
+ *    [rememberHazeState], [hazeSource] and `hazeBlur` with a
+ *    [HazeBlurStyle] block). Any future API drift stays confined to
+ *    THIS file.
  *  - If Haze had to be dropped entirely, replacing this class's body with
  *    the [NoGlassBackdrop] behaviour (one small edit) leaves every other
  *    file — GlassDock, the scaffold, all screens — compiling and looking
@@ -67,18 +70,24 @@ class HazeGlassBackdrop(private val state: HazeState) : GlassBackdrop {
         // Live glass: backdrop blur at the spec's radius, tinted with the
         // surface colour at GlassTokens.TintAlpha, over the fake-glass
         // border + specular recipe so both rungs share one silhouette.
+        // Haze 2.1 API (verified against the published 2.1.0 sources):
+        // Modifier.hazeBlur(input, style) with a HazeBlurStyle block;
+        // styles compare by identity, so the style is remembered.
         val tint = glassFallbackFill(isDark).copy(alpha = 1f)
+        val style = remember(tint) {
+            HazeBlurStyle {
+                blurRadius(GlassTokens.BlurRadius)
+                backgroundColor(tint)
+                colorEffects(listOf(HazeColorEffect.tint(tint.copy(alpha = GlassTokens.TintAlpha))))
+                noiseFactor(0f)
+            }
+        }
         Box(
             modifier = modifier
                 .clip(shape)
-                .hazeEffect(
-                    state = state,
-                    style = HazeStyle(
-                        backgroundColor = tint,
-                        tints = listOf(HazeTint(tint.copy(alpha = GlassTokens.TintAlpha))),
-                        blurRadius = GlassTokens.BlurRadius,
-                        noiseFactor = 0f,
-                    ),
+                .hazeBlur(
+                    input = HazeInput.Sources(state),
+                    style = style,
                 )
                 .border(width = 1.2.dp, brush = glassBorderBrush(), shape = shape),
         ) {
