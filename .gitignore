@@ -1,0 +1,16 @@
+*.iml
+.gradle/
+/build/
+**/build/
+local.properties
+.idea/
+captures/
+.externalNativeBuild/
+.cxx/
+keystore.properties
+release.keystore
+
+# Fetched/built cores (tools/ scripts regenerate them; see tools/cores.txt)
+app/libs/zedcore.aar
+app/src/main/jniLibs/
+app/src/main/assets/psiphon_servers.dat

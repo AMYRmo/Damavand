@@ -1,0 +1,109 @@
+# Damavand v2 CI (architecture §6.4).
+# Job 1 (fast, JDK only): the §6.2 unit suites for :model and :logic.
+# Job 2: fetch the cores with the tools/ scripts (same order as the v1
+# release pipeline, plus get-cottendns), verify them, and assemble the
+# arm64 APK. No signing and no release upload here — that stays in
+# release.yml.
+name: Damavand v2 CI
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: damavand-v2-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  jvm-tests:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      - uses: gradle/actions/setup-gradle@v5
+
+      - name: Unit tests (:model, :logic)
+        run: ./gradlew :model:test :logic:test --no-daemon
+
+  assemble-arm64:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      - uses: gradle/actions/setup-gradle@v5
+
+      - uses: actions/setup-go@v6
+        with:
+          go-version: '1.27.x' # >= go.mod's 1.26.0 (tools/get-cottendns.sh)
+
+      - uses: android-actions/setup-android@v4
+        with:
+          log-accepted-android-sdk-licenses: false
+          packages: 'platforms;android-37.0 build-tools;37.0.0 platform-tools'
+
+      - name: Fetch the cores
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          bash tools/get-cores.sh android
+          bash tools/get-aether.sh
+          bash tools/fetch-psiphon-servers.sh
+          bash tools/get-mihomo.sh
+          bash tools/get-cottendns.sh
+          bash tools/strip-cores.sh
+
+      - name: Verify the cores
+        run: |
+          set -e
+          ls -l app/libs/zedcore.aar
+          # v2 ships the arm64 APK only; the v1 verify loop's lib list minus
+          # the cores v2 dropped (Tor/OpenConnect stack), plus the two new
+          # staged binaries.
+          for lib in libhev-socks5-tunnel libzeptun-jni libaether libpsiphon-tunnel-core liblyrebird libmihomo libcottendns; do
+            [ -f "app/src/main/jniLibs/arm64-v8a/$lib.so" ] || { echo "::error::arm64-v8a/$lib.so is missing"; exit 1; }
+          done
+          for so in app/src/main/jniLibs/arm64-v8a/libhev-socks5-tunnel.so app/src/main/jniLibs/arm64-v8a/libzeptun-jni.so; do
+            readelf --dyn-syms -W "$so" | grep -qE ' (JNI_OnLoad|Java_)' || { echo "::error::$so has no JNI entry points"; exit 1; }
+          done
+
+      - name: Assemble the arm64 release APK (unsigned)
+        run: ./gradlew :app:assembleRelease --no-daemon -x lint
+
+      - name: Verify the APK
+        run: |
+          set -e
+          APK=$(ls app/build/outputs/apk/release/*arm64-v8a*.apk | head -1)
+          echo "APK: $APK ($(du -m "$APK" | cut -f1) MB)"
+          python3 - "$APK" <<'PYEOF'
+          import sys, zipfile
+          with zipfile.ZipFile(sys.argv[1]) as z:
+              abis = sorted({p.split('/')[1] for p in z.namelist() if p.startswith('lib/')})
+              assert abis == ['arm64-v8a'], abis
+              for lib in ('libgojni.so', 'libhev-socks5-tunnel.so', 'libaether.so',
+                          'libpsiphon-tunnel-core.so', 'liblyrebird.so',
+                          'libmihomo.so', 'libcottendns.so'):
+                  assert any(p.endswith('/' + lib) for p in z.namelist()), f'{lib} missing'
+          print('APK verified: arm64-v8a, core libs present')
+          PYEOF
+
+      - name: Upload the artifact
+        uses: actions/upload-artifact@v7
+        with:
+          name: Damavand-v2-arm64
+          if-no-files-found: error
+          path: app/build/outputs/apk/release/*arm64-v8a*.apk

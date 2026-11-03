@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Persian (showcase locale, architecture §5.4). Mirrors values/strings.xml. -->
+<resources>
+    <string name="app_name">دماوند</string>
+
+    <string name="dest_home">خانه</string>
+    <string name="dest_servers">سرورها</string>
+    <string name="dest_chains">زنجیره‌ها</string>
+    <string name="dest_settings">تنظیمات</string>
+
+    <string name="connect">اتصال</string>
+    <string name="disconnect">قطع اتصال</string>
+    <string name="connecting">در حال اتصال…</string>
+    <string name="connection_failed">اتصال ناموفق بود</string>
+
+    <string name="stage_starting">در حال شروع</string>
+    <string name="stage_authenticating">احراز هویت</string>
+    <string name="stage_verifying">بررسی اتصال</string>
+    <string name="stage_retrying">تلاش مجدد</string>
+    <string name="stage_connected">متصل شد</string>
+    <string name="stage_failed">ناموفق</string>
+</resources>
