@@ -186,6 +186,35 @@ object ProfileFactory {
         CoreKind.AUTO -> AutoSelectProfile(id = id, name = "", targetSubscriptionId = "")
     }
 
+    /** The same profile under a different id (refresh reconciliation). */
+    fun withId(profile: Profile, id: String): Profile = remap(profile, id = id)
+
+    /** The same profile under a different display name. */
+    fun renamed(profile: Profile, name: String): Profile = remap(profile, name = name)
+
+    /** A manual copy of a profile: new id, detached from any subscription. */
+    fun duplicate(profile: Profile, newId: String, newName: String): Profile =
+        remap(profile, id = newId, name = newName, subscriptionId = null)
+
+    /** The same profile with its subscription link removed (kept as manual). */
+    fun detached(profile: Profile): Profile = remap(profile, subscriptionId = null)
+
+    private fun remap(
+        profile: Profile,
+        id: String = profile.id,
+        name: String = profile.name,
+        subscriptionId: String? = profile.subscriptionId,
+    ): Profile = when (profile) {
+        is XrayProfile -> profile.copy(id = id, name = name, subscriptionId = subscriptionId)
+        is SingBoxProfile -> profile.copy(id = id, name = name, subscriptionId = subscriptionId)
+        is PsiphonProfile -> profile.copy(id = id, name = name, subscriptionId = subscriptionId)
+        is AetherProfile -> profile.copy(id = id, name = name, subscriptionId = subscriptionId)
+        is MihomoProfile -> profile.copy(id = id, name = name, subscriptionId = subscriptionId)
+        is WhitednsProfile -> profile.copy(id = id, name = name, subscriptionId = subscriptionId)
+        is ChainProfile -> profile.copy(id = id, name = name, subscriptionId = subscriptionId)
+        is AutoSelectProfile -> profile.copy(id = id, name = name, subscriptionId = subscriptionId)
+    }
+
     private fun firstOutbound(text: String): JsonObject? {
         val root = runCatching { json.parseToJsonElement(text) as? JsonObject }.getOrNull() ?: return null
         val outbounds = root["outbounds"] as? JsonArray

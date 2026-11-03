@@ -29,6 +29,8 @@ haze = "2.1.0"
 # closest known stable.
 kaml = "0.62.2"
 
+zxing = "3.5.3"
+
 junit5 = "5.11.4"
 
 [libraries]
@@ -53,6 +55,9 @@ haze-blur-material3 = { group = "dev.chrisbanes.haze", name = "haze-blur-materia
 haze-glass-material3 = { group = "dev.chrisbanes.haze", name = "haze-glass-material3", version.ref = "haze" }
 
 kaml = { group = "com.charleskorn.kaml", name = "kaml", version.ref = "kaml" }
+
+# QR rendering for config sharing (§5.2 Servers overflow: share link/QR).
+zxing-core = { group = "com.google.zxing", name = "core", version.ref = "zxing" }
 
 kotlinx-coroutines-android = { group = "org.jetbrains.kotlinx", name = "kotlinx-coroutines-android", version.ref = "coroutines" }
 kotlinx-coroutines-core = { group = "org.jetbrains.kotlinx", name = "kotlinx-coroutines-core", version.ref = "coroutines" }

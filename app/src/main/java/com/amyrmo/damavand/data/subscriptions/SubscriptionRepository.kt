@@ -73,6 +73,11 @@ class SubscriptionRepository(context: Context) {
         scheduleWrite()
     }
 
+    fun replaceAll(subscriptions: List<Subscription>) {
+        _subscriptions.value = subscriptions
+        scheduleWrite()
+    }
+
     suspend fun flush() {
         pendingWrite?.join()
         writeNow()

@@ -1,7 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- English (default locale). Persian lives in values-fa (architecture §5.4).
-     Screens add their strings here / there as they land; the design-system
-     strings below are the ones the shared components reference directly. -->
+<!-- English (default locale). Persian lives in values-fa (architecture §5.4). -->
 <resources>
     <string name="app_name">Damavand</string>
 
@@ -21,4 +19,338 @@
     <string name="stage_retrying">Retrying</string>
     <string name="stage_connected">Connected</string>
     <string name="stage_failed">Failed</string>
+
+    <!-- Common -->
+    <string name="common_save">Save</string>
+    <string name="common_cancel">Cancel</string>
+    <string name="common_delete">Delete</string>
+    <string name="common_edit">Edit</string>
+    <string name="common_share">Share</string>
+    <string name="common_copy">Copy</string>
+    <string name="common_copied">Copied to clipboard</string>
+    <string name="common_add">Add</string>
+    <string name="common_close">Close</string>
+    <string name="common_back">Back</string>
+    <string name="common_name">Name</string>
+    <string name="common_duplicate">Duplicate</string>
+    <string name="common_ping">Ping</string>
+    <string name="common_more">More</string>
+    <string name="common_test">Test</string>
+    <string name="common_refresh">Refresh</string>
+
+    <!-- Home -->
+    <string name="home_status_idle">Not connected</string>
+    <string name="home_status_connected">Connected</string>
+    <string name="home_status_connecting">Connecting</string>
+    <string name="home_status_failed">Connection failed</string>
+    <string name="home_no_profile">No profile yet — add one from the Servers tab</string>
+    <string name="home_dashboard_title">Session</string>
+    <string name="home_exit_ip">Exit IP</string>
+    <string name="home_location">Location</string>
+    <string name="home_down">Download</string>
+    <string name="home_up">Upload</string>
+    <string name="home_traffic_note">App traffic since connect (device-measured)</string>
+    <string name="home_snapshot_note">Last retrieved snapshot</string>
+    <string name="home_used_of">Used %1$s of %2$s</string>
+    <string name="home_days_left">%1$d days left</string>
+    <string name="home_expires">Expires %1$s</string>
+    <string name="home_fault_details">Hop %1$d · %2$s · failed at %3$s</string>
+    <string name="home_slide_connect">Slide to connect</string>
+    <string name="home_slide_disconnect">Slide to disconnect</string>
+    <string name="home_session_time">Session time</string>
+
+    <!-- Servers -->
+    <string name="servers_manual">Manual</string>
+    <string name="servers_add">Add server</string>
+    <string name="servers_empty">No servers in this group yet</string>
+    <string name="servers_smart_auto">Smart (fastest)</string>
+    <string name="servers_smart_auto_sub">%1$d servers · picks the fastest</string>
+    <string name="servers_subscriptions">Subscriptions</string>
+    <string name="servers_delete_confirm">Delete %1$s?</string>
+    <string name="add_paste_link">Paste a link or config</string>
+    <string name="add_import">Import</string>
+    <string name="add_invalid_link">That link or content is not supported</string>
+    <string name="add_file">Import from file</string>
+    <string name="add_subscription">Add subscription URL</string>
+    <string name="add_blank">New empty config</string>
+    <string name="add_url_label">Subscription URL</string>
+    <string name="add_name_optional">Name (optional)</string>
+    <string name="share_qr_title">Share config</string>
+    <string name="share_no_link">This config has no share link</string>
+
+    <!-- Editors -->
+    <string name="editor_new">New %1$s config</string>
+    <string name="editor_edit">Edit config</string>
+    <string name="editor_name_required">Enter a name</string>
+    <string name="editor_dns">DNS</string>
+    <string name="xray_payload_link">Share link</string>
+    <string name="xray_payload_json">Raw JSON</string>
+    <string name="xray_link_invalid">This link cannot be parsed</string>
+    <string name="xray_json_invalid">This is not valid JSON</string>
+    <string name="xray_mode">Payload</string>
+    <string name="singbox_fragment">Outbound fragment</string>
+    <string name="singbox_json">sing-box JSON</string>
+    <string name="singbox_source">Source link</string>
+    <string name="live_log_title">Live log</string>
+    <string name="live_log_empty">No log lines yet</string>
+
+    <!-- Aether editor -->
+    <string name="aether_protocol">Protocol</string>
+    <string name="aether_transport">Transport</string>
+    <string name="aether_scan_mode">Scan mode</string>
+    <string name="aether_obfuscation">Obfuscation</string>
+    <string name="aether_ip_version">IP version</string>
+    <string name="aether_endpoint">Endpoint</string>
+    <string name="aether_address">Address</string>
+    <string name="aether_port">Port</string>
+    <string name="aether_scan_note">No endpoint set — the core scans for one when connecting.</string>
+    <string name="aether_exit_loc">Exit location</string>
+    <string name="aether_masque_sni">MASQUE SNI</string>
+    <string name="aether_fragment">Fragment ClientHello</string>
+    <string name="aether_fragment_size">Fragment size</string>
+    <string name="aether_fragment_delay">Fragment delay</string>
+    <string name="aether_ech">Encrypted Client Hello (ECH)</string>
+    <string name="aether_ech_dns">ECH DNS</string>
+    <string name="aether_ech_domain">ECH domain</string>
+    <string name="aether_fingerprint">Fingerprint</string>
+    <string name="aether_final_mask">Final mask (JSON)</string>
+    <string name="aether_dial_mode">Dial mode</string>
+    <string name="aether_psiphon_carrier">Psiphon carrier</string>
+    <string name="aether_psiphon_mode">Psiphon mode</string>
+    <string name="aether_psiphon_region">Psiphon region</string>
+    <string name="aether_psiphon_cdn_ips">CDN IPs</string>
+    <string name="aether_psiphon_cdn_sni">CDN SNI</string>
+    <string name="aether_psiphon_cdn_sets">CDN sets</string>
+    <string name="aether_psiphon_bundled">Use bundled server list</string>
+    <string name="aether_tor_carrier">Tor carrier</string>
+    <string name="aether_tor_bridges">Tor bridges</string>
+    <string name="aether_tor_relays">Tor relays</string>
+    <string name="aether_tor_bridge_lines">Bridge lines (one per line)</string>
+    <string name="aether_upstream">Upstream SOCKS5</string>
+    <string name="aether_extra_args">Extra flags</string>
+    <string name="aether_command">Command</string>
+    <string name="aether_command_custom">Custom command</string>
+    <string name="aether_command_revert">Use generated</string>
+    <string name="aether_problem_carrier">A reverse carrier (Tor/Psiphon) needs a MASQUE-based protocol.</string>
+    <string name="aether_problem_conflict">Tor and Psiphon carriers conflict in this combination.</string>
+    <string name="aether_problem_bridges">Tor bridges are set to “own” but no bridge lines were given.</string>
+    <string name="aether_keys">WARP keys</string>
+    <string name="aether_keys_complete">Keys ready</string>
+    <string name="aether_keys_missing">Missing: %1$s</string>
+    <string name="aether_keys_renew">Renew keys</string>
+    <string name="aether_keys_reset">Reset keys</string>
+    <string name="aether_keys_export">Export keys</string>
+    <string name="aether_keys_working">Working…</string>
+    <string name="aether_two_hop_outer">Outer endpoint</string>
+    <string name="aether_two_hop_inner">Inner endpoint</string>
+    <string name="aether_section_tunnel">Tunnel</string>
+    <string name="aether_section_carriers">Carriers</string>
+    <string name="aether_section_advanced">Advanced</string>
+
+    <!-- Mihomo editor -->
+    <string name="mihomo_yaml">Clash YAML</string>
+    <string name="mihomo_sub_url">Subscription URL</string>
+    <string name="mihomo_log_level">Log level</string>
+    <string name="mihomo_invalid">The YAML does not parse, or contains no proxies</string>
+    <string name="mihomo_mode_yaml">YAML</string>
+    <string name="mihomo_mode_sub">Subscription</string>
+
+    <!-- Psiphon editor -->
+    <string name="psiphon_country">Egress country (blank = default)</string>
+    <string name="psiphon_mode">Mode</string>
+    <string name="psiphon_cdn">CDN fronting</string>
+    <string name="psiphon_cdn_ips">CDN IPs / CIDRs (one per line)</string>
+    <string name="psiphon_cdn_sni">CDN SNI names</string>
+
+    <!-- Whitedns editor -->
+    <string name="whitedns_engine">Engine</string>
+    <string name="whitedns_domains">Tunnel domains (one per line)</string>
+    <string name="whitedns_key">Encryption key</string>
+    <string name="whitedns_method">Encryption method</string>
+    <string name="whitedns_resolvers">Resolvers (one per line, IP literals)</string>
+    <string name="whitedns_resolvers_invalid">Not IP literals: %1$s</string>
+    <string name="whitedns_resolver_test">Test resolvers</string>
+    <string name="whitedns_tunnel_mode">Tunnel mode</string>
+    <string name="whitedns_transport">Resolver transport</string>
+    <string name="whitedns_balancing">Balancing strategy</string>
+    <string name="whitedns_slow_note">DNS tunnels are slow — they are for networks where only DNS works.</string>
+
+    <!-- Chains -->
+    <string name="chains_empty">No chains yet — build one from your configs</string>
+    <string name="chains_new">New chain</string>
+    <string name="chains_broken">Broken</string>
+    <string name="chains_warning">Warning</string>
+    <string name="chains_missing_member">A member config is missing</string>
+    <string name="chain_builder_title">Chain builder</string>
+    <string name="chain_add_hop">Add hop</string>
+    <string name="chain_preview">Traffic: this device → %1$s → internet</string>
+    <string name="chain_simple_hint">Tip: a single Aether config can already carry Psiphon or Tor inside itself — chains are for mixing different cores.</string>
+    <string name="chain_entry">Entry</string>
+    <string name="chain_exit">Exit</string>
+    <string name="chain_hop_n">Hop %1$d</string>
+    <string name="chain_error_too_short">A chain needs at least 2 hops</string>
+    <string name="chain_error_too_long">A chain can have at most 5 hops</string>
+    <string name="chain_error_duplicate">A config cannot appear twice</string>
+    <string name="chain_error_nested">Chains cannot contain chains</string>
+    <string name="chain_error_position">This core cannot sit at this position</string>
+    <string name="chain_error_splice">This core cannot dial through the previous hop</string>
+    <string name="chain_error_udp">%1$s needs UDP but %2$s cannot carry it</string>
+    <string name="chain_error_whitedns">The DNS-tunnel member is invalid</string>
+    <string name="chain_error_custom_upstream">A custom-command Aether with its own --upstream cannot sit mid-chain</string>
+    <string name="chain_error_dynamic">This hop cannot follow a Psiphon hop</string>
+    <string name="chain_error_sealed">A sealed config cannot be planned</string>
+    <string name="chain_error_generic">This chain is not valid</string>
+    <string name="chain_warn_dns">Contains a DNS tunnel — expect DNS-tunnel speeds</string>
+    <string name="chain_warn_latency">Four or more hops — latency compounds</string>
+    <string name="chain_warn_tcp">A Psiphon hop makes that segment TCP-only</string>
+    <string name="auto_no_members">That subscription has no servers to pick from</string>
+
+    <!-- Subscriptions -->
+    <string name="subs_title">Subscriptions</string>
+    <string name="sub_add">Add subscription</string>
+    <string name="sub_empty">No subscriptions yet</string>
+    <string name="sub_added">Subscription %1$s added</string>
+    <string name="sub_refreshed">%1$s updated</string>
+    <string name="sub_refresh_failed">Update failed: %1$s</string>
+    <string name="sub_members">%1$d servers</string>
+    <string name="sub_updated">Updated %1$s</string>
+    <string name="sub_never_updated">Never updated</string>
+    <string name="sub_expires">Expires %1$s</string>
+    <string name="sub_snapshot">Snapshot from the provider — refresh to update</string>
+    <string name="sub_edit">Edit subscription</string>
+    <string name="sub_url">URL</string>
+    <string name="sub_user_agent">User-Agent (optional)</string>
+    <string name="sub_delete_title">Delete subscription?</string>
+    <string name="sub_delete_members">Also delete its %1$d servers</string>
+    <string name="sub_delete_keep">Keep servers as manual configs</string>
+
+    <!-- Logs -->
+    <string name="logs_title">Logs</string>
+    <string name="logs_search">Search logs</string>
+    <string name="logs_filter_all">All</string>
+    <string name="logs_empty">No log lines</string>
+    <string name="logs_share">Share logs</string>
+    <string name="logs_clear">Clear</string>
+
+    <!-- Settings -->
+    <string name="settings_appearance">Appearance</string>
+    <string name="settings_language">Language</string>
+    <string name="settings_vpn">VPN</string>
+    <string name="settings_dns">DNS</string>
+    <string name="settings_cores">Cores</string>
+    <string name="settings_backup">Backup &amp; restore</string>
+    <string name="settings_about">About</string>
+    <string name="settings_subscriptions">Subscriptions</string>
+    <string name="settings_logs">Logs</string>
+    <string name="appearance_theme">Theme</string>
+    <string name="theme_system">System</string>
+    <string name="theme_light">Light</string>
+    <string name="theme_dark">Dark</string>
+    <string name="appearance_amoled">AMOLED (pure black)</string>
+    <string name="appearance_reduce_transparency">Reduce transparency</string>
+    <string name="appearance_reduce_transparency_sub">Opaque glass everywhere</string>
+    <string name="appearance_glass_blur">Glass blur on the dock</string>
+    <string name="appearance_connect_style">Connect control</string>
+    <string name="connect_style_pill">Button</string>
+    <string name="connect_style_slide">Slide</string>
+    <string name="language_system">System</string>
+    <string name="language_fa">فارسی</string>
+    <string name="language_en">English</string>
+    <string name="vpn_routing">Default routing</string>
+    <string name="routing_global">Global</string>
+    <string name="routing_rule">Rule-based</string>
+    <string name="routing_iran">Bypass Iran</string>
+    <string name="vpn_proxy_only">Proxy-only mode</string>
+    <string name="vpn_proxy_only_sub">Local proxy without the VPN tunnel interface</string>
+    <string name="vpn_mtu">TUN MTU</string>
+    <string name="vpn_per_app">Per-app mode</string>
+    <string name="per_app_all">All apps</string>
+    <string name="per_app_include">Only selected apps</string>
+    <string name="per_app_exclude">All except selected</string>
+    <string name="per_app_packages">Package names (one per line)</string>
+    <string name="dns_session">Default session DNS</string>
+    <string name="dns_session_hint">Used by bridge sessions when the exit config carries no DNS (e.g. https://dns.google/dns-query)</string>
+    <string name="cores_versions">Core versions (build pins)</string>
+    <string name="cores_geo">Geo files</string>
+    <string name="cores_geo_note">Geo files are seeded from the app bundle at first run</string>
+    <string name="cores_aether_data">Aether data</string>
+    <string name="cores_aether_clear">Clear Aether data (keys included)</string>
+    <string name="aether_data_cleared">Aether data cleared</string>
+    <string name="backup_export">Export backup</string>
+    <string name="backup_import">Import backup</string>
+    <string name="backup_imported">Imported %1$d profiles and %2$d subscriptions</string>
+    <string name="backup_failed">That backup could not be read</string>
+    <string name="backup_note">Exports all profiles and subscriptions as one JSON file.</string>
+    <string name="about_version">Version %1$s</string>
+    <string name="about_text">Damavand — a multi-core VPN client: Xray, Psiphon, Aether, Mihomo and DNS tunnels, chainable into one connection.</string>
+
+    <!-- Keys referenced by the UI phase screens -->
+    <string name="common_connect">Connect</string>
+    <string name="common_dns">DNS</string>
+    <string name="dest_subscriptions">Subscriptions</string>
+    <string name="dest_logs">Logs</string>
+    <string name="live_log">Live log</string>
+    <string name="editor_xray">Xray config</string>
+    <string name="editor_singbox">sing-box config</string>
+    <string name="editor_aether">Aether config</string>
+    <string name="editor_mihomo">Mihomo config</string>
+    <string name="editor_psiphon">Psiphon config</string>
+    <string name="editor_whitedns">DNS tunnel config</string>
+    <string name="add_paste">Paste a link</string>
+    <string name="add_import_file">Import from file</string>
+    <string name="servers_ping">Ping</string>
+    <string name="servers_no_link">This profile has no share link</string>
+    <string name="xray_link">Config link</string>
+    <string name="xray_payload">Payload</string>
+    <string name="xray_mode_link">Link</string>
+    <string name="xray_mode_json">Raw JSON</string>
+    <string name="xray_json_label">Outbound JSON</string>
+    <string name="xray_sealed_note">Sealed payload (ZedSecure) — it is kept exactly as imported.</string>
+    <string name="singbox_json_label">Config JSON</string>
+    <string name="psi_country">Country (region)</string>
+    <string name="psi_mode">Mode</string>
+    <string name="psi_cdn">CDN fronting</string>
+    <string name="psi_cdn_ips">CDN edge IPs (one per line)</string>
+    <string name="psi_cdn_sni">CDN SNI</string>
+    <string name="aether_tunnel">Tunnel</string>
+    <string name="aether_outer">First hop endpoint (host:port)</string>
+    <string name="aether_inner">Second hop endpoint (host:port)</string>
+    <string name="aether_scan">Scan for endpoint</string>
+    <string name="aether_scan_unavailable">Not available yet</string>
+    <string name="aether_ip">IP version</string>
+    <string name="aether_masque">MASQUE</string>
+    <string name="aether_sni">MASQUE SNI</string>
+    <string name="aether_carriers">Carriers</string>
+    <string name="aether_psiphon">Psiphon</string>
+    <string name="aether_psiphon_sni">Psiphon CDN SNI</string>
+    <string name="aether_psiphon_ips">Psiphon CDN IPs</string>
+    <string name="aether_psiphon_sets">Psiphon CDN sets</string>
+    <string name="aether_tor">Tor</string>
+    <string name="aether_tor_lines">Bridge lines</string>
+    <string name="aether_advanced">Advanced</string>
+    <string name="wd_engine">Engine</string>
+    <string name="wd_domains">Domains (one per line)</string>
+    <string name="wd_key">Encryption key</string>
+    <string name="wd_method">Encryption method</string>
+    <string name="wd_resolvers">Resolvers (one per line)</string>
+    <string name="wd_test_resolvers">Test resolvers</string>
+    <string name="wd_tunnel_mode">Tunnel mode</string>
+    <string name="wd_transport">Resolver transport</string>
+    <string name="wd_balancing">Balancing strategy</string>
+    <string name="chain_builder">Chain builder</string>
+    <string name="chain_hops">Hops</string>
+    <string name="chain_broken">Broken</string>
+    <string name="chain_warning">Check</string>
+    <string name="chain_error_missing">A hop is missing (position %1$d)</string>
+    <string name="chain_error_short">A chain needs at least 2 hops</string>
+    <string name="chain_error_long">A chain can have at most %1$d hops</string>
+    <string name="chain_error_custom">%1$s uses a custom command and cannot take an upstream hop</string>
+    <string name="logs_filter_error">Errors</string>
+    <string name="logs_filter_warning">Warnings</string>
+    <string name="routing_rules">Rule-based</string>
+    <string name="routing_iran_bypass">Iran bypass</string>
+    <string name="language_rtl_note">Persian lays the app out right-to-left; English left-to-right.</string>
+    <string name="sub_none">No subscriptions yet</string>
+    <string name="sub_refresh">Refresh</string>
+    <string name="sub_keep_members">Keep servers</string>
 </resources>

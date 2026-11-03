@@ -28,6 +28,18 @@ enum class DamavandIconKind {
     Servers,
     Chains,
     Settings,
+    MoreVert,
+    Plus,
+    Edit,
+    Trash,
+    Share,
+    Refresh,
+    ChevronRight,
+    ArrowUp,
+    ArrowDown,
+    Close,
+    Check,
+    Copy,
 }
 
 @Composable
@@ -105,6 +117,130 @@ fun DamavandIcon(
                     strokeWidth = x(2f),
                     cap = StrokeCap.Round,
                 )
+            }
+
+            DamavandIconKind.MoreVert -> {
+                for (cy in listOf(5.5f, 12f, 18.5f)) {
+                    drawCircle(color = tint, radius = x(1.7f), center = Offset(x(12f), x(cy)))
+                }
+            }
+
+            DamavandIconKind.Plus -> {
+                drawLine(tint, Offset(x(12f), x(5f)), Offset(x(12f), x(19f)), strokeWidth = x(2.2f), cap = StrokeCap.Round)
+                drawLine(tint, Offset(x(5f), x(12f)), Offset(x(19f), x(12f)), strokeWidth = x(2.2f), cap = StrokeCap.Round)
+            }
+
+            DamavandIconKind.Edit -> {
+                // Pencil: a rotated body with a tip.
+                val path = Path().apply {
+                    moveTo(x(4f), x(20f))
+                    lineTo(x(5.6f), x(15f))
+                    lineTo(x(16.2f), x(4.4f))
+                    lineTo(x(19.6f), x(7.8f))
+                    lineTo(x(9f), x(18.4f))
+                    close()
+                }
+                drawPath(path, tint, style = Stroke(width = x(1.8f)))
+                drawLine(tint, Offset(x(14.2f), x(6.4f)), Offset(x(17.6f), x(9.8f)), strokeWidth = x(1.8f), cap = StrokeCap.Round)
+            }
+
+            DamavandIconKind.Trash -> {
+                drawLine(tint, Offset(x(4.5f), x(6.5f)), Offset(x(19.5f), x(6.5f)), strokeWidth = x(2f), cap = StrokeCap.Round)
+                drawLine(tint, Offset(x(9.5f), x(6.5f)), Offset(x(9.5f), x(4.2f)), strokeWidth = x(2f), cap = StrokeCap.Round)
+                drawLine(tint, Offset(x(14.5f), x(6.5f)), Offset(x(14.5f), x(4.2f)), strokeWidth = x(2f), cap = StrokeCap.Round)
+                val path = Path().apply {
+                    moveTo(x(6.2f), x(6.5f))
+                    lineTo(x(7.2f), x(19.5f))
+                    lineTo(x(16.8f), x(19.5f))
+                    lineTo(x(17.8f), x(6.5f))
+                }
+                drawPath(path, tint, style = Stroke(width = x(1.8f)))
+                drawLine(tint, Offset(x(10f), x(10f)), Offset(x(10.2f), x(16.5f)), strokeWidth = x(1.6f), cap = StrokeCap.Round)
+                drawLine(tint, Offset(x(14f), x(10f)), Offset(x(13.8f), x(16.5f)), strokeWidth = x(1.6f), cap = StrokeCap.Round)
+            }
+
+            DamavandIconKind.Share -> {
+                // Three nodes joined by lines.
+                val a = Offset(x(6f), x(12f))
+                val b = Offset(x(17.5f), x(5.5f))
+                val c = Offset(x(17.5f), x(18.5f))
+                drawLine(tint, a, b, strokeWidth = x(1.7f), cap = StrokeCap.Round)
+                drawLine(tint, a, c, strokeWidth = x(1.7f), cap = StrokeCap.Round)
+                for (p in listOf(a, b, c)) {
+                    drawCircle(color = tint, radius = x(2.4f), center = p)
+                }
+            }
+
+            DamavandIconKind.Refresh -> {
+                drawArc(
+                    color = tint,
+                    startAngle = -60f,
+                    sweepAngle = 300f,
+                    useCenter = false,
+                    topLeft = Offset(x(4.5f), x(4.5f)),
+                    size = Size(x(15f), x(15f)),
+                    style = Stroke(width = x(2f), cap = StrokeCap.Round),
+                )
+                val path = Path().apply {
+                    moveTo(x(18.6f), x(2.8f))
+                    lineTo(x(19.4f), x(8.2f))
+                    lineTo(x(14.2f), x(7.2f))
+                    close()
+                }
+                drawPath(path, tint)
+            }
+
+            DamavandIconKind.ChevronRight -> {
+                val path = Path().apply {
+                    moveTo(x(9f), x(4.5f))
+                    lineTo(x(16.5f), x(12f))
+                    lineTo(x(9f), x(19.5f))
+                }
+                drawPath(path, tint, style = Stroke(width = x(2.2f), cap = StrokeCap.Round))
+            }
+
+            DamavandIconKind.ArrowUp -> {
+                drawLine(tint, Offset(x(12f), x(20f)), Offset(x(12f), x(5f)), strokeWidth = x(2.2f), cap = StrokeCap.Round)
+                drawLine(tint, Offset(x(5.5f), x(11f)), Offset(x(12f), x(4.5f)), strokeWidth = x(2.2f), cap = StrokeCap.Round)
+                drawLine(tint, Offset(x(18.5f), x(11f)), Offset(x(12f), x(4.5f)), strokeWidth = x(2.2f), cap = StrokeCap.Round)
+            }
+
+            DamavandIconKind.ArrowDown -> {
+                drawLine(tint, Offset(x(12f), x(4f)), Offset(x(12f), x(19f)), strokeWidth = x(2.2f), cap = StrokeCap.Round)
+                drawLine(tint, Offset(x(5.5f), x(13f)), Offset(x(12f), x(19.5f)), strokeWidth = x(2.2f), cap = StrokeCap.Round)
+                drawLine(tint, Offset(x(18.5f), x(13f)), Offset(x(12f), x(19.5f)), strokeWidth = x(2.2f), cap = StrokeCap.Round)
+            }
+
+            DamavandIconKind.Close -> {
+                drawLine(tint, Offset(x(5.5f), x(5.5f)), Offset(x(18.5f), x(18.5f)), strokeWidth = x(2.2f), cap = StrokeCap.Round)
+                drawLine(tint, Offset(x(18.5f), x(5.5f)), Offset(x(5.5f), x(18.5f)), strokeWidth = x(2.2f), cap = StrokeCap.Round)
+            }
+
+            DamavandIconKind.Check -> {
+                val path = Path().apply {
+                    moveTo(x(4.5f), x(12.5f))
+                    lineTo(x(9.8f), x(17.8f))
+                    lineTo(x(19.5f), x(6.5f))
+                }
+                drawPath(path, tint, style = Stroke(width = x(2.4f), cap = StrokeCap.Round))
+            }
+
+            DamavandIconKind.Copy -> {
+                drawRoundRect(
+                    color = tint,
+                    topLeft = Offset(x(8.5f), x(8.5f)),
+                    size = Size(x(11.5f), x(11.5f)),
+                    cornerRadius = CornerRadius(x(2f), x(2f)),
+                    style = Stroke(width = x(1.8f)),
+                )
+                val path = Path().apply {
+                    moveTo(x(15.5f), x(8.5f))
+                    lineTo(x(15.5f), x(5.2f))
+                    lineTo(x(5.2f), x(5.2f))
+                    lineTo(x(5.2f), x(15.5f))
+                    lineTo(x(8.5f), x(15.5f))
+                }
+                drawPath(path, tint, style = Stroke(width = x(1.8f)))
             }
 
             DamavandIconKind.Settings -> {

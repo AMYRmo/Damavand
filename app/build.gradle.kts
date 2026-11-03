@@ -98,6 +98,8 @@ dependencies {
     implementation(libs.androidx.compose.animation)
     implementation(libs.androidx.compose.material3)
 
+    implementation(libs.zxing.core)
+
     // Liquid Glass, dock only (architecture §5.3, decision D8).
     implementation(libs.haze)
     implementation(libs.haze.blur)

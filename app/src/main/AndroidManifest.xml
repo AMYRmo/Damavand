@@ -35,7 +35,17 @@
             </intent-filter>
         </service>
 
-        <!-- QS tile and the home widget land in a later phase
-             (architecture §7); the manifest grows with them. -->
+        <!-- Quick Settings tile (§5.2): toggles the last-used profile.
+             A home-screen widget remains a later phase (§7). -->
+        <service
+            android:name=".platform.DamavandTileService"
+            android:exported="true"
+            android:icon="@drawable/ic_tile"
+            android:label="@string/app_name"
+            android:permission="android.permission.BIND_QUICK_SETTINGS_TILE">
+            <intent-filter>
+                <action android:name="android.service.quicksettings.action.QS_TILE" />
+            </intent-filter>
+        </service>
     </application>
 </manifest>

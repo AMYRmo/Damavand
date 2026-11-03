@@ -116,7 +116,7 @@ class SubscriptionService(
         for (member in members) {
             val prior = existingByKey[ProfileFactory.identityKey(member)]
             val resolved = if (prior != null && prior.id != member.id) {
-                withId(member, prior.id)
+                ProfileFactory.withId(member, prior.id)
             } else {
                 member
             }
@@ -126,17 +126,6 @@ class SubscriptionService(
         for (stale in existing) {
             if (stale.id !in keptIds) profiles.remove(stale.id)
         }
-    }
-
-    private fun withId(profile: Profile, id: String): Profile = when (profile) {
-        is com.amyrmo.damavand.model.XrayProfile -> profile.copy(id = id)
-        is com.amyrmo.damavand.model.SingBoxProfile -> profile.copy(id = id)
-        is com.amyrmo.damavand.model.PsiphonProfile -> profile.copy(id = id)
-        is com.amyrmo.damavand.model.AetherProfile -> profile.copy(id = id)
-        is MihomoProfile -> profile.copy(id = id)
-        is com.amyrmo.damavand.model.WhitednsProfile -> profile.copy(id = id)
-        is com.amyrmo.damavand.model.ChainProfile -> profile.copy(id = id)
-        is com.amyrmo.damavand.model.AutoSelectProfile -> profile.copy(id = id)
     }
 
     companion object {
