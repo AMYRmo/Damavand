@@ -14,7 +14,10 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 
 URL="https://s3.amazonaws.com//psiphon/web/mjr4-p23r-puwl/server_list_compressed"
-KEY_SOURCE="$ROOT/aether/aether/aether/src/psiphon.rs"
+# v2 does not vendor the Aether Rust sources; the signing key (a public
+# constant, byte-identical to SERVER_LIST_SIGNATURE_KEY in Aether v2.4.0's
+# psiphon.rs) is kept in tools/psiphon-signing-key.txt instead.
+KEY_SOURCE="$ROOT/tools/psiphon-signing-key.txt"
 TARGET="$ROOT/app/src/main/assets/psiphon_servers.dat"
 STAMP="$ROOT/app/src/main/assets/psiphon_servers.stamp"
 
@@ -30,7 +33,7 @@ if [[ -z "$PY" ]]; then
   exit 1
 fi
 if [[ ! -f "$KEY_SOURCE" ]]; then
-  echo "Aether sources not found at $ROOT/aether" >&2
+  echo "Psiphon signing key not found at $KEY_SOURCE" >&2
   exit 1
 fi
 
@@ -55,11 +58,9 @@ if published is None:
     print("[psiphon-servers] no Last-Modified header; the fetch time stands for the publication time")
 io.open(work + "/stamp", "w").write(str(published) + chr(10))
 print("[psiphon-servers] published %s" % time.strftime("%Y-%m-%d %H:%M:%S UTC", time.gmtime(published)))
-source = io.open(key_source, encoding="utf-8").read()
-found = re.search(r'SERVER_LIST_SIGNATURE_KEY: &str = concat!\((.*?)\);', source, re.S)
-if not found:
-    sys.exit("the signing key was not found in " + key_source)
-key = "".join(re.findall(r'"([^"]*)"', found.group(1)))
+key = io.open(key_source, encoding="utf-8").read().strip()
+if not key:
+    sys.exit("the signing key file is empty: " + key_source)
 package = json.loads(zlib.decompress(open(work + "/list", "rb").read()))
 if base64.b64decode(package["signingPublicKeyDigest"]) != hashlib.sha256(key.encode()).digest():
     sys.exit("the list names another key than the one the core carries")

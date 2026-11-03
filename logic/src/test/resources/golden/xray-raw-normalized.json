@@ -1,0 +1,54 @@
+{
+    "inbounds": [
+        {
+            "tag": "socks-in",
+            "protocol": "socks",
+            "settings": {
+                "udp": true
+            },
+            "listen": "127.0.0.1",
+            "port": 10808
+        }
+    ],
+    "outbounds": [
+        {
+            "tag": "proxy",
+            "protocol": "vless",
+            "settings": {
+                "vnext": [
+                    {
+                        "address": "vl.example.com",
+                        "port": 443,
+                        "users": [
+                            {
+                                "id": "b831381d-6324-4d53-ad4f-8cda48b30811",
+                                "encryption": "none"
+                            }
+                        ]
+                    }
+                ]
+            }
+        },
+        {
+            "protocol": "freedom",
+            "tag": "direct"
+        }
+    ],
+    "policy": {
+        "levels": {
+            "8": {
+                "connIdle": 300,
+                "downlinkOnly": 1,
+                "handshake": 4,
+                "uplinkOnly": 1,
+                "statsUserUplink": false,
+                "statsUserDownlink": false
+            }
+        },
+        "system": {
+            "statsOutboundUplink": true,
+            "statsOutboundDownlink": true
+        }
+    },
+    "stats": {}
+}

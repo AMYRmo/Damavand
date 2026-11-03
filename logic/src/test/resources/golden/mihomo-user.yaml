@@ -1,0 +1,31 @@
+mixed-port: 18210
+allow-lan: false
+mode: global
+log-level: info
+proxies:
+  - name: node-1
+    type: vless
+    server: vl.example.com
+    port: 443
+    uuid: b831381d-6324-4d53-ad4f-8cda48b30811
+  - name: node-2
+    type: trojan
+    server: tj.example.com
+    port: 443
+    password: s3cret
+proxy-groups:
+  - name: Proxy
+    type: select
+    proxies:
+      - node-1
+      - node-2
+rules:
+  - "DOMAIN-SUFFIX,ir,DIRECT"
+  - "GEOIP,IR,DIRECT"
+  - "GEOIP,private,DIRECT"
+  - "MATCH,Proxy"
+bind-address: 127.0.0.1
+external-controller: ""
+ipv6: true
+unified-delay: true
+tcp-concurrent: true

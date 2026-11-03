@@ -1,0 +1,36 @@
+{
+    "log": {
+        "level": "info"
+    },
+    "outbounds": [
+        {
+            "type": "vless",
+            "tag": "proxy",
+            "server": "vl.example.com",
+            "server_port": 443
+        }
+    ],
+    "inbounds": [
+        {
+            "type": "socks",
+            "tag": "in",
+            "listen_port": 2080,
+            "listen": "127.0.0.1"
+        },
+        {
+            "type": "tun",
+            "tag": "tun-in",
+            "address": [
+                "172.19.0.1/30"
+            ],
+            "mtu": 1400,
+            "auto_route": true,
+            "strict_route": false,
+            "stack": "gvisor"
+        }
+    ],
+    "route": {
+        "auto_detect_interface": true,
+        "final": "proxy"
+    }
+}

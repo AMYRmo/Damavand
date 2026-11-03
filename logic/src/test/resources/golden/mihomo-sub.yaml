@@ -1,0 +1,29 @@
+proxy-providers:
+  sub:
+    type: http
+    url: https://sub.example.com/clash
+    interval: 3600
+    health-check:
+      enable: true
+      url: https://www.gstatic.com/generate_204
+      interval: 300
+proxy-groups:
+  - name: Auto
+    type: url-test
+    use:
+      - sub
+    url: https://www.gstatic.com/generate_204
+    interval: 300
+mixed-port: 18210
+allow-lan: false
+bind-address: 127.0.0.1
+mode: rule
+log-level: info
+external-controller: ""
+ipv6: true
+unified-delay: true
+tcp-concurrent: true
+rules:
+  - "GEOIP,IR,DIRECT"
+  - "GEOIP,private,DIRECT"
+  - "MATCH,Auto"

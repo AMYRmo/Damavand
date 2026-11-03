@@ -56,6 +56,10 @@ kotlinx-serialization-json = { group = "org.jetbrains.kotlinx", name = "kotlinx-
 
 junit-bom = { group = "org.junit", name = "junit-bom", version.ref = "junit5" }
 junit-jupiter = { group = "org.junit.jupiter", name = "junit-jupiter" }
+# Version managed by junit-bom above (platform 1.11.4 for JUnit 5.11.4).
+# Gradle 9 no longer bundles the platform launcher, so test tasks need it
+# on the runtime classpath explicitly (CI jvm-tests failure, 2026-11-03).
+junit-platform-launcher = { group = "org.junit.platform", name = "junit-platform-launcher" }
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }

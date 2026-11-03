@@ -1,0 +1,181 @@
+{
+    "log": {
+        "loglevel": "warning",
+        "access": "none"
+    },
+    "inbounds": [
+        {
+            "tag": "socks-in",
+            "port": 10808,
+            "protocol": "socks",
+            "listen": "127.0.0.1",
+            "settings": {
+                "auth": "noauth",
+                "udp": true,
+                "userLevel": 8
+            },
+            "sniffing": {
+                "enabled": true,
+                "destOverride": [
+                    "http",
+                    "tls",
+                    "quic"
+                ],
+                "routeOnly": false
+            }
+        }
+    ],
+    "outbounds": [
+        {
+            "tag": "proxy",
+            "protocol": "vless",
+            "settings": {
+                "vnext": [
+                    {
+                        "address": "vl.example.com",
+                        "port": 443,
+                        "users": [
+                            {
+                                "id": "b831381d-6324-4d53-ad4f-8cda48b30811",
+                                "encryption": "none",
+                                "level": 8
+                            }
+                        ]
+                    }
+                ]
+            },
+            "streamSettings": {
+                "network": "ws",
+                "wsSettings": {
+                    "path": "/ws",
+                    "host": "cdn.example.com",
+                    "headers": {
+                        "Host": "cdn.example.com"
+                    }
+                },
+                "security": "tls",
+                "tlsSettings": {
+                    "serverName": "vl.example.com"
+                },
+                "sockopt": {
+                    "dialerProxy": "chain-out"
+                }
+            },
+            "mux": {
+                "enabled": false,
+                "concurrency": 8,
+                "xudpConcurrency": 16,
+                "xudpProxyUDP443": "reject"
+            }
+        },
+        {
+            "tag": "direct",
+            "protocol": "freedom",
+            "settings": {
+                "domainStrategy": "UseIP"
+            }
+        },
+        {
+            "tag": "block",
+            "protocol": "blackhole"
+        },
+        {
+            "tag": "chain-out",
+            "protocol": "socks",
+            "settings": {
+                "servers": [
+                    {
+                        "address": "127.0.0.1",
+                        "port": 19999
+                    }
+                ]
+            }
+        }
+    ],
+    "dns": {
+        "servers": [
+            "https://1.1.1.1/dns-query",
+            {
+                "address": "1.1.1.1",
+                "domains": [
+                    "domain:localhost",
+                    "domain:local",
+                    "domain:lan"
+                ],
+                "skipFallback": true,
+                "tag": "domestic-dns-base"
+            }
+        ],
+        "tag": "dns-module",
+        "queryStrategy": "UseIPv4"
+    },
+    "routing": {
+        "domainStrategy": "AsIs",
+        "rules": [
+            {
+                "type": "field",
+                "outboundTag": "direct",
+                "inboundTag": [
+                    "domestic-dns-base"
+                ]
+            },
+            {
+                "type": "field",
+                "outboundTag": "proxy",
+                "inboundTag": [
+                    "dns-module"
+                ]
+            },
+            {
+                "type": "field",
+                "outboundTag": "direct",
+                "ip": [
+                    "0.0.0.0/8",
+                    "10.0.0.0/8",
+                    "100.64.0.0/10",
+                    "127.0.0.0/8",
+                    "169.254.0.0/16",
+                    "172.16.0.0/12",
+                    "192.0.0.0/24",
+                    "192.0.2.0/24",
+                    "192.168.0.0/16",
+                    "198.18.0.0/15",
+                    "198.51.100.0/24",
+                    "203.0.113.0/24",
+                    "224.0.0.0/4",
+                    "240.0.0.0/4",
+                    "255.255.255.255/32",
+                    "::1/128",
+                    "fc00::/7",
+                    "fe80::/10"
+                ]
+            },
+            {
+                "type": "field",
+                "outboundTag": "direct",
+                "domain": [
+                    "domain:localhost",
+                    "domain:local",
+                    "domain:lan"
+                ]
+            }
+        ]
+    },
+    "policy": {
+        "levels": {
+            "8": {
+                "connIdle": 300,
+                "downlinkOnly": 1,
+                "handshake": 4,
+                "uplinkOnly": 1,
+                "statsUserUplink": false,
+                "statsUserDownlink": false
+            }
+        },
+        "system": {
+            "statsOutboundUplink": true,
+            "statsOutboundDownlink": true
+        }
+    },
+    "stats": {}
+}
