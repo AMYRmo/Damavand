@@ -107,3 +107,16 @@ jobs:
           name: Damavand-v2-arm64
           if-no-files-found: error
           path: app/build/outputs/apk/release/*arm64-v8a*.apk
+
+      # Device-test build: AGP signs debug APKs with the runner's debug
+      # key, so this artifact is directly installable (the release APK
+      # above is unsigned until the release pipeline signs it).
+      - name: Assemble the arm64 debug APK (installable test build)
+        run: ./gradlew :app:assembleDebug --no-daemon -x lint
+
+      - name: Upload the debug artifact
+        uses: actions/upload-artifact@v7
+        with:
+          name: Damavand-v2-debug-arm64
+          if-no-files-found: error
+          path: app/build/outputs/apk/debug/*arm64-v8a*.apk
