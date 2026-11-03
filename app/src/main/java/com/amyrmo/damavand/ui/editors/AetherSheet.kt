@@ -27,7 +27,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.unit.dp
 import com.amyrmo.damavand.R
-import com.amyrmo.damavand.core.ProcessSupervisor
+import com.amyrmo.damavand.core.supervisor.ProcessSupervisor
 import com.amyrmo.damavand.core.adapters.AetherAdapter
 import com.amyrmo.damavand.core.adapters.AetherKeysStatus
 import com.amyrmo.damavand.logic.AetherCommands

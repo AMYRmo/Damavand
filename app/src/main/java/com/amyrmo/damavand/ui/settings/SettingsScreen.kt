@@ -200,22 +200,22 @@ private fun AppearancePage(vm: AppViewModel, ui: UiSettings) {
                 },
             )
         },
-        onPick = { mode -> vm.updateUiSettings { copy(themeMode = mode) } },
+        onPick = { mode -> vm.updateUiSettings { it.copy(themeMode = mode) } },
     )
     SwitchRow(
         label = stringResource(R.string.appearance_amoled),
         checked = ui.amoled,
-        onCheckedChange = { value -> vm.updateUiSettings { copy(amoled = value) } },
+        onCheckedChange = { value -> vm.updateUiSettings { it.copy(amoled = value) } },
     )
     SwitchRow(
         label = stringResource(R.string.appearance_reduce_transparency),
         checked = ui.reduceTransparency,
-        onCheckedChange = { value -> vm.updateUiSettings { copy(reduceTransparency = value) } },
+        onCheckedChange = { value -> vm.updateUiSettings { it.copy(reduceTransparency = value) } },
     )
     SwitchRow(
         label = stringResource(R.string.appearance_glass_blur),
         checked = ui.glassBlur,
-        onCheckedChange = { value -> vm.updateUiSettings { copy(glassBlur = value) } },
+        onCheckedChange = { value -> vm.updateUiSettings { it.copy(glassBlur = value) } },
     )
     PickerRow(
         label = stringResource(R.string.appearance_connect_style),
@@ -229,7 +229,7 @@ private fun AppearancePage(vm: AppViewModel, ui: UiSettings) {
                 },
             )
         },
-        onPick = { style -> vm.updateUiSettings { copy(connectStyle = style) } },
+        onPick = { style -> vm.updateUiSettings { it.copy(connectStyle = style) } },
     )
 }
 
@@ -246,7 +246,7 @@ private fun LanguagePage(vm: AppViewModel, ui: UiSettings) {
                 AppLanguage.EN -> "English"
             }
         },
-        onPick = { language -> vm.updateUiSettings { copy(language = language) } },
+        onPick = { language -> vm.updateUiSettings { it.copy(language = language) } },
     )
     Text(
         text = stringResource(R.string.language_rtl_note),
@@ -272,12 +272,12 @@ private fun VpnPage(vm: AppViewModel, app: AppSettings) {
                 },
             )
         },
-        onPick = { routing -> vm.updateAppSettings { copy(routing = routing) } },
+        onPick = { routing -> vm.updateAppSettings { it.copy(routing = routing) } },
     )
     SwitchRow(
         label = stringResource(R.string.vpn_proxy_only),
         checked = app.proxyOnly,
-        onCheckedChange = { value -> vm.updateAppSettings { copy(proxyOnly = value) } },
+        onCheckedChange = { value -> vm.updateAppSettings { it.copy(proxyOnly = value) } },
     )
     var mtuText by remember { mutableStateOf(app.device.mtu.toString()) }
     FormTextField(
@@ -285,7 +285,7 @@ private fun VpnPage(vm: AppViewModel, app: AppSettings) {
         onValueChange = { text ->
             mtuText = text.filter { it.isDigit() }
             mtuText.toIntOrNull()?.takeIf { it in 576..9000 }?.let { mtu ->
-                vm.updateAppSettings { copy(device = device.copy(mtu = mtu)) }
+                vm.updateAppSettings { it.copy(device = it.device.copy(mtu = mtu)) }
             }
         },
         label = stringResource(R.string.vpn_mtu),
@@ -311,7 +311,7 @@ private fun VpnPage(vm: AppViewModel, app: AppSettings) {
             .filter { it.isNotEmpty() }
             .toSet()
         vm.updateAppSettings {
-            copy(
+            it.copy(
                 perApp = when (mode) {
                     PerAppMode.ALL -> PerAppSelection.All
                     PerAppMode.INCLUDE -> PerAppSelection.Include(packages)
@@ -357,7 +357,7 @@ private fun DnsPage(vm: AppViewModel, app: AppSettings) {
         value = dnsText,
         onValueChange = { text ->
             dnsText = text
-            vm.updateAppSettings { copy(sessionDns = text.trim()) }
+            vm.updateAppSettings { it.copy(sessionDns = text.trim()) }
         },
         label = stringResource(R.string.dns_session),
         supportingText = stringResource(R.string.dns_session_hint),

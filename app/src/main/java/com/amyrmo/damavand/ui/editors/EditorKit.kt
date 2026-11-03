@@ -121,7 +121,7 @@ fun <T> PickerRow(
     label: String,
     value: T,
     options: List<T>,
-    labelOf: (T) -> String,
+    labelOf: @Composable (T) -> String,
     onPick: (T) -> Unit,
     modifier: Modifier = Modifier,
 ) {
