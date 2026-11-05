@@ -8,7 +8,7 @@ sealed interface DeepLinkRequest {
 
 object DeepLinkParser {
     val SCHEMES: Set<String> = setOf(
-        "damavand", "zedsecure", "v2rayng", "hiddify", "sing-box", "clash", "clashmeta", "v2raytun", "streisand",
+        "damavand", "zedsecure", "v2rayng", "hiddify", "sing-box", "v2raytun", "streisand",
         "happ", "vless", "vmess", "trojan", "ss", "hysteria", "hysteria2", "hy2", "wireguard",
         "socks", "socks5", "snispoof", "aether",
     )
@@ -57,10 +57,6 @@ object DeepLinkParser {
             }
             "sing-box" -> when (action) {
                 "import-remote-profile" -> payload(queryUrl(query), queryName(query) ?: fragment, rawFragment)
-                else -> null
-            }
-            "clash", "clashmeta" -> when (action) {
-                "install-config" -> payload(queryUrl(query), queryName(query) ?: fragment, rawFragment)
                 else -> null
             }
             "v2raytun", "streisand", "happ" -> when (action) {
@@ -189,7 +185,6 @@ data class DeepLinkPreview(
 
         private fun sourceLabel(source: ProfileSource): String = when (source) {
             is ProfileSource.Aether -> "Aether"
-            is ProfileSource.Mihomo -> "Mihomo"
             is ProfileSource.Psiphon -> "Psiphon"
             is ProfileSource.DnsTunnel -> if (source.settings.isVaydns) "VayDNS" else "DNSTT"
             is ProfileSource.Tor -> "Tor"

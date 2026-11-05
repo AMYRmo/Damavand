@@ -756,7 +756,6 @@ class ConfigRepository(private val store: KeyValueStore) {
         val name = payload.name
         return when (val src = payload.source) {
             is ProfileSource.Aether -> { addAether(name, src.mode, src.accessKey); 1 }
-            is ProfileSource.Mihomo -> { addMihomoProfile(src.config.copy(remarks = name)); 1 }
             is ProfileSource.Psiphon -> { addPsiphon(src.settings, name); 1 }
             is ProfileSource.DnsTunnel -> { addDnsTunnel(src.settings, name); 1 }
             is ProfileSource.Tor -> { addTor(name); 1 }
@@ -921,28 +920,6 @@ class ConfigRepository(private val store: KeyValueStore) {
             id = existing?.id ?: newId(),
             addedAt = existing?.addedAt ?: currentTimeMillis(),
             config = config.copy(remarks = config.remarks.ifBlank { existing?.name ?: "" }),
-        ).let { carryOver(existing, it) }
-        _profiles.value = if (existing != null) {
-            _profiles.value.map { if (it.id == profile.id) profile else it }
-        } else {
-            listOf(profile) + _profiles.value
-        }
-        persistProfiles()
-        if (_activeId.value == null) setActive(profile.id)
-        return profile
-    }
-
-    fun addMihomoProfile(config: com.amyrmo.damavand.domain.config.MihomoProfile, id: String? = null): VpnProfile {
-        val existing = id?.let { profile(it) }
-        // Free mode: an empty profile gets the bundled public subscription so it
-        // connects out of the box — no server of your own needed.
-        val effective = if (config.yaml.isBlank() && config.subUrl.isBlank()) {
-            config.copy(subUrl = com.amyrmo.damavand.domain.config.MihomoProfile.DEFAULT_SUB)
-        } else config
-        val profile = VpnProfile.fromMihomoConfig(
-            id = existing?.id ?: newId(),
-            addedAt = existing?.addedAt ?: currentTimeMillis(),
-            config = effective.copy(remarks = effective.remarks.ifBlank { existing?.name ?: "" }),
         ).let { carryOver(existing, it) }
         _profiles.value = if (existing != null) {
             _profiles.value.map { if (it.id == profile.id) profile else it }
@@ -1494,8 +1471,26 @@ class ConfigRepository(private val store: KeyValueStore) {
 
     private fun loadProfiles(): List<VpnProfile> {
         val raw = store.getString(KEY_PROFILES) ?: return emptyList()
-        val loaded = runCatching { json.decodeFromString<List<VpnProfile>>(raw) }.getOrDefault(emptyList())
-        return repairOpenVpnType(loaded)
+        val loaded = runCatching { json.decodeFromString<List<VpnProfile>>(raw) }.getOrNull()
+        if (loaded != null) return repairOpenVpnType(loaded)
+        // The stored list no longer decodes as a whole — e.g. it still holds
+        // an entry whose kind this build cannot read (the Mihomo profile
+        // source was removed in v141-plus). Salvage every entry that still
+        // decodes and drop only the unreadable ones, instead of discarding
+        // the user's whole list; write the cleaned list back once, the same
+        // way repairOpenVpnType persists its repairs.
+        val salvaged = runCatching {
+            val array = json.parseToJsonElement(raw) as? kotlinx.serialization.json.JsonArray
+            array?.mapNotNull { element ->
+                runCatching {
+                    json.decodeFromJsonElement(VpnProfile.serializer(), element)
+                }.getOrNull()
+            }
+        }.getOrNull() ?: return emptyList()
+        if (salvaged.isNotEmpty()) {
+            store.putString(KEY_PROFILES, json.encodeToString(salvaged))
+        }
+        return repairOpenVpnType(salvaged)
     }
 
     private fun repairOpenVpnType(profiles: List<VpnProfile>): List<VpnProfile> {

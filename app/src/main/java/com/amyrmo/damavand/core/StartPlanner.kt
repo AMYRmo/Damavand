@@ -128,7 +128,6 @@ class StartPlanner(context: Context) {
         profile.sniSpoofSettings() != null -> VpnManager.KIND_SNISPOOF
         profile.isSingBoxConfig -> VpnManager.KIND_SINGBOX
         profile.isAether -> VpnManager.KIND_AETHER
-        profile.isMihomo -> VpnManager.KIND_MIHOMO
         else -> VpnManager.KIND_XRAY
     }
 
@@ -151,10 +150,9 @@ class StartPlanner(context: Context) {
             }.toString()
         }
         if (profile.isTor) return "tor"
-        // The aether/mihomo engines read their settings from the active profile
-        // themselves (startAether/startMihomo); the config payload is unused.
+        // The aether engine reads its settings from the active profile
+        // itself (startAether); the config payload is unused.
         if (profile.isAether) return "{}"
-        if (profile.isMihomo) return "{}"
         (profile.source as? com.amyrmo.damavand.domain.config.ProfileSource.SingBoxConfig)?.let { src ->
 
             val s = settingsRepository.settings.value

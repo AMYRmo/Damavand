@@ -75,8 +75,6 @@ object VpnManager {
 
     const val KIND_AETHER = "aether"
 
-    const val KIND_MIHOMO = "mihomo"
-
     fun onStarting(remark: String) {
         activeSocksPort = null
         _status.value = Status(

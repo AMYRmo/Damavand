@@ -452,7 +452,6 @@ private fun bentoEngineLabel(p: com.amyrmo.damavand.domain.config.VpnProfile): S
         is com.amyrmo.damavand.domain.config.ProfileSource.Tor -> "Tor"
         is com.amyrmo.damavand.domain.config.ProfileSource.Psiphon -> "Psiphon"
         is com.amyrmo.damavand.domain.config.ProfileSource.Aether -> "Aether"
-        is com.amyrmo.damavand.domain.config.ProfileSource.Mihomo -> "Mihomo"
         is com.amyrmo.damavand.domain.config.ProfileSource.MasterDns -> "MasterDNS"
         is com.amyrmo.damavand.domain.config.ProfileSource.Ssh -> "SSH"
         is com.amyrmo.damavand.domain.config.ProfileSource.OpenConnect -> "OpenConnect"
