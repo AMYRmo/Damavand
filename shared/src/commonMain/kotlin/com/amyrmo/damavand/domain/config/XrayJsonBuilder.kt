@@ -45,6 +45,10 @@ object XrayJsonBuilder {
 
     private val ALLOWED_VLESS_FLOWS = setOf("xtls-rprx-vision", "xtls-rprx-vision-udp443")
 
+    const val WARP_MASQUE_SNI = "consumer-masque.cloudflareclient.com"
+
+    private val MASQUE_TYPED_KEYS = setOf("host", "path", "user", "pass", "headers", "warp")
+
     private val BUILTIN_OUTBOUND_TAGS = setOf("proxy", "direct", "block")
 
     const val CHAIN_OUT_TAG = "chain-out"
@@ -269,7 +273,7 @@ object XrayJsonBuilder {
         data class Xray(val server: ServerConfig) : ChainHop {
             override val label: String get() = server.protocol.label
             override val needsUdp: Boolean
-                get() = server.protocol.isWireguardFamily || server.protocol == Protocol.HYSTERIA
+                get() = server.protocol.isUdpBased
             override val carriesUdp: Boolean get() = server.protocol.carriesUdp
         }
 
@@ -733,6 +737,8 @@ object XrayJsonBuilder {
         val dialerSocksPort: Int? = null,
 
         val engineFront: EngineFront? = null,
+
+        val useSystemCa: Boolean = false,
     )
 
     data class LanShare(
@@ -810,7 +816,7 @@ object XrayJsonBuilder {
         val hostHeader = s.transport.host?.split(",")?.firstOrNull()?.trim()?.takeIf { it.isNotEmpty() }
         val sni = s.tls.sni?.trim()?.takeIf { it.isNotEmpty() }
         val nameIsExplicit = when {
-            s.protocol == Protocol.HYSTERIA -> sni != null
+            s.protocol == Protocol.HYSTERIA || s.protocol == Protocol.MASQUE -> sni != null || s.isWarp
             s.protocol.isWireguardFamily -> true
             else -> when (s.tls.security.lowercase()) {
                 "tls" -> sni != null || hostHeader != null
@@ -822,6 +828,18 @@ object XrayJsonBuilder {
     }
 
     private val HOST_HEADER_TRANSPORTS = setOf("ws", "websocket", "httpupgrade", "xhttp", "splithttp")
+
+    fun dnsServerAddress(entry: String): String? {
+        val v = entry.trim()
+        if (v.isEmpty() || v.contains('$')) return null
+        if (v.contains("://")) return v
+        val host = when {
+            v.startsWith("[") -> v.substringAfter('[').substringBefore(']')
+            v.count { it == ':' } == 1 -> v.substringBefore(':')
+            else -> v
+        }
+        return host.takeIf { isIpLiteral(it) }
+    }
 
     fun isIpLiteral(value: String): Boolean {
         val v = value.trim().removePrefix("[").removeSuffix("]")
@@ -1497,6 +1515,13 @@ private fun statsPolicy(slowUpstream: Boolean = false) = buildJsonObject {
                     put("port", s.port)
                     put("version", 2)
                 }
+
+                Protocol.MASQUE -> {
+                    put("address", address)
+                    put("port", s.port)
+                    val dns = s.dnsServers.mapNotNull(::dnsServerAddress).filter { !it.contains("://") }
+                    if (dns.isNotEmpty()) putJsonArray("remoteDNS") { dns.forEach { add(it) } }
+                }
             }
         }
 
@@ -1513,6 +1538,8 @@ private fun statsPolicy(slowUpstream: Boolean = false) = buildJsonObject {
             }
         } else if (s.protocol == Protocol.HYSTERIA) {
             put("streamSettings", hysteriaStreamSettings(s, options, dialerProxy))
+        } else if (s.protocol == Protocol.MASQUE) {
+            put("streamSettings", applyFinalMask(masqueStreamSettings(s, options, dialerProxy), s.transport.finalMask))
         } else if (s.protocol.isWireguardFamily && (dialerProxy != null || pinsServerHost(s, options))) {
             putJsonObject("streamSettings") { putSockopt(s, options, dialerProxy) }
         }
@@ -1568,6 +1595,76 @@ private fun statsPolicy(slowUpstream: Boolean = false) = buildJsonObject {
         }
 
         putSockopt(s, options, dialerProxy)
+    }
+
+    private fun masqueStreamSettings(
+        s: ServerConfig,
+        options: BuildOptions,
+        dialerProxy: String?,
+    ) = buildJsonObject {
+        put("network", "masque")
+        put("security", "tls")
+        val alpn = s.tls.alpn?.split(",")?.map(String::trim)?.filter(String::isNotEmpty)
+            ?.firstOrNull { it == "h3" || it == "h2" } ?: "h3"
+        val sni = s.tls.sni?.takeIf { it.isNotBlank() }
+            ?: if (s.isWarp) WARP_MASQUE_SNI else s.transport.host?.takeIf { it.isNotBlank() }
+        put("tlsSettings", tlsSettingsOf(s, sni, options, alpnOverride = listOf(alpn), fingerprint = alpn == "h2"))
+        putJsonObject("masqueSettings") {
+            (runCatching { Json.parseToJsonElement(s.transport.xhttpExtra.orEmpty()) }.getOrNull() as? JsonObject)
+                ?.forEach { (k, v) -> if (k !in MASQUE_TYPED_KEYS) put(k, v) }
+            s.transport.host?.takeIf { it.isNotBlank() }?.let { put("host", it) }
+            s.transport.path?.takeIf { it.isNotBlank() }?.let { put("path", it) }
+            masqueHeaders(s.transport.headers)?.let { put("headers", it) }
+            if (s.isWarp) {
+                putJsonObject("warp") {
+                    put("privateKey", s.secretKey.trim())
+                    if (s.peerPublicKey.isNotBlank()) put("publicKey", s.peerPublicKey.trim())
+                    putJsonArray("address") { s.localAddresses.forEach { add(it.trim()) } }
+                }
+            } else {
+                if (s.username.isNotBlank()) put("user", s.username)
+                if (s.userId.isNotBlank()) put("pass", s.userId)
+            }
+        }
+        putSockopt(s, options, dialerProxy)
+    }
+
+    fun masqueHeaders(raw: String?): JsonObject? {
+        val text = raw?.trim()?.takeIf { it.isNotEmpty() } ?: return null
+        (runCatching { Json.parseToJsonElement(text) }.getOrNull() as? JsonObject)?.let { obj ->
+            return JsonObject(obj.filterValues { it is JsonPrimitive })
+        }
+        val pairs = text.split('\n', ';').mapNotNull { line ->
+            val name = line.substringBefore(':', "").trim()
+            val value = line.substringAfter(':', "").trim()
+            if (name.isEmpty() || name.equals("host", ignoreCase = true)) null else name to value
+        }
+        if (pairs.isEmpty()) return null
+        return buildJsonObject { pairs.forEach { (k, v) -> put(k, v) } }
+    }
+
+    private fun tlsSettingsOf(
+        s: ServerConfig,
+        serverName: String?,
+        options: BuildOptions,
+        alpnOverride: List<String>? = null,
+        fingerprint: Boolean = true,
+    ) = buildJsonObject {
+        if (serverName != null) put("serverName", serverName)
+        if (fingerprint) {
+            s.tls.fingerprint?.lowercase()?.takeIf { fp -> fp == "unsafe" || fp in PRESET_FINGERPRINTS || fp.startsWith("hello") }
+                ?.let { put("fingerprint", it) }
+        }
+        val pinned = s.pinnedCertSha256?.takeIf { it.isNotBlank() }
+        if (pinned != null) put("pinnedPeerCertSha256", pinned)
+        val vcn = s.tls.verifyPeerCertByName?.takeIf { it.isNotBlank() }
+        if (vcn != null) put("verifyPeerCertByName", vcn)
+        else if (pinned == null && s.tls.allowInsecure && serverName != null) put("verifyPeerCertByName", serverName)
+        s.tls.cipherSuites?.takeIf { it.isNotBlank() }?.let { put("cipherSuites", it) }
+        val alpn = alpnOverride ?: s.tls.alpn?.split(",")?.map(String::trim)?.filter(String::isNotEmpty)
+        if (!alpn.isNullOrEmpty()) putJsonArray("alpn") { alpn.forEach { add(it) } }
+        s.tls.echConfigList?.takeIf { it.isNotBlank() }?.let { put("echConfigList", it) }
+        if (options.useSystemCa) put("useSystemCA", true)
     }
 
     private fun streamSettings(

@@ -333,6 +333,7 @@ fun ServersScreen(
     var showSniSpoof by remember { mutableStateOf(false) }
     var showProxyChain by remember { mutableStateOf(false) }
     var showCrossChain by remember { mutableStateOf(false) }
+    var showWarp by remember { mutableStateOf(false) }
 
     val servers = profiles.filterNot { it.isLocked }
 
@@ -1205,6 +1206,10 @@ fun ServersScreen(
                 showAddSheet = false
                 showSsh = true
             },
+            onWarp = {
+                showAddSheet = false
+                showWarp = true
+            },
             onSniSpoof = {
                 showAddSheet = false
                 showSniSpoof = true
@@ -1220,6 +1225,18 @@ fun ServersScreen(
             onSubscription = {
                 showAddSheet = false
                 showSubs = true
+            },
+        )
+    }
+
+    if (showWarp) {
+        WarpDialog(
+            onDismiss = { showWarp = false },
+            onRegistered = { link ->
+                showWarp = false
+                repository.importText(link)
+                    .onSuccess { toastRes(Res.string.warp_added) }
+                    .onFailure { toastImportFailure(it) }
             },
         )
     }
@@ -2142,6 +2159,7 @@ private fun AddServerSheet(
     onAether: () -> Unit,
     onMihomo: () -> Unit,
     onSsh: () -> Unit,
+    onWarp: () -> Unit,
     onSniSpoof: () -> Unit,
     onProxyChain: () -> Unit,
     onCrossChain: () -> Unit,
@@ -2193,6 +2211,7 @@ private fun AddServerSheet(
             Option(Res.drawable.ic_bolt, Res.string.aether_add_title, onAether, free = true)
             Option(Res.drawable.ic_description, Res.string.mihomo_add_title, onMihomo, free = true)
             Option(Res.drawable.ic_speed, Res.string.ssh_add_title, onSsh)
+            Option(Res.drawable.ic_public, Res.string.warp_add_title, onWarp, free = true)
             if (LocalPlatform.current.supportsSniSpoof) Option(Res.drawable.ic_bolt, Res.string.snispoof_add_title, onSniSpoof)
 
             OptionGroup(Res.string.add_group_dns)

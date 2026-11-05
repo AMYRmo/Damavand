@@ -1739,4 +1739,11 @@
     <string name="onb_rules_torrent">BitTorrent directly</string>
     <string name="onb_rules_torrent_sum">Keeps torrent traffic off your server</string>
     <string name="onb_welcome_body">A few quick choices and you are ready: your language, where you are, how traffic should flow and how the app looks.</string>
+    <string name="warp_add_title">Cloudflare WARP</string>
+    <string name="warp_add_body">Registers a free WARP device with Cloudflare and adds it as a MASQUE server. If you are connected, registration goes through the current connection.</string>
+    <string name="warp_add_terms">By adding WARP you accept Cloudflare's terms of service (cloudflare.com/application/terms).</string>
+    <string name="warp_registering">Registering with Cloudflare…</string>
+    <string name="warp_failed">Registration failed: %1$s</string>
+    <string name="warp_add_action">Register</string>
+    <string name="warp_added">Cloudflare WARP added</string>
 </resources>

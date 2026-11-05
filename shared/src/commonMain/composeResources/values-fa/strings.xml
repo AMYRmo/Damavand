@@ -1729,4 +1729,11 @@
     <string name="onb_rules_torrent">بیت‌تورنت مستقیم</string>
     <string name="onb_rules_torrent_sum">ترافیک تورنت از سرور شما رد نمی‌شود</string>
     <string name="onb_welcome_body">چند انتخاب کوتاه و آماده‌اید: زبان، کشوری که در آن هستید، مسیر ترافیک و ظاهر برنامه.</string>
+    <string name="warp_add_title">Cloudflare WARP</string>
+    <string name="warp_add_body">یک دستگاه رایگان WARP در Cloudflare ثبت می‌کند و آن را به‌صورت سرور MASQUE اضافه می‌کند. اگر وصل هستید، ثبت از راه همان اتصال انجام می‌شود.</string>
+    <string name="warp_add_terms">با افزودن WARP شرایط استفادهٔ Cloudflare را می‌پذیرید (cloudflare.com/application/terms).</string>
+    <string name="warp_registering">در حال ثبت در Cloudflare…</string>
+    <string name="warp_failed">ثبت ناموفق بود: %1$s</string>
+    <string name="warp_add_action">ثبت</string>
+    <string name="warp_added">Cloudflare WARP اضافه شد</string>
 </resources>

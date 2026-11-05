@@ -189,7 +189,7 @@ object PingService {
         return profile.protocol !in UDP_OUTBOUND_PROTOCOLS
     }
 
-    private val UDP_OUTBOUND_PROTOCOLS = setOf("WIREGUARD", "AMNEZIAWG", "HYSTERIA")
+    private val UDP_OUTBOUND_PROTOCOLS = setOf("WIREGUARD", "AMNEZIAWG", "HYSTERIA", "MASQUE")
 
     private suspend fun probeWithTimeout(profile: VpnProfile, config: String, url: String): Long =
         withContext(Dispatchers.IO) {

@@ -1660,4 +1660,11 @@
     <string name="onb_rules_torrent">BitTorrent 直连</string>
     <string name="onb_rules_torrent_sum">种子流量不经过你的服务器</string>
     <string name="onb_welcome_body">几步快速选择即可开始：语言、所在国家、流量走向和外观。</string>
+    <string name="warp_add_title">Cloudflare WARP</string>
+    <string name="warp_add_body">在 Cloudflare 注册一个免费的 WARP 设备，并作为 MASQUE 服务器添加。如果已连接，注册会通过当前连接进行。</string>
+    <string name="warp_add_terms">添加 WARP 即表示你接受 Cloudflare 的服务条款（cloudflare.com/application/terms）。</string>
+    <string name="warp_registering">正在向 Cloudflare 注册…</string>
+    <string name="warp_failed">注册失败：%1$s</string>
+    <string name="warp_add_action">注册</string>
+    <string name="warp_added">已添加 Cloudflare WARP</string>
 </resources>

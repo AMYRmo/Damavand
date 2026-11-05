@@ -1660,4 +1660,11 @@
     <string name="onb_rules_torrent">BitTorrent напрямую</string>
     <string name="onb_rules_torrent_sum">Торрент-трафик не пойдёт через ваш сервер</string>
     <string name="onb_welcome_body">Несколько быстрых шагов: язык, ваша страна, маршрут трафика и внешний вид.</string>
+    <string name="warp_add_title">Cloudflare WARP</string>
+    <string name="warp_add_body">Регистрирует бесплатное устройство WARP в Cloudflare и добавляет его как сервер MASQUE. Если вы подключены, регистрация идёт через текущее подключение.</string>
+    <string name="warp_add_terms">Добавляя WARP, вы принимаете условия использования Cloudflare (cloudflare.com/application/terms).</string>
+    <string name="warp_registering">Регистрация в Cloudflare…</string>
+    <string name="warp_failed">Не удалось зарегистрироваться: %1$s</string>
+    <string name="warp_add_action">Зарегистрировать</string>
+    <string name="warp_added">Cloudflare WARP добавлен</string>
 </resources>
