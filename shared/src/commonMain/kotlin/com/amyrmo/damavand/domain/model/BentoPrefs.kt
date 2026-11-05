@@ -3,7 +3,7 @@ package com.amyrmo.damavand.domain.model
 import kotlinx.serialization.Serializable
 
 @Serializable
-enum class BentoPalette { Brand, Accent, Pastel, Vivid, Mono, Citrus, Matcha, Neon, Pistachio, Ocean, Sunset, Berry }
+enum class BentoPalette { Brand, Accent, Pastel, Vivid, Mono, Citrus, Matcha, Neon, Pistachio, Ocean, Sunset, Berry, Damavand }
 
 @Serializable
 enum class BentoCorners { Leaf, Round, Soft }
@@ -22,7 +22,7 @@ enum class BentoConnect { Slide, Button, Morph, Rail, Hold, Tile }
 
 @Serializable
 data class BentoPrefs(
-    val palette: BentoPalette = BentoPalette.Brand,
+    val palette: BentoPalette = BentoPalette.Damavand,
     val corners: BentoCorners = BentoCorners.Leaf,
     val title: BentoTitle = BentoTitle.Large,
     val density: BentoDensity = BentoDensity.Comfortable,

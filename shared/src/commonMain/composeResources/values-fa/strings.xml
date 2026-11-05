@@ -1736,4 +1736,14 @@
     <string name="warp_failed">ثبت ناموفق بود: %1$s</string>
     <string name="warp_add_action">ثبت</string>
     <string name="warp_added">Cloudflare WARP اضافه شد</string>
+    <string name="bento_palette_damavand">دماوند</string>
+    <string name="bento_live_kill">کیل‌سوییچ روشن</string>
+    <string name="bento_live_mode_proxy">فقط پروکسی</string>
+    <string name="bento_live_mode_system">پروکسی سیستم</string>
+    <string name="bento_live_mode_vpn">حالت VPN</string>
+    <string name="bento_live_rules">%1$d قانون</string>
+    <string name="bento_live_vpn">MTU %1$d · %2$s</string>
+    <string name="onb_region_change">قانون‌های کشور</string>
+    <string name="onb_replay_sub">زبان، قانون‌های کشور و ظاهر، قدم به قدم</string>
+    <string name="onb_replay_title">راه‌اندازی دوباره</string>
 </resources>

@@ -8,7 +8,7 @@ enum class ColorStyle { Damavand, TonalSpot, Vibrant, Expressive, Rainbow, Fruit
 
 enum class ColorContrast(val level: Double) { Standard(0.0), Medium(0.5), High(1.0) }
 
-enum class AppDesign { Pixel, Portal, Old, Bento }
+enum class AppDesign { Pixel, Portal, Bento }
 
 enum class ScreenTransition {
     Fade,

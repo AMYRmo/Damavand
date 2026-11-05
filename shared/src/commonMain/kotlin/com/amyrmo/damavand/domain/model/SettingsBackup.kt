@@ -2,6 +2,7 @@ package com.amyrmo.damavand.domain.model
 
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.put
@@ -9,7 +10,7 @@ import kotlinx.serialization.json.put
 object SettingsBackup {
     const val FILE_NAME = "damavand-settings.json"
     private const val MARK = "damavandSettings"
-    private const val VERSION = 1
+    private const val VERSION = 2
 
     private val json = Json {
         ignoreUnknownKeys = true
@@ -29,6 +30,16 @@ object SettingsBackup {
     fun read(text: String): AppSettings? = runCatching {
         val root = json.parseToJsonElement(text).jsonObject
         val body = root["settings"]?.takeIf { root.containsKey(MARK) } ?: return null
-        json.decodeFromJsonElement(AppSettings.serializer(), body)
+        val decoded = json.decodeFromJsonElement(AppSettings.serializer(), body)
+        val version = (root[MARK] as? JsonPrimitive)?.content?.toIntOrNull() ?: VERSION
+        // One-time migration: backups written before v2 recorded the palette as
+        // "Brand" for what then rendered as Damavand red. Since v2, "Brand" is
+        // ZedSecure's lime again and Damavand red is its own palette, so a v1
+        // "Brand" selection resolves to Damavand. v2+ backups are truthful.
+        if (version < 2 && decoded.bento.palette == BentoPalette.Brand) {
+            decoded.copy(bento = decoded.bento.copy(palette = BentoPalette.Damavand))
+        } else {
+            decoded
+        }
     }.getOrNull()
 }

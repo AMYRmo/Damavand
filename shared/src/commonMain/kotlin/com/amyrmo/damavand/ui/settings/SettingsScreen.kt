@@ -98,6 +98,9 @@ fun SettingsScreen(
 
     onDeepLinkBack: (() -> Unit)? = null,
 
+    onReplayTour: (() -> Unit)? = null,
+
+    onReplaySetup: (() -> Unit)? = null,
 
     mtuHint: com.amyrmo.damavand.data.net.MtuServerHint? = null,
 
@@ -171,13 +174,21 @@ fun SettingsScreen(
     ) {
     stateHolder.SaveableStateProvider(shown) {
         when (shown) {
-            SettingsPage.Root -> RootPage(
+            // Damavand: the Bento hub is the Settings root for EVERY design
+            // (Amir's directive — ZedSecure shows it only under its Bento
+            // design, but Portal is Damavand's default, so gating on the
+            // design would hide the hub from most users). RootPage below is
+            // kept for reference/reversibility.
+            SettingsPage.Root -> BentoRoot(
                 settings = settings,
                 contentPadding = contentPadding,
                 modifier = modifier,
                 onOpen = { page = it },
                 onAbout = { showAbout = true },
+                onReplayTour = onReplayTour,
+                onReplaySetup = onReplaySetup,
                 hasAi = ai != null,
+                onUpdate = onUpdate,
             )
             SettingsPage.Ui -> UiPage(settings, contentPadding, modifier, onUpdate, onLanguage)
             SettingsPage.Vpn -> VpnPage(settings, contentPadding, modifier, onUpdate, mtuHint)
@@ -283,7 +294,8 @@ private fun RootPage(
     modifier: Modifier,
     onOpen: (SettingsPage) -> Unit,
     onAbout: () -> Unit,
-
+    onReplayTour: (() -> Unit)?,
+    onReplaySetup: (() -> Unit)?,
     hasAi: Boolean,
 ) {
     val platform = LocalPlatform.current
@@ -329,6 +341,20 @@ private fun RootPage(
                     stringResource(Res.string.ai_subtitle),
                     art = SettingsArts.Ai,
                 ) { onOpen(SettingsPage.Ai) }
+            }
+            if (onReplayTour != null) {
+                SettingsMenuRow(
+                    stringResource(Res.string.tour_replay_title),
+                    stringResource(Res.string.tour_replay_subtitle),
+                    art = SettingsArts.Tour,
+                ) { onReplayTour() }
+            }
+            if (onReplaySetup != null) {
+                SettingsMenuRow(
+                    stringResource(Res.string.onb_replay_title),
+                    stringResource(Res.string.onb_replay_sub),
+                    art = SettingsArts.Routing,
+                ) { onReplaySetup() }
             }
         }
 
@@ -478,6 +504,321 @@ private fun RootPage(
         )
         Spacer(Modifier.height(28.dp))
     }
+}
+
+@Composable
+private fun BentoRoot(
+    settings: AppSettings,
+    contentPadding: PaddingValues,
+    modifier: Modifier,
+    onOpen: (SettingsPage) -> Unit,
+    onAbout: () -> Unit,
+    onReplayTour: (() -> Unit)?,
+    onReplaySetup: (() -> Unit)?,
+    hasAi: Boolean,
+    onUpdate: ((AppSettings) -> AppSettings) -> Unit,
+) {
+    val platform = LocalPlatform.current
+    var checkTrigger by androidx.compose.runtime.remember { androidx.compose.runtime.mutableIntStateOf(0) }
+    var checking by androidx.compose.runtime.remember { mutableStateOf(false) }
+    val live = settings.bento.liveTiles
+    val fromPlay = platform.distribution == Distribution.PlayStore
+    val designName = stringResource(
+        when (settings.appDesign) {
+            AppDesign.Bento -> Res.string.home_design_bento
+            AppDesign.Pixel -> Res.string.home_design_pixel
+            AppDesign.Portal -> Res.string.home_design_portal
+        },
+    )
+    val paletteName = stringResource(
+        when (settings.bento.palette) {
+            com.amyrmo.damavand.domain.model.BentoPalette.Brand -> Res.string.bento_palette_brand
+            com.amyrmo.damavand.domain.model.BentoPalette.Accent -> Res.string.bento_palette_accent
+            com.amyrmo.damavand.domain.model.BentoPalette.Pastel -> Res.string.bento_palette_pastel
+            com.amyrmo.damavand.domain.model.BentoPalette.Vivid -> Res.string.bento_palette_vivid
+            com.amyrmo.damavand.domain.model.BentoPalette.Mono -> Res.string.bento_palette_mono
+            com.amyrmo.damavand.domain.model.BentoPalette.Citrus -> Res.string.bento_palette_citrus
+            com.amyrmo.damavand.domain.model.BentoPalette.Matcha -> Res.string.bento_palette_matcha
+            com.amyrmo.damavand.domain.model.BentoPalette.Neon -> Res.string.bento_palette_neon
+            com.amyrmo.damavand.domain.model.BentoPalette.Pistachio -> Res.string.bento_palette_pistachio
+            com.amyrmo.damavand.domain.model.BentoPalette.Ocean -> Res.string.bento_palette_ocean
+            com.amyrmo.damavand.domain.model.BentoPalette.Sunset -> Res.string.bento_palette_sunset
+            com.amyrmo.damavand.domain.model.BentoPalette.Berry -> Res.string.bento_palette_berry
+            com.amyrmo.damavand.domain.model.BentoPalette.Damavand -> Res.string.bento_palette_damavand
+        },
+    )
+    val modeName = stringResource(
+        when (settings.runMode) {
+            com.amyrmo.damavand.domain.model.RunMode.Vpn -> Res.string.bento_live_mode_vpn
+            com.amyrmo.damavand.domain.model.RunMode.ProxyOnly -> Res.string.bento_live_mode_proxy
+            com.amyrmo.damavand.domain.model.RunMode.SystemProxy -> Res.string.bento_live_mode_system
+        },
+    )
+    val vpnLive = stringResource(Res.string.bento_live_vpn, settings.vpnMtu, if (settings.useZepTun) "zeptun" else "hev") +
+        if (settings.killSwitch) " · " + stringResource(Res.string.bento_live_kill) else ""
+    val ruleCount = com.amyrmo.damavand.domain.config.RoutingMigration.effectiveRulesets(settings).count { it.enabled }
+    val dnsLive = if (settings.remoteDnsMode == "custom" && settings.remoteDnsPrimary.isNotBlank()) {
+        settings.remoteDnsPrimary
+    } else {
+        stringResource(Res.string.summary_dns_protocols)
+    }
+    val torLive = stringResource(
+        when (settings.torBridgesMode) {
+            "default" -> Res.string.tor_bridges_default
+            "own" -> Res.string.tor_bridges_own
+            else -> Res.string.tor_bridges_none
+        },
+    )
+    val entries = buildList {
+        add(com.amyrmo.damavand.ui.bento.BentoHubEntry(
+            key = "appearance",
+            title = stringResource(Res.string.title_ui_settings),
+            summary = if (live) listOfNotNull(designName, paletteName.takeIf { settings.appDesign == AppDesign.Bento }).joinToString(" · ")
+            else stringResource(Res.string.summary_ui_settings),
+            art = SettingsArts.Appearance,
+            keywords = listOf(
+                stringResource(Res.string.home_design_title),
+                stringResource(Res.string.bento_group_look),
+                stringResource(Res.string.bento_palette_title),
+                stringResource(Res.string.title_pref_dynamic_color),
+                stringResource(Res.string.title_pref_ui_mode_night),
+                stringResource(Res.string.title_pref_amoled),
+                stringResource(Res.string.title_pref_reduce_motion),
+                stringResource(Res.string.title_pref_live_notif),
+                stringResource(Res.string.title_pref_notif_chip),
+                stringResource(Res.string.title_pref_double_column_display),
+                stringResource(Res.string.title_pref_confirm_remove),
+                stringResource(Res.string.title_pref_home_after_select),
+                stringResource(Res.string.nav_style_title),
+            ),
+            tourKey = TourTargets.SETTINGS_LOOK,
+        ) { onOpen(SettingsPage.Ui) })
+        add(com.amyrmo.damavand.ui.bento.BentoHubEntry(
+            key = "vpn",
+            title = stringResource(Res.string.title_vpn_settings),
+            summary = if (live) vpnLive else stringResource(Res.string.summary_vpn_settings),
+            art = SettingsArts.Vpn,
+            keywords = listOf(
+                stringResource(Res.string.kill_switch),
+                stringResource(Res.string.title_pref_vpn_mtu),
+                stringResource(Res.string.title_pref_ipv6_enabled),
+                stringResource(Res.string.title_pref_vpn_bypass_lan),
+                stringResource(Res.string.title_pref_vpn_dns),
+                stringResource(Res.string.title_pref_vpn_interface_address),
+                stringResource(Res.string.tun_engine_title),
+                stringResource(Res.string.battery_opt_title),
+                stringResource(Res.string.title_pref_local_dns_enabled),
+                stringResource(Res.string.title_pref_fake_dns_enabled),
+                "MTU", "IPv6", "TUN",
+            ),
+            tourKey = TourTargets.SETTINGS_CORE,
+        ) { onOpen(SettingsPage.Vpn) })
+        add(com.amyrmo.damavand.ui.bento.BentoHubEntry(
+            key = "dns",
+            title = stringResource(Res.string.title_dns_protocols),
+            summary = if (live) dnsLive else stringResource(Res.string.summary_dns_protocols),
+            art = SettingsArts.Dns,
+            keywords = listOf(stringResource(Res.string.dns_override), "DNS", "DoH", "DoT"),
+            tourKey = TourTargets.SETTINGS_TUNNELS,
+        ) { onOpen(SettingsPage.DnsProtocols) })
+        add(com.amyrmo.damavand.ui.bento.BentoHubEntry(
+            key = "routing",
+            title = stringResource(Res.string.routing_title),
+            summary = if (live) stringResource(Res.string.bento_live_rules, ruleCount) else stringResource(Res.string.routing_subtitle),
+            art = SettingsArts.Routing,
+            keywords = listOf("geoip", "geosite"),
+            tourKey = TourTargets.SETTINGS_ROUTING,
+        ) { onOpen(SettingsPage.Routing) })
+        add(com.amyrmo.damavand.ui.bento.BentoHubEntry(
+            key = "tor",
+            title = stringResource(Res.string.title_tor_settings),
+            summary = if (live) torLive else stringResource(Res.string.summary_tor_settings),
+            art = SettingsArts.Tor,
+            keywords = listOf("Snowflake", "obfs4", "meek", "webtunnel"),
+        ) { onOpen(SettingsPage.Tor) })
+        add(com.amyrmo.damavand.ui.bento.BentoHubEntry(
+            key = "speed-test",
+            title = stringResource(Res.string.title_speedtest),
+            summary = stringResource(Res.string.summary_speedtest),
+            art = SettingsArts.SpeedTest,
+        ) { onOpen(SettingsPage.SpeedTest) })
+        add(com.amyrmo.damavand.ui.bento.BentoHubEntry(
+            key = "monitor",
+            title = stringResource(Res.string.monitor_title),
+            summary = stringResource(Res.string.monitor_subtitle),
+            art = SettingsArts.Monitor,
+        ) { onOpen(SettingsPage.Monitor) })
+        add(com.amyrmo.damavand.ui.bento.BentoHubEntry(
+            key = "per-app",
+            title = stringResource(Res.string.per_app_title),
+            summary = if (settings.perAppProxyEnabled) {
+                stringResource(Res.string.per_app_selected, settings.perAppPackages.size)
+            } else {
+                stringResource(Res.string.per_app_mode_off)
+            },
+            art = SettingsArts.PerApp,
+        ) { onOpen(SettingsPage.PerApp) })
+        add(com.amyrmo.damavand.ui.bento.BentoHubEntry(
+            key = "core",
+            title = stringResource(Res.string.title_core_settings),
+            summary = stringResource(Res.string.summary_core_settings),
+            art = SettingsArts.Core,
+            keywords = listOf(
+                stringResource(Res.string.title_pref_sniffing_enabled),
+                stringResource(Res.string.title_pref_route_only_enabled),
+                stringResource(Res.string.title_pref_remote_dns),
+                stringResource(Res.string.title_pref_domestic_dns),
+                stringResource(Res.string.title_pref_dns_hosts),
+                stringResource(Res.string.title_pref_enable_local_proxy),
+                stringResource(Res.string.title_pref_local_proxy_port),
+                stringResource(Res.string.title_pref_proxy_sharing_enabled),
+                stringResource(Res.string.title_pref_lan_auth),
+                stringResource(Res.string.title_pref_lan_password),
+            ),
+        ) { onOpen(SettingsPage.Core) })
+        add(com.amyrmo.damavand.ui.bento.BentoHubEntry(
+            key = "mode",
+            title = stringResource(Res.string.title_mode_settings),
+            summary = if (live) modeName else stringResource(Res.string.summary_mode_settings),
+            art = SettingsArts.Mode,
+        ) { onOpen(SettingsPage.Mode) })
+        add(com.amyrmo.damavand.ui.bento.BentoHubEntry(
+            key = "sing-box",
+            title = stringResource(Res.string.title_singbox_settings),
+            summary = stringResource(Res.string.summary_singbox_settings),
+            art = SettingsArts.SingBox,
+        ) { onOpen(SettingsPage.SingBox) })
+        add(com.amyrmo.damavand.ui.bento.BentoHubEntry(
+            key = "ssh",
+            title = stringResource(Res.string.title_ssh_settings),
+            summary = stringResource(Res.string.summary_ssh_settings),
+            art = SettingsArts.Ssh,
+        ) { onOpen(SettingsPage.Ssh) })
+        add(com.amyrmo.damavand.ui.bento.BentoHubEntry(
+            key = "map",
+            title = stringResource(Res.string.map_title),
+            summary = stringResource(Res.string.map_settings_sub),
+            art = SettingsArts.Map,
+            tourKey = TourTargets.SETTINGS_TOOLS,
+        ) { onOpen(SettingsPage.Map) })
+        add(com.amyrmo.damavand.ui.bento.BentoHubEntry(
+            key = "mux",
+            title = stringResource(Res.string.title_mux_settings),
+            summary = stringResource(Res.string.summary_mux_settings),
+            art = SettingsArts.Mux,
+            keywords = listOf(
+                stringResource(Res.string.title_pref_mux_enabled),
+                stringResource(Res.string.title_pref_mux_concurrency),
+                stringResource(Res.string.title_pref_mux_xudp_concurrency),
+            ),
+        ) { onOpen(SettingsPage.Mux) })
+        add(com.amyrmo.damavand.ui.bento.BentoHubEntry(
+            key = "fragment",
+            title = stringResource(Res.string.title_fragment_settings),
+            summary = stringResource(Res.string.summary_fragment_settings),
+            art = SettingsArts.Fragment,
+            keywords = listOf(
+                stringResource(Res.string.title_pref_fragment_enabled),
+                stringResource(Res.string.title_pref_fragment_packets),
+                stringResource(Res.string.title_pref_fragment_length),
+                stringResource(Res.string.title_pref_fragment_interval),
+            ),
+        ) { onOpen(SettingsPage.Fragment) })
+        add(com.amyrmo.damavand.ui.bento.BentoHubEntry(
+            key = "observatory",
+            title = stringResource(Res.string.title_observatory_settings),
+            summary = stringResource(Res.string.summary_observatory_settings),
+            art = SettingsArts.Observatory,
+        ) { onOpen(SettingsPage.Observatory) })
+        add(com.amyrmo.damavand.ui.bento.BentoHubEntry(
+            key = "advanced",
+            title = stringResource(Res.string.title_advanced),
+            summary = stringResource(Res.string.summary_advanced),
+            art = SettingsArts.Advanced,
+            keywords = listOf(
+                stringResource(Res.string.title_pref_is_booted),
+                stringResource(Res.string.title_pref_delay_test_url),
+                stringResource(Res.string.title_pref_real_ping_concurrency),
+                stringResource(Res.string.title_pref_ip_api_url),
+                stringResource(Res.string.title_pref_auto_test_after_update),
+                stringResource(Res.string.title_pref_auto_remove_invalid),
+                stringResource(Res.string.title_pref_auto_sort_after_test),
+            ),
+        ) { onOpen(SettingsPage.Advanced) })
+        add(com.amyrmo.damavand.ui.bento.BentoHubEntry(
+            key = "assets",
+            title = stringResource(Res.string.assets_title),
+            summary = stringResource(Res.string.assets_subtitle),
+            art = SettingsArts.Assets,
+            keywords = listOf(stringResource(Res.string.title_pref_geo_files_source)),
+        ) { onOpen(SettingsPage.Assets) })
+        if (hasAi) {
+            add(com.amyrmo.damavand.ui.bento.BentoHubEntry(
+                key = "ai",
+                title = stringResource(Res.string.ai_title),
+                summary = stringResource(Res.string.ai_subtitle),
+                art = SettingsArts.Ai,
+            ) { onOpen(SettingsPage.Ai) })
+        }
+        if (onReplayTour != null) {
+            add(com.amyrmo.damavand.ui.bento.BentoHubEntry(
+                key = "tour",
+                title = stringResource(Res.string.tour_replay_title),
+                summary = stringResource(Res.string.tour_replay_subtitle),
+                art = SettingsArts.Tour,
+            ) { onReplayTour() })
+        }
+        if (onReplaySetup != null) {
+            add(com.amyrmo.damavand.ui.bento.BentoHubEntry(
+                key = "setup",
+                title = stringResource(Res.string.onb_replay_title),
+                summary = stringResource(Res.string.onb_replay_sub),
+                art = SettingsArts.Routing,
+                keywords = listOf(stringResource(Res.string.onb_region_change), stringResource(Res.string.onb_region_title)),
+            ) { onReplaySetup() })
+        }
+        add(com.amyrmo.damavand.ui.bento.BentoHubEntry(
+            key = "update",
+            title = stringResource(Res.string.update_check_title),
+            summary = when {
+                checking -> stringResource(Res.string.update_checking)
+                fromPlay -> stringResource(Res.string.update_check_summary)
+                else -> stringResource(Res.string.update_check_summary_github)
+            },
+            art = SettingsArts.Update,
+        ) { if (!checking) { checking = true; checkTrigger++ } })
+        add(com.amyrmo.damavand.ui.bento.BentoHubEntry(
+            key = "rate",
+            title = stringResource(if (fromPlay) Res.string.rate_title else Res.string.rate_title_github),
+            summary = stringResource(if (fromPlay) Res.string.rate_summary else Res.string.rate_summary_github),
+            art = SettingsArts.Rate,
+        ) { platform.openStorePage() })
+        add(com.amyrmo.damavand.ui.bento.BentoHubEntry(
+            key = "privacy",
+            title = stringResource(Res.string.privacy_title),
+            summary = stringResource(Res.string.privacy_settings_sub),
+            art = SettingsArts.Privacy,
+        ) { onOpen(SettingsPage.Privacy) })
+        add(com.amyrmo.damavand.ui.bento.BentoHubEntry(
+            key = "about",
+            title = stringResource(Res.string.settings_about),
+            summary = AppInfo.versionName,
+            art = SettingsArts.About,
+            tourKey = TourTargets.SETTINGS_ABOUT,
+        ) { onAbout() })
+    }
+    com.amyrmo.damavand.ui.bento.BentoHub(
+        entries = entries,
+        layoutCode = settings.bento.tiles,
+        onLayoutChange = { code -> onUpdate { it.copy(bento = it.bento.copy(tiles = code)) } },
+        contentPadding = contentPadding,
+        modifier = modifier,
+    )
+    ManualUpdateCheckHost(
+        settings = settings,
+        trigger = checkTrigger,
+        onFinished = { checking = false },
+    )
 }
 
 @Composable

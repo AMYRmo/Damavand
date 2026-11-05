@@ -69,6 +69,7 @@ import com.amyrmo.damavand.shared.resources.bento_motifs
 import com.amyrmo.damavand.shared.resources.bento_motifs_sum
 import com.amyrmo.damavand.shared.resources.bento_palette_accent
 import com.amyrmo.damavand.shared.resources.bento_palette_brand
+import com.amyrmo.damavand.shared.resources.bento_palette_damavand
 import com.amyrmo.damavand.shared.resources.bento_palette_mono
 import com.amyrmo.damavand.shared.resources.bento_palette_citrus
 import com.amyrmo.damavand.shared.resources.bento_palette_matcha
@@ -223,6 +224,7 @@ internal fun PalettePicker(settings: AppSettings, selected: BentoPalette, onSele
     val dark = Bento.colors.dark
     val seed = accentSeed(settings.accentColor)
     val options = listOf(
+        BentoPalette.Damavand to stringResource(Res.string.bento_palette_damavand),
         BentoPalette.Brand to stringResource(Res.string.bento_palette_brand),
         BentoPalette.Accent to stringResource(Res.string.bento_palette_accent),
         BentoPalette.Pastel to stringResource(Res.string.bento_palette_pastel),

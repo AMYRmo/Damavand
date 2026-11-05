@@ -5,6 +5,7 @@ import android.content.SharedPreferences
 import com.amyrmo.damavand.domain.model.AppLanguage
 import com.amyrmo.damavand.domain.ai.AiSettings
 import com.amyrmo.damavand.domain.model.AppSettings
+import com.amyrmo.damavand.domain.model.BentoPrefs
 import com.amyrmo.damavand.domain.model.DomainStrategy
 import com.amyrmo.damavand.domain.model.FragmentPackets
 import com.amyrmo.damavand.domain.model.GeoFilesSource
@@ -239,6 +240,10 @@ class SettingsRepository(context: Context) {
 
             killSwitch = prefs.getBoolean("kill_switch", d.killSwitch),
 
+            bento = prefs.getString("bento_prefs", null)
+                ?.let { runCatching { aiJson.decodeFromString(BentoPrefs.serializer(), it) }.getOrNull() }
+                ?: d.bento,
+
             ai = prefs.getString("ai_settings", null)
                 ?.let { runCatching { aiJson.decodeFromString(AiSettings.serializer(), it) }.getOrNull() }
                 ?: d.ai,
@@ -451,6 +456,7 @@ class SettingsRepository(context: Context) {
             putInt("ssh_max_channels", s.sshMaxChannels)
 
             putBoolean("kill_switch", s.killSwitch)
+            putString("bento_prefs", aiJson.encodeToString(BentoPrefs.serializer(), s.bento))
             putString("ai_settings", aiJson.encodeToString(AiSettings.serializer(), s.ai))
         }.apply()
     }

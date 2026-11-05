@@ -49,7 +49,6 @@ import androidx.compose.ui.unit.dp
 import com.amyrmo.damavand.domain.model.AppDesign
 import com.amyrmo.damavand.shared.resources.Res
 import com.amyrmo.damavand.shared.resources.*
-import com.amyrmo.damavand.ui.theme.ZedGradients
 import org.jetbrains.compose.resources.painterResource
 import org.jetbrains.compose.resources.stringResource
 import kotlin.math.sqrt
@@ -94,12 +93,6 @@ fun AppDesignPicker(selected: AppDesign, onSelect: (AppDesign) -> Unit) {
                     modifier = Modifier.weight(1f),
                     onClick = { onSelect(AppDesign.Portal) },
                 ) { PortalPreview() }
-                DesignCard(
-                    name = stringResource(Res.string.home_design_old),
-                    selected = selected == AppDesign.Old,
-                    modifier = Modifier.weight(1f),
-                    onClick = { onSelect(AppDesign.Old) },
-                ) { OldPreview() }
             }
         }
     }
@@ -250,33 +243,5 @@ private fun DesignCard(
 private fun BentoPreviewCard() {
     Box(Modifier.fillMaxSize().background(com.amyrmo.damavand.ui.bento.Bento.colors.ground)) {
         com.amyrmo.damavand.ui.bento.BentoDesignPreview()
-    }
-}
-
-@Composable
-private fun OldPreview() {
-    val cs = MaterialTheme.colorScheme
-    Column(
-        Modifier.fillMaxSize().padding(10.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(7.dp),
-    ) {
-        Spacer(Modifier.height(4.dp))
-        Box(
-            Modifier
-                .size(62.dp)
-                .clip(MaterialShapes.Cookie9Sided.toShape())
-                .background(ZedGradients.idle),
-            contentAlignment = Alignment.Center,
-        ) {
-            Text("Z", color = Color.White, style = MaterialTheme.typography.titleLargeEmphasized)
-        }
-        Spacer(Modifier.height(2.dp))
-        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(5.dp)) {
-            Box(Modifier.weight(1f).height(26.dp).clip(RoundedCornerShape(7.dp)).background(cs.surfaceContainerHighest))
-            Box(Modifier.weight(1f).height(26.dp).clip(RoundedCornerShape(7.dp)).background(cs.surfaceContainerHighest))
-        }
-        Box(Modifier.fillMaxWidth().height(18.dp).clip(RoundedCornerShape(7.dp)).background(cs.primaryContainer))
-        Box(Modifier.fillMaxWidth().height(18.dp).clip(RoundedCornerShape(9.dp)).background(cs.primary))
     }
 }

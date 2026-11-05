@@ -1667,4 +1667,14 @@
     <string name="warp_failed">Не удалось зарегистрироваться: %1$s</string>
     <string name="warp_add_action">Зарегистрировать</string>
     <string name="warp_added">Cloudflare WARP добавлен</string>
+    <string name="bento_palette_damavand">Дамаванд</string>
+    <string name="bento_live_kill">kill switch включён</string>
+    <string name="bento_live_mode_proxy">Только прокси</string>
+    <string name="bento_live_mode_system">Системный прокси</string>
+    <string name="bento_live_mode_vpn">Режим VPN</string>
+    <string name="bento_live_rules">Правил: %1$d</string>
+    <string name="bento_live_vpn">MTU %1$d · %2$s</string>
+    <string name="onb_region_change">Правила страны</string>
+    <string name="onb_replay_sub">Язык, правила страны и внешний вид по шагам</string>
+    <string name="onb_replay_title">Пройти настройку снова</string>
 </resources>

@@ -179,7 +179,7 @@ private fun persianTypography(): Typography {
 }
 
 @Composable
-fun typographyFor(language: String, design: AppDesign = AppDesign.Old): Typography = when {
+fun typographyFor(language: String, design: AppDesign = AppDesign.Portal): Typography = when {
     language == "fa" -> persianTypography()
     design == AppDesign.Pixel && language != "ru" -> googleSansFamily().let { latinTypography(it, it) }
     else -> latinTypography()
