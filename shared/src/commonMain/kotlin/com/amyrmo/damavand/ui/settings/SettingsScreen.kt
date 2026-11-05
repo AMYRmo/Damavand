@@ -49,6 +49,10 @@ import com.amyrmo.damavand.domain.model.ListDensity
 import com.amyrmo.damavand.domain.model.FragmentPackets
 import com.amyrmo.damavand.domain.model.HevLogLevel
 import com.amyrmo.damavand.domain.model.LogLevel
+import com.amyrmo.damavand.domain.model.MaskFragment
+import com.amyrmo.damavand.domain.model.MaskRange
+import com.amyrmo.damavand.domain.model.NoiseKind
+import com.amyrmo.damavand.domain.model.UdpNoise
 import com.amyrmo.damavand.domain.model.NavBarStyle
 import com.amyrmo.damavand.domain.model.NotifChip
 import com.amyrmo.damavand.domain.model.OutboundDomainResolve
@@ -1675,6 +1679,12 @@ private fun CorePage(
                 selected = s.outboundDomainResolve,
                 onSelected = { v -> onUpdate { it.copy(outboundDomainResolve = v) } },
             )
+            SettingsSwitchRow(
+                title = stringResource(Res.string.browser_dialer_title),
+                summary = stringResource(Res.string.browser_dialer_hint),
+                checked = s.browserDialer,
+                onCheckedChange = { v -> onUpdate { it.copy(browserDialer = v) } },
+            )
         }
 
         SettingsGroup {
@@ -2100,7 +2110,265 @@ private fun FragmentPage(
                 },
             )
         }
+
+        SettingsGroup(stringResource(Res.string.mask_group)) {
+            SettingsSwitchRow(
+                title = stringResource(Res.string.mask_enable),
+                summary = stringResource(Res.string.mask_hint),
+                checked = s.maskEnabled,
+                onCheckedChange = { v -> onUpdate { it.copy(maskEnabled = v) } },
+            )
+            if (s.maskEnabled) {
+                s.maskFragments.forEachIndexed { index, fragment ->
+                    MaskFragmentEditor(
+                        fragment = fragment,
+                        onChange = { next ->
+                            onUpdate { st ->
+                                st.copy(maskFragments = st.maskFragments.toMutableList().also { it[index] = next })
+                            }
+                        },
+                        onRemove = {
+                            onUpdate { st ->
+                                st.copy(maskFragments = st.maskFragments.filterIndexed { i, _ -> i != index })
+                            }
+                        },
+                    )
+                }
+                SettingsMenuRow(
+                    stringResource(Res.string.mask_add_fragment),
+                    stringResource(Res.string.mask_fragments),
+                ) { onUpdate { st -> st.copy(maskFragments = st.maskFragments + MaskFragment()) } }
+                s.maskNoises.forEachIndexed { index, noise ->
+                    MaskNoiseEditor(
+                        noise = noise,
+                        onChange = { next ->
+                            onUpdate { st ->
+                                st.copy(maskNoises = st.maskNoises.toMutableList().also { it[index] = next })
+                            }
+                        },
+                        onRemove = {
+                            onUpdate { st ->
+                                st.copy(maskNoises = st.maskNoises.filterIndexed { i, _ -> i != index })
+                            }
+                        },
+                    )
+                }
+                SettingsMenuRow(
+                    stringResource(Res.string.mask_add_noise),
+                    stringResource(Res.string.mask_noises),
+                ) { onUpdate { st -> st.copy(maskNoises = st.maskNoises + UdpNoise()) } }
+                SettingsEditRow(
+                    title = stringResource(Res.string.mask_reset_min),
+                    value = s.maskNoiseResetMin.toString(),
+                    numeric = true,
+                    onValueChanged = { v ->
+                        v.toIntOrNull()?.takeIf { it >= 0 }?.let { n ->
+                            onUpdate { it.copy(maskNoiseResetMin = n) }
+                        }
+                    },
+                )
+                SettingsEditRow(
+                    title = stringResource(Res.string.mask_reset_max),
+                    value = s.maskNoiseResetMax.toString(),
+                    numeric = true,
+                    onValueChanged = { v ->
+                        v.toIntOrNull()?.takeIf { it >= 0 }?.let { n ->
+                            onUpdate { it.copy(maskNoiseResetMax = n) }
+                        }
+                    },
+                )
+            }
+        }
+
+        SettingsGroup(stringResource(Res.string.mask_masque_group)) {
+            SettingsSwitchRow(
+                title = stringResource(Res.string.mask_masque_enable),
+                summary = stringResource(Res.string.mask_masque_hint),
+                checked = s.masqueMaskEnabled,
+                onCheckedChange = { v -> onUpdate { it.copy(masqueMaskEnabled = v) } },
+            )
+            SettingsEditRow(
+                title = stringResource(Res.string.mask_masque_sni),
+                value = s.masqueSni,
+                placeholder = "consumer-masque.cloudflareclient.com",
+                onValueChanged = { v -> onUpdate { it.copy(masqueSni = v) } },
+            )
+            if (s.masqueMaskEnabled) {
+                s.masqueMaskFragments.forEachIndexed { index, fragment ->
+                    MaskFragmentEditor(
+                        fragment = fragment,
+                        onChange = { next ->
+                            onUpdate { st ->
+                                st.copy(masqueMaskFragments = st.masqueMaskFragments.toMutableList().also { it[index] = next })
+                            }
+                        },
+                        onRemove = {
+                            onUpdate { st ->
+                                st.copy(masqueMaskFragments = st.masqueMaskFragments.filterIndexed { i, _ -> i != index })
+                            }
+                        },
+                    )
+                }
+                SettingsMenuRow(
+                    stringResource(Res.string.mask_add_fragment),
+                    stringResource(Res.string.mask_fragments_h2),
+                ) { onUpdate { st -> st.copy(masqueMaskFragments = st.masqueMaskFragments + MaskFragment()) } }
+                s.masqueMaskNoises.forEachIndexed { index, noise ->
+                    MaskNoiseEditor(
+                        noise = noise,
+                        onChange = { next ->
+                            onUpdate { st ->
+                                st.copy(masqueMaskNoises = st.masqueMaskNoises.toMutableList().also { it[index] = next })
+                            }
+                        },
+                        onRemove = {
+                            onUpdate { st ->
+                                st.copy(masqueMaskNoises = st.masqueMaskNoises.filterIndexed { i, _ -> i != index })
+                            }
+                        },
+                    )
+                }
+                SettingsMenuRow(
+                    stringResource(Res.string.mask_add_noise),
+                    stringResource(Res.string.mask_noises_h3),
+                ) { onUpdate { st -> st.copy(masqueMaskNoises = st.masqueMaskNoises + UdpNoise()) } }
+                SettingsEditRow(
+                    title = stringResource(Res.string.mask_reset_min),
+                    value = s.masqueMaskNoiseResetMin.toString(),
+                    numeric = true,
+                    onValueChanged = { v ->
+                        v.toIntOrNull()?.takeIf { it >= 0 }?.let { n ->
+                            onUpdate { it.copy(masqueMaskNoiseResetMin = n) }
+                        }
+                    },
+                )
+                SettingsEditRow(
+                    title = stringResource(Res.string.mask_reset_max),
+                    value = s.masqueMaskNoiseResetMax.toString(),
+                    numeric = true,
+                    onValueChanged = { v ->
+                        v.toIntOrNull()?.takeIf { it >= 0 }?.let { n ->
+                            onUpdate { it.copy(masqueMaskNoiseResetMax = n) }
+                        }
+                    },
+                )
+            }
+        }
+
+        // BPB port, cluster 5: ECH config fetched over DNS at dial time.
+        SettingsGroup(stringResource(Res.string.ech_group)) {
+            SettingsSwitchRow(
+                title = stringResource(Res.string.ech_enabled),
+                summary = stringResource(Res.string.ech_hint),
+                checked = s.echEnabled,
+                onCheckedChange = { v -> onUpdate { it.copy(echEnabled = v) } },
+            )
+            SettingsEditRow(
+                title = stringResource(Res.string.ech_dns),
+                value = s.echDns,
+                enabled = s.echEnabled,
+                placeholder = "8.8.8.8",
+                onValueChanged = { v -> onUpdate { it.copy(echDns = v) } },
+            )
+        }
     }
+}
+
+/** Editor block for one authored finalmask TCP fragment entry. */
+@Composable
+private fun MaskFragmentEditor(
+    fragment: MaskFragment,
+    onChange: (MaskFragment) -> Unit,
+    onRemove: () -> Unit,
+) {
+    SettingsListRow(
+        title = stringResource(Res.string.title_pref_fragment_packets),
+        options = FragmentPackets.entries.map { it to it.value },
+        selected = fragment.packets,
+        onSelected = { v -> onChange(fragment.copy(packets = v)) },
+    )
+    SettingsEditRow(
+        title = stringResource(Res.string.mask_lengths),
+        value = fragment.lengths.joinToString(",") { it.toXrayString() },
+        placeholder = "100-200",
+        onValueChanged = { v ->
+            val parsed = v.split(',').map { MaskRange.parseOrNull(it) }
+            if (parsed.isNotEmpty() && parsed.all { it != null }) {
+                onChange(fragment.copy(lengths = parsed.filterNotNull()))
+            }
+        },
+    )
+    SettingsEditRow(
+        title = stringResource(Res.string.mask_delays),
+        value = fragment.delays.joinToString(",") { it.toXrayString() },
+        placeholder = "10-20",
+        onValueChanged = { v ->
+            val parsed = v.split(',').map { MaskRange.parseOrNull(it) }
+            if (parsed.isNotEmpty() && parsed.all { it != null }) {
+                onChange(fragment.copy(delays = parsed.filterNotNull()))
+            }
+        },
+    )
+    SettingsEditRow(
+        title = stringResource(Res.string.title_pref_fragment_maxsplit),
+        value = fragment.maxSplit?.toXrayString().orEmpty(),
+        placeholder = "—",
+        onValueChanged = { v ->
+            if (v.isBlank()) onChange(fragment.copy(maxSplit = null))
+            else MaskRange.parseOrNull(v)?.let { onChange(fragment.copy(maxSplit = it)) }
+        },
+    )
+    SettingsMenuRow(stringResource(Res.string.mask_remove), "") { onRemove() }
+}
+
+/** Editor block for one authored finalmask UDP noise entry. */
+@Composable
+private fun MaskNoiseEditor(
+    noise: UdpNoise,
+    onChange: (UdpNoise) -> Unit,
+    onRemove: () -> Unit,
+) {
+    SettingsListRow(
+        title = stringResource(Res.string.mask_noise_kind),
+        options = NoiseKind.entries.map { it to it.name },
+        selected = noise.kind,
+        onSelected = { v -> onChange(noise.copy(kind = v)) },
+    )
+    if (noise.kind == NoiseKind.Rand) {
+        SettingsEditRow(
+            title = stringResource(Res.string.mask_noise_size),
+            value = noise.size.toXrayString(),
+            placeholder = "50-100",
+            onValueChanged = { v ->
+                MaskRange.parseOrNull(v)?.let { onChange(noise.copy(size = it)) }
+            },
+        )
+    } else {
+        SettingsEditRow(
+            title = stringResource(Res.string.mask_noise_packet),
+            value = noise.packet,
+            onValueChanged = { v -> onChange(noise.copy(packet = v)) },
+        )
+    }
+    SettingsEditRow(
+        title = stringResource(Res.string.mask_noise_count),
+        value = noise.count.toString(),
+        numeric = true,
+        onValueChanged = { v ->
+            v.toIntOrNull()?.takeIf { it in 1..100 }?.let { n ->
+                onChange(noise.copy(count = n))
+            }
+        },
+    )
+    SettingsEditRow(
+        title = stringResource(Res.string.mask_noise_delay),
+        value = noise.delay.toXrayString(),
+        placeholder = "1-5",
+        onValueChanged = { v ->
+            MaskRange.parseOrNull(v)?.let { onChange(noise.copy(delay = it)) }
+        },
+    )
+    SettingsMenuRow(stringResource(Res.string.mask_remove), "") { onRemove() }
 }
 
 @Composable

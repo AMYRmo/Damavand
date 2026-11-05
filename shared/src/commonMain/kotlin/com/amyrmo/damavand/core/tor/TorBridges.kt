@@ -11,7 +11,12 @@ object TorBridges {
             .getOrDefault("")
         val lines = text.split('\n').map { it.trim() }.filter { it.isNotEmpty() && !it.startsWith("#") }
 
-        return lines.mapNotNull { line ->
+        return parse(lines, transport)
+    }
+
+    /** Parses raw bridge lines (bundled file or Moat-fetched) for one transport. */
+    fun parse(lines: List<String>, transport: String): List<Bridge> =
+        lines.mapNotNull { line ->
             val first = line.substringBefore(' ')
             if (transport == "vanilla") {
                 if (first.contains(':') && !first.any { it.isLetter() }) Bridge("vanilla", first, line) else null
@@ -21,7 +26,6 @@ object TorBridges {
                 null
             }
         }
-    }
 
     private fun addressToken(line: String): String {
         val parts = line.split(' ')

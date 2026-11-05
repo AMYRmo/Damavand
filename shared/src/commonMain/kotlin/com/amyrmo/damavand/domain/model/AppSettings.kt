@@ -476,6 +476,38 @@ data class AppSettings(
 
     val torFakeSniEnabled: Boolean = false,
     val torFakeSniHosts: String = "",
+
+    // BPB port, cluster 1: authored finalmask system. All defaults reproduce
+    // the pre-port behavior (no authored mask is emitted anywhere).
+    val maskEnabled: Boolean = false,
+    val maskFragments: List<MaskFragment> = emptyList(),
+    val maskNoises: List<UdpNoise> = emptyList(),
+    val maskNoiseResetMin: Int = 30,
+    val maskNoiseResetMax: Int = 60,
+    val masqueMaskEnabled: Boolean = false,
+    val masqueMaskFragments: List<MaskFragment> = emptyList(),
+    val masqueMaskNoises: List<UdpNoise> = emptyList(),
+    val masqueMaskNoiseResetMin: Int = 30,
+    val masqueMaskNoiseResetMax: Int = 60,
+    val masqueSni: String = "",
+
+    // BPB port, cluster 2: fresh Tor bridges fetched from the Moat API
+    // (newline-joined bridge lines, all transports). Empty = bundled only.
+    val torMoatBridges: String = "",
+
+    // BPB port, cluster 3: resolver for sanction-bypass rules (Shecan).
+    val antiSanctionDns: String = "178.22.122.100",
+
+    // BPB port, cluster 5: fetch ECH configs over DNS for TLS outbounds
+    // that carry no link-provided echConfigList. [echDns] is the resolver
+    // the core queries at dial time (an IP or a DoH URL).
+    val echEnabled: Boolean = false,
+    val echDns: String = "8.8.8.8",
+
+    // BPB port, cluster 5: Browser Dialer. When on, the Xray core opens
+    // WebSocket connections through a hidden WebView, so their TLS handshake
+    // is the browser's. Native side: core/BrowserDialer.
+    val browserDialer: Boolean = false,
 ) {
     val useHevTun: Boolean get() = true
 

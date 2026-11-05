@@ -252,6 +252,19 @@ fun RoutingScreen(
                         checked = settings.blockAds,
                         onCheckedChange = { v -> onUpdate { it.copy(blockAds = v) } },
                     )
+                    Spacer(Modifier.height(6.dp))
+                    SettingsEditRow(
+                        title = stringResource(Res.string.anti_sanction_dns),
+                        value = settings.antiSanctionDns,
+                        placeholder = "178.22.122.100",
+                        onValueChanged = { v -> onUpdate { it.copy(antiSanctionDns = v) } },
+                    )
+                    Text(
+                        stringResource(Res.string.anti_sanction_dns_hint),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(top = 6.dp),
+                    )
                 }
                 platform.geoAssets?.let { geo -> GeoFilesBanner(geo, settings) }
 
@@ -438,6 +451,7 @@ private fun RuleRow(
             stringResource(Res.string.rule_outbound_missing)
         rule.outboundTag == RulesetItem.OUTBOUND_DIRECT -> stringResource(Res.string.rule_outbound_direct)
         rule.outboundTag == RulesetItem.OUTBOUND_BLOCK -> stringResource(Res.string.rule_outbound_block)
+        rule.outboundTag == RulesetItem.OUTBOUND_SANCTION -> stringResource(Res.string.rule_outbound_sanction)
         else -> stringResource(Res.string.rule_outbound_proxy)
     }
     val summary = buildList {

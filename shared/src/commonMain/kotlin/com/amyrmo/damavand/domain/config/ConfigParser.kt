@@ -390,6 +390,7 @@ object ConfigParser {
             allowedIps = (p.query["allowedips"] ?: p.query["allowed_ips"])
                 ?.split(",")?.map { it.trim() }?.filter { it.isNotEmpty() }.orEmpty(),
             dnsServers = p.query["dns"]?.split(",")?.map { it.trim() }?.filter { it.isNotEmpty() }.orEmpty(),
+            candidateAddresses = p.query["candidates"]?.split(",")?.map { it.trim() }?.filter { it.isNotEmpty() }.orEmpty(),
             awg = awg,
         )
     }

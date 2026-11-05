@@ -1736,6 +1736,9 @@
     <string name="warp_failed">ثبت ناموفق بود: %1$s</string>
     <string name="warp_add_action">ثبت</string>
     <string name="warp_added">Cloudflare WARP اضافه شد</string>
+    <string name="warp_add_body_wg">یک دستگاه WARP رایگان در Cloudflare ثبت می‌کند و آن را به‌عنوان سرور WireGuard اضافه می‌کند. اگر متصل باشید، ثبت‌نام از اتصال فعلی می‌گذرد.</string>
+    <string name="warp_mode_masque">MASQUE (H3)</string>
+    <string name="warp_mode_wireguard">WireGuard</string>
     <string name="bento_palette_damavand">دماوند</string>
     <string name="bento_live_kill">کیل‌سوییچ روشن</string>
     <string name="bento_live_mode_proxy">فقط پروکسی</string>
@@ -1746,4 +1749,43 @@
     <string name="onb_region_change">قانون‌های کشور</string>
     <string name="onb_replay_sub">زبان، قانون‌های کشور و ظاهر، قدم به قدم</string>
     <string name="onb_replay_title">راه‌اندازی دوباره</string>
+    <!-- BPB port: finalmask authoring -->
+    <string name="mask_group">فاینال‌ماسک (پیشرفته)</string>
+    <string name="mask_enable">فعال‌سازی فاینال‌ماسک</string>
+    <string name="mask_hint">ماسک‌های ساخته‌شده به‌صورت فاینال‌ماسک Xray به خروجی‌های پروکسی وصل می‌شوند. ورودی‌های تکه‌تکه‌سازی اینجا جای تکه‌تکه‌سازی قدیمی بالا را می‌گیرند.</string>
+    <string name="mask_fragments">ورودی‌های تکه‌تکه‌سازی TCP</string>
+    <string name="mask_fragments_h2">ورودی‌های تکه‌تکه‌سازی H2</string>
+    <string name="mask_add_fragment">افزودن ورودی تکه‌تکه‌سازی</string>
+    <string name="mask_noises">ورودی‌های نویز UDP</string>
+    <string name="mask_noises_h3">ورودی‌های نویز H3</string>
+    <string name="mask_add_noise">افزودن ورودی نویز</string>
+    <string name="mask_lengths">طول‌ها</string>
+    <string name="mask_delays">تأخیرها</string>
+    <string name="mask_remove">حذف ورودی</string>
+    <string name="mask_noise_kind">نوع نویز</string>
+    <string name="mask_noise_size">اندازه نویز</string>
+    <string name="mask_noise_packet">بار نویز</string>
+    <string name="mask_noise_count">تعداد تکرار</string>
+    <string name="mask_noise_delay">تأخیر نویز</string>
+    <string name="mask_reset_min">حداقل بازنشانی نویز (ثانیه)</string>
+    <string name="mask_reset_max">حداکثر بازنشانی نویز (ثانیه)</string>
+    <string name="mask_masque_group">ماسک‌های MASQUE</string>
+    <string name="mask_masque_enable">فعال‌سازی ماسک‌های MASQUE</string>
+    <string name="mask_masque_hint">اتصال‌های MASQUE روی H2 از ورودی‌های تکه‌تکه‌سازی و اتصال‌های H3 از ورودی‌های نویز استفاده می‌کنند.</string>
+    <string name="mask_masque_sni">SNI جایگزین MASQUE</string>
+    <!-- BPB port: Tor Moat bridges -->
+    <string name="tor_moat_fetch">دریافت پل‌های تازه</string>
+    <string name="tor_moat_fetched">%1$d پل تازه از Tor Moat دریافت شد</string>
+    <string name="tor_moat_failed">دریافت از Moat ناموفق بود — از پل‌های داخلی استفاده می‌شود</string>
+    <!-- BPB port: anti-sanction DNS -->
+    <string name="anti_sanction_dns">DNS ضدتحریم</string>
+    <string name="anti_sanction_dns_hint">دامنه‌های قانون‌های «تحریم» مستقیم می‌روند و با این DNS آدرس‌یابی می‌شوند (پیش‌فرض: شکن). برای استفاده، پیش‌تنظیم «دور زدن تحریم‌ها» را اضافه کنید.</string>
+    <string name="rule_outbound_sanction">مستقیم · DNS ضدتحریم</string>
+    <!-- BPB port: ECH over DNS -->
+    <string name="ech_group">ECH</string>
+    <string name="ech_enabled">دریافت ECH از DNS</string>
+    <string name="ech_hint">برای سرورهای TLS بدون کانفیگ ECH داخلی، هسته هنگام اتصال کانفیگ ECH مربوط به cloudflare-ech.com را از این Resolver دریافت می‌کند.</string>
+    <string name="ech_dns">Resolver مربوط به ECH</string>
+    <string name="browser_dialer_title">دایلر مرورگر</string>
+    <string name="browser_dialer_hint">اتصال‌های WebSocket را از طریق یک نمای پنهان مرورگر باز می‌کند تا هندشیک TLS آن‌ها متعلق به مرورگر باشد. هنگام اتصال به سرور Xray اعمال می‌شود.</string>
 </resources>

@@ -9,6 +9,8 @@ object LocalPorts {
 
     const val DESKTOP_METRICS = 10817
 
+    const val BROWSER_DIALER = 10832
+
     const val PSIPHON_SOCKS = 10830
     const val PSIPHON_HTTP = 10831
 
@@ -32,6 +34,7 @@ object LocalPorts {
 
     fun isInternal(port: Int): Boolean =
         port == XRAY_SOCKS || port == XRAY_HTTP || port == SNI_SPOOF || port == DESKTOP_METRICS ||
+            port == BROWSER_DIALER ||
             port == PSIPHON_SOCKS || port == PSIPHON_HTTP || port == TOR_SOCKS || port == CHAIN_CARRIER ||
             port in SSH..SSH_MAX || port in DNS_TUNNEL..DNS_TUNNEL_MAX ||
             port in MASTER_DNS..MASTER_DNS_MAX || port in SSH_OVER_DNS..SSH_OVER_DNS_MAX

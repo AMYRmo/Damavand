@@ -1,6 +1,10 @@
 package com.amyrmo.damavand.domain.config
 
+import com.amyrmo.damavand.domain.model.FinalMaskJson
+import com.amyrmo.damavand.domain.model.MaskFragment
+import com.amyrmo.damavand.domain.model.RulesetItem
 import com.amyrmo.damavand.domain.model.RulesetPresets
+import com.amyrmo.damavand.domain.model.UdpNoise
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
@@ -55,6 +59,7 @@ object XrayJsonBuilder {
 
     private const val TAG_DNS_MODULE = "dns-module"
     private const val TAG_DOMESTIC_DNS = "domestic-dns"
+    private const val TAG_ANTI_SANCTION_DNS = "anti-sanction-dns"
 
     private const val TAG_SOCKS_IN = "socks-in"
 
@@ -78,18 +83,62 @@ object XrayJsonBuilder {
     private const val ENGINE_HANDSHAKE_SEC = 60
 
     private const val FAKEDNS_POOL = "198.18.0.0/15"
+    // Pinned bootstrap IPs for well-known public DoH hosts (BPB port:
+    // lib/services/public_dns.dart), IPv4 first. A DNS server named by one
+    // of these hosts needs no lookup before the tunnel is up — its IPs go
+    // straight into the config's DNS hosts. Geo-steered names (NextDNS,
+    // doh.dns.sb) are deliberately absent: their IPs depend on the viewer.
     private val KNOWN_DNS_HOSTS = mapOf(
-        "cloudflare-dns.com" to listOf("104.16.248.249", "104.16.249.249"),
-        "dns.cloudflare.com" to listOf("162.159.61.8", "172.64.41.8"),
-        "one.one.one.one" to listOf("1.1.1.1", "1.0.0.1"),
-        "1dot1dot1dot1.cloudflare-dns.com" to listOf("1.1.1.1", "1.0.0.1"),
-        "dns.google" to listOf("8.8.8.8", "8.8.4.4"),
-        "dns.quad9.net" to listOf("9.9.9.9", "149.112.112.112"),
-        "doh.opendns.com" to listOf("146.112.41.2"),
-        "dns.adguard-dns.com" to listOf("94.140.14.14", "94.140.15.15"),
-        "common.dot.dns.yandex.net" to listOf("77.88.8.8", "77.88.8.1"),
-        "dns.alidns.com" to listOf("223.5.5.5", "223.6.6.6"),
+        "dns.google" to listOf("8.8.8.8", "8.8.4.4", "2001:4860:4860::8888", "2001:4860:4860::8844"),
+        "dns.google.com" to listOf("8.8.8.8", "8.8.4.4", "2001:4860:4860::8888", "2001:4860:4860::8844"),
+        "cloudflare-dns.com" to listOf("104.16.248.249", "104.16.249.249", "2606:4700::6810:f8f9", "2606:4700::6810:f9f9"),
+        "one.one.one.one" to listOf("1.1.1.1", "1.0.0.1", "2606:4700:4700::1111", "2606:4700:4700::1001"),
+        "1dot1dot1dot1.cloudflare-dns.com" to listOf("1.1.1.1", "1.0.0.1", "2606:4700:4700::1111", "2606:4700:4700::1001"),
+        "security.cloudflare-dns.com" to listOf("1.1.1.2", "1.0.0.2", "2606:4700:4700::1112", "2606:4700:4700::1002"),
+        "family.cloudflare-dns.com" to listOf("1.1.1.3", "1.0.0.3", "2606:4700:4700::1113", "2606:4700:4700::1003"),
+        "mozilla.cloudflare-dns.com" to listOf("162.159.61.4", "172.64.41.4", "2803:f800:53::4", "2a06:98c1:52::4"),
+        "dns.quad9.net" to listOf("9.9.9.9", "149.112.112.112", "2620:fe::fe", "2620:fe::9"),
+        "dns9.quad9.net" to listOf("9.9.9.9", "149.112.112.9", "2620:fe::fe:9", "2620:fe::9"),
+        "dns10.quad9.net" to listOf("9.9.9.10", "149.112.112.10", "2620:fe::10", "2620:fe::fe:10"),
+        "dns11.quad9.net" to listOf("9.9.9.11", "149.112.112.11", "2620:fe::11", "2620:fe::fe:11"),
+        "dns12.quad9.net" to listOf("9.9.9.12", "149.112.112.12", "2620:fe::12", "2620:fe::fe:12"),
+        "dns.adguard-dns.com" to listOf("94.140.14.14", "94.140.15.15", "2a10:50c0::ad1:ff", "2a10:50c0::ad2:ff"),
+        "unfiltered.adguard-dns.com" to listOf("94.140.14.140", "94.140.14.141", "2a10:50c0::1:ff", "2a10:50c0::2:ff"),
+        "family.adguard-dns.com" to listOf("94.140.14.15", "94.140.15.16", "2a10:50c0::bad1:ff", "2a10:50c0::bad2:ff"),
+        "dns.adguard.com" to listOf("94.140.14.14", "94.140.15.15", "2a10:50c0::ad1:ff", "2a10:50c0::ad2:ff"),
+        "dns-unfiltered.adguard.com" to listOf("94.140.14.140", "94.140.14.141", "2a10:50c0::1:ff", "2a10:50c0::2:ff"),
+        "dns-family.adguard.com" to listOf("94.140.14.15", "94.140.15.16", "2a10:50c0::bad1:ff", "2a10:50c0::bad2:ff"),
+        "doh.opendns.com" to listOf("146.112.41.2", "2620:119:fc::2"),
+        "doh.familyshield.opendns.com" to listOf("146.112.41.3", "2620:119:fc::3"),
+        "doh.sandbox.opendns.com" to listOf("146.112.41.4", "2620:119:fc::4"),
+        "doh.cleanbrowsing.org" to listOf("185.228.168.10", "185.228.168.168"),
+        "dns.mullvad.net" to listOf("194.242.2.2", "2a07:e340::2"),
+        "doh.mullvad.net" to listOf("194.242.2.2", "2a07:e340::2"),
+        "adblock.dns.mullvad.net" to listOf("194.242.2.3", "2a07:e340::3"),
+        "base.dns.mullvad.net" to listOf("194.242.2.4", "2a07:e340::4"),
+        "extended.dns.mullvad.net" to listOf("194.242.2.5", "2a07:e340::5"),
+        "family.dns.mullvad.net" to listOf("194.242.2.6", "2a07:e340::6"),
+        "all.dns.mullvad.net" to listOf("194.242.2.9", "2a07:e340::9"),
+        "freedns.controld.com" to listOf("76.76.2.11", "2606:1a40::11"),
+        "doh.sb" to listOf("185.222.222.222", "45.11.45.11", "2a09::", "2a11::"),
+        "common.dot.dns.yandex.net" to listOf("77.88.8.8", "77.88.8.1", "2a02:6b8::feed:ff", "2a02:6b8:0:1::feed:ff"),
+        "safe.dot.dns.yandex.net" to listOf("77.88.8.88", "77.88.8.2", "2a02:6b8::feed:bad", "2a02:6b8:0:1::feed:bad"),
+        "family.dot.dns.yandex.net" to listOf("77.88.8.7", "77.88.8.3", "2a02:6b8::feed:a11", "2a02:6b8:0:1::feed:a11"),
+        "dns.alidns.com" to listOf("223.5.5.5", "223.6.6.6", "2400:3200::1", "2400:3200:baba::1"),
         "doh.pub" to listOf("1.12.12.12", "120.53.53.53"),
+        "dns.pub" to listOf("1.12.12.12", "120.53.53.53"),
+        "doh.360.cn" to listOf("101.198.192.33", "101.198.193.29"),
+        "dns.surfsharkdns.com" to listOf("194.169.169.169", "2a09:a707:169::"),
+        "dns.twnic.tw" to listOf("101.101.101.101", "2001:de4::101", "2001:de4::102"),
+        "public.dns.iij.jp" to listOf("103.2.57.5", "103.2.57.6", "2001:300::5", "2001:300::6"),
+        "dns.switch.ch" to listOf("130.59.31.248", "130.59.31.251", "2001:620:0:ff::2", "2001:620:0:ff::3"),
+        "dns.digitale-gesellschaft.ch" to listOf("185.95.218.42", "185.95.218.43", "2a05:fc84::42", "2a05:fc84::43"),
+        "dns.njal.la" to listOf("95.215.19.53", "2001:67c:2354:2::53"),
+        "doh.libredns.gr" to listOf("116.202.176.26", "2a01:4f8:1c0c:8274::1"),
+        "doh.applied-privacy.net" to listOf("146.255.56.98", "2a02:1b8:10:234::2"),
+        "dns.brahma.world" to listOf("157.90.124.62", "2a01:4f8:1c1c:f5e1::1"),
+        "dns.aa.net.uk" to listOf("217.169.20.22", "217.169.20.23", "2001:8b0::2022", "2001:8b0::2023"),
+        "dns.cloudflare.com" to listOf("162.159.61.8", "172.64.41.8"),
         "dot.pub" to listOf("1.12.12.12", "120.53.53.53"),
         "dns.sb" to listOf("45.11.45.11", "185.222.222.222"),
     )
@@ -139,7 +188,33 @@ object XrayJsonBuilder {
         if (net in REMOVED_NETWORKS) throw UnsupportedTransportException(net)
 
         val withDns = if (server.dnsServers.isEmpty()) options else options.copy(serverDns = server.dnsServers)
+        if (!forSpeedtest) runCatching { balancedConfig(server, socksPort, withDns) }.getOrNull()?.let { return it }
         return assemble(socksPort, withDns, forSpeedtest) { add(proxyOutbound(server, withDns)) }
+    }
+
+    /**
+     * BPB port, cluster 5: in-config best-ping balancing for a multi-address
+     * profile (BPB's balancer over a profile's candidate endpoints). BPB
+     * emits one outbound per candidate plus a leastPing balancer and a burst
+     * observatory; Damavand's core implements the same selection with its
+     * autoselect group (probe-based, switch margin from the auto-select
+     * tuning), so the candidates become group members under the "proxy" tag
+     * and the rest of the config is unchanged. Returns null when the profile
+     * has fewer than two distinct endpoints — the plain build then applies.
+     * Chains and speed tests keep the single-endpoint build.
+     */
+    private fun balancedConfig(server: ServerConfig, socksPort: Int, options: BuildOptions): String? {
+        val endpoints = server.candidateEndpoints()
+        if (endpoints.size < 2) return null
+        val members = endpoints.map { (host, port) ->
+            AutoMember.Server(
+                profileId = if (host.contains(':')) "[$host]:$port" else "$host:$port",
+                server = server.copy(address = host, port = port, candidateAddresses = emptyList()),
+            )
+        }
+        val group = autoSelectGroup(AutoSelectTags.GROUP, AutoSelectTags::member, members, options.ruleGroupTuning, options)
+        if (group.tags.isEmpty()) return null
+        return assemble(socksPort, options, forSpeedtest = false) { group.outbounds.forEach { add(it) } }
     }
 
     data class EngineFront(
@@ -516,6 +591,8 @@ object XrayJsonBuilder {
         }
         fun resolveOutboundTag(ruleTag: String): String = when {
             ruleTag in BUILTIN_OUTBOUND_TAGS -> ruleTag
+            // Anti-sanction rules route direct; only their DNS differs.
+            ruleTag == RulesetItem.OUTBOUND_SANCTION -> "direct"
             emittedTagFor(ruleTag) in namedOutbounds -> emittedTagFor(ruleTag)
             emittedTagFor(ruleTag) in groupOutbounds -> emittedTagFor(ruleTag)
             else -> "proxy"
@@ -558,7 +635,7 @@ object XrayJsonBuilder {
 
                 if (!forSpeedtest && localDnsActive(options)) add(dnsOutbound())
 
-                if (options.fragmentEnabled && options.dialerSocksPort == null) {
+                if (options.fragmentEnabled && options.dialerSocksPort == null && !authoredTcpMask(options)) {
                     add(fragmentOutbound(options))
                 }
 
@@ -739,6 +816,27 @@ object XrayJsonBuilder {
         val engineFront: EngineFront? = null,
 
         val useSystemCa: Boolean = false,
+
+        // BPB port, cluster 1: authored finalmask system. Defaults emit nothing.
+        val maskEnabled: Boolean = false,
+        val maskFragments: List<MaskFragment> = emptyList(),
+        val maskNoises: List<UdpNoise> = emptyList(),
+        val maskNoiseResetMin: Int = 30,
+        val maskNoiseResetMax: Int = 60,
+        val masqueMaskEnabled: Boolean = false,
+        val masqueMaskFragments: List<MaskFragment> = emptyList(),
+        val masqueMaskNoises: List<UdpNoise> = emptyList(),
+        val masqueMaskNoiseResetMin: Int = 30,
+        val masqueMaskNoiseResetMax: Int = 60,
+        val masqueSni: String = "",
+
+        // BPB port, cluster 3: resolver for OUTBOUND_SANCTION rules (Shecan).
+        val antiSanctionDns: String = "178.22.122.100",
+
+        // BPB port, cluster 5: fetch ECH configs over DNS (query form) for
+        // TLS outbounds that carry no link-provided echConfigList.
+        val echEnabled: Boolean = false,
+        val echDns: String = "8.8.8.8",
     )
 
     data class LanShare(
@@ -911,6 +1009,8 @@ object XrayJsonBuilder {
 
         val domesticServers: List<Pair<String, List<String>>> = emptyList(),
 
+        val antiSanctionServers: List<Pair<String, List<String>>> = emptyList(),
+
         val proxyDomains: List<String> = emptyList(),
 
         val blockedDomains: List<String> = emptyList(),
@@ -920,6 +1020,7 @@ object XrayJsonBuilder {
 
     private fun dnsSplit(rules: List<EffectiveRule>, options: BuildOptions): DnsSplit {
         val domestic = mutableListOf<Pair<String, List<String>>>()
+        val antiSanction = mutableListOf<Pair<String, List<String>>>()
         val proxied = mutableListOf<String>()
         val blocked = mutableListOf<String>()
 
@@ -932,11 +1033,17 @@ object XrayJsonBuilder {
                 r.outboundTag == "direct" ->
                     domestic += "${TAG_DOMESTIC_DNS}-$index" to r.domains
 
+                // BPB port: sanction-bypass domains resolve via the
+                // anti-sanction DNS, not the regular direct DNS.
+                r.outboundTag == RulesetItem.OUTBOUND_SANCTION ->
+                    antiSanction += "${TAG_ANTI_SANCTION_DNS}-$index" to r.domains
+
                 else -> proxied += r.domains
             }
         }
         return DnsSplit(
             domesticServers = domestic,
+            antiSanctionServers = antiSanction,
             proxyDomains = proxied.distinct(),
             blockedDomains = blocked.distinct(),
             enabled = true,
@@ -946,11 +1053,12 @@ object XrayJsonBuilder {
     private fun dnsRoutingRules(split: DnsSplit): List<JsonObject> {
         if (!split.enabled) return emptyList()
         return buildList {
-            if (split.domesticServers.isNotEmpty()) add(
+            val directDnsTags = split.domesticServers + split.antiSanctionServers
+            if (directDnsTags.isNotEmpty()) add(
                 buildJsonObject {
                     put("type", "field")
                     put("outboundTag", "direct")
-                    putJsonArray("inboundTag") { split.domesticServers.forEach { add(it.first) } }
+                    putJsonArray("inboundTag") { directDnsTags.forEach { add(it.first) } }
                 },
             )
 
@@ -971,7 +1079,7 @@ object XrayJsonBuilder {
             if (i > 0) e.substring(0, i).trim() to e.substring(i + 1).trim() else null
         }.filter { it.first.isNotEmpty() && it.second.isNotEmpty() }
 
-        val dnsServerHosts = (listOf(options.remoteDns, options.directDns) + options.serverDns)
+        val dnsServerHosts = (listOf(options.remoteDns, options.directDns, options.antiSanctionDns) + options.serverDns)
             .mapNotNull { dnsServerHost(it) }
             .distinct()
             .mapNotNull { host -> KNOWN_DNS_HOSTS[host]?.let { host to it } }
@@ -1014,6 +1122,15 @@ object XrayJsonBuilder {
             split.domesticServers.forEach { (tag, domains) ->
                 addJsonObject {
                     put("address", options.directDns)
+                    putJsonArray("domains") { domains.forEach { add(it) } }
+
+                    put("skipFallback", true)
+                    put("tag", tag)
+                }
+            }
+            split.antiSanctionServers.forEach { (tag, domains) ->
+                addJsonObject {
+                    put("address", options.antiSanctionDns)
                     putJsonArray("domains") { domains.forEach { add(it) } }
 
                     put("skipFallback", true)
@@ -1539,7 +1656,10 @@ private fun statsPolicy(slowUpstream: Boolean = false) = buildJsonObject {
         } else if (s.protocol == Protocol.HYSTERIA) {
             put("streamSettings", hysteriaStreamSettings(s, options, dialerProxy))
         } else if (s.protocol == Protocol.MASQUE) {
-            put("streamSettings", applyFinalMask(masqueStreamSettings(s, options, dialerProxy), s.transport.finalMask))
+            put(
+                "streamSettings",
+                applyFinalMask(masqueStreamSettings(s, options, dialerProxy), s.transport.finalMask, masqueFinalMask(s, options)),
+            )
         } else if (s.protocol.isWireguardFamily && (dialerProxy != null || pinsServerHost(s, options))) {
             putJsonObject("streamSettings") { putSockopt(s, options, dialerProxy) }
         }
@@ -1607,6 +1727,7 @@ private fun statsPolicy(slowUpstream: Boolean = false) = buildJsonObject {
         val alpn = s.tls.alpn?.split(",")?.map(String::trim)?.filter(String::isNotEmpty)
             ?.firstOrNull { it == "h3" || it == "h2" } ?: "h3"
         val sni = s.tls.sni?.takeIf { it.isNotBlank() }
+            ?: options.masqueSni.takeIf { it.isNotBlank() }
             ?: if (s.isWarp) WARP_MASQUE_SNI else s.transport.host?.takeIf { it.isNotBlank() }
         put("tlsSettings", tlsSettingsOf(s, sni, options, alpnOverride = listOf(alpn), fingerprint = alpn == "h2"))
         putJsonObject("masqueSettings") {
@@ -1643,6 +1764,35 @@ private fun statsPolicy(slowUpstream: Boolean = false) = buildJsonObject {
         return buildJsonObject { pairs.forEach { (k, v) -> put(k, v) } }
     }
 
+    // The well-known ECH public name whose HTTPS record carries the config
+    // (BPB's buildTlsSettings/_echConfigList).
+    private const val ECH_PUBLIC_NAME = "cloudflare-ech.com"
+
+    /**
+     * BPB port, cluster 5: ECH emission for one TLS settings object. A
+     * link-carried echConfigList always wins and is emitted verbatim, as
+     * before. Otherwise, when the user enabled ECH-over-DNS, emit BPB's
+     * query form — "<name>+<resolver>" — so the core fetches the ECH config
+     * from the resolver at dial time, with the DNS query itself going direct
+     * (echSockopt), mirroring BPB.
+     */
+    private fun kotlinx.serialization.json.JsonObjectBuilder.putEch(s: ServerConfig, options: BuildOptions) {
+        val carried = s.tls.echConfigList?.takeIf { it.isNotBlank() }
+        if (carried != null) {
+            put("echConfigList", carried)
+            return
+        }
+        if (!options.echEnabled) return
+        val dns = options.echDns.trim().ifBlank { "8.8.8.8" }
+        val server = when {
+            isIpLiteral(dns) && dns.contains(':') -> "udp://[$dns]"
+            isIpLiteral(dns) -> "udp://$dns"
+            else -> dns
+        }
+        put("echConfigList", "$ECH_PUBLIC_NAME+$server")
+        putJsonObject("echSockopt") { put("dialerProxy", "direct") }
+    }
+
     private fun tlsSettingsOf(
         s: ServerConfig,
         serverName: String?,
@@ -1663,7 +1813,7 @@ private fun statsPolicy(slowUpstream: Boolean = false) = buildJsonObject {
         s.tls.cipherSuites?.takeIf { it.isNotBlank() }?.let { put("cipherSuites", it) }
         val alpn = alpnOverride ?: s.tls.alpn?.split(",")?.map(String::trim)?.filter(String::isNotEmpty)
         if (!alpn.isNullOrEmpty()) putJsonArray("alpn") { alpn.forEach { add(it) } }
-        s.tls.echConfigList?.takeIf { it.isNotBlank() }?.let { put("echConfigList", it) }
+        putEch(s, options)
         if (options.useSystemCa) put("useSystemCA", true)
     }
 
@@ -1671,20 +1821,70 @@ private fun statsPolicy(slowUpstream: Boolean = false) = buildJsonObject {
         s: ServerConfig,
         options: BuildOptions = BuildOptions(),
         dialerProxy: String? = entryDialer(options),
-    ): JsonObject = applyFinalMask(streamSettingsBase(s, options, dialerProxy), s.transport.finalMask)
+    ): JsonObject = applyFinalMask(
+        streamSettingsBase(s, options, dialerProxy),
+        s.transport.finalMask,
+        authoredFinalMask(options),
+    )
 
-    private fun applyFinalMask(stream: JsonObject, raw: String?): JsonObject {
-        val text = raw?.takeIf { it.isNotBlank() } ?: return stream
-        val parsed = runCatching { Json.parseToJsonElement(text) as? JsonObject }.getOrNull()
-            ?: return stream
+    /**
+     * Merges mask sources into the stream's `finalmask`: whatever the stream
+     * already carries first, then the user-authored mask, then the
+     * link-carried mask (the link wins per top-level key, as before).
+     */
+    private fun applyFinalMask(stream: JsonObject, raw: String?, authored: JsonObject? = null): JsonObject {
+        val parsed = raw?.takeIf { it.isNotBlank() }
+            ?.let { runCatching { Json.parseToJsonElement(it) as? JsonObject }.getOrNull() }
+        if (parsed == null && authored == null) return stream
         val existing = stream["finalmask"] as? JsonObject
-        val merged = if (existing == null) parsed else buildJsonObject {
-            existing.forEach { (k, v) -> put(k, v) }
-            parsed.forEach { (k, v) -> put(k, v) }
+        val merged = buildJsonObject {
+            existing?.forEach { (k, v) -> put(k, v) }
+            authored?.forEach { (k, v) -> put(k, v) }
+            parsed?.forEach { (k, v) -> put(k, v) }
         }
         return buildJsonObject {
             stream.forEach { (k, v) -> if (k != "finalmask") put(k, v) }
             put("finalmask", merged)
+        }
+    }
+
+    /** The settings-authored finalmask for ordinary proxy outbounds (BPB port). */
+    private fun authoredFinalMask(options: BuildOptions): JsonObject? =
+        if (!options.maskEnabled) null
+        else FinalMaskJson.build(
+            options.maskFragments,
+            options.maskNoises,
+            options.maskNoiseResetMin,
+            options.maskNoiseResetMax,
+        )
+
+    /** True when authored TCP fragments exist and replace the legacy freedom fragment dialer. */
+    private fun authoredTcpMask(options: BuildOptions): Boolean =
+        options.maskEnabled && options.maskFragments.isNotEmpty()
+
+    /**
+     * The MASQUE variant mask (BPB port): H2 outbounds get the authored MASQUE
+     * fragment entries, H3 outbounds the authored MASQUE UDP noises. Empty
+     * lists fall back to one default entry, mirroring BPB's MasqueSettings.
+     */
+    private fun masqueFinalMask(s: ServerConfig, options: BuildOptions): JsonObject? {
+        if (!options.masqueMaskEnabled) return null
+        val alpn = s.tls.alpn?.split(",")?.map(String::trim)?.filter(String::isNotEmpty)
+            ?.firstOrNull { it == "h3" || it == "h2" } ?: "h3"
+        return if (alpn == "h3") {
+            FinalMaskJson.build(
+                emptyList(),
+                options.masqueMaskNoises.ifEmpty { listOf(UdpNoise()) },
+                options.masqueMaskNoiseResetMin,
+                options.masqueMaskNoiseResetMax,
+            )
+        } else {
+            FinalMaskJson.build(
+                options.masqueMaskFragments.ifEmpty { listOf(MaskFragment()) },
+                emptyList(),
+                options.masqueMaskNoiseResetMin,
+                options.masqueMaskNoiseResetMax,
+            )
         }
     }
 
@@ -1808,7 +2008,7 @@ private fun statsPolicy(slowUpstream: Boolean = false) = buildJsonObject {
                         }
                     }
 
-                    s.tls.echConfigList?.takeIf { it.isNotBlank() }?.let { put("echConfigList", it) }
+                    putEch(s, options)
                 } else {
                     s.tls.publicKey?.takeIf { it.isNotBlank() }?.let { put("publicKey", it) }
                     s.tls.shortId?.takeIf { it.isNotBlank() }?.let { put("shortId", it) }
@@ -1898,7 +2098,8 @@ private fun statsPolicy(slowUpstream: Boolean = false) = buildJsonObject {
 
     private fun entryDialer(options: BuildOptions): String? = when {
         options.dialerSocksPort != null -> CHAIN_OUT_TAG
-        options.fragmentEnabled -> "fragment"
+        // Authored finalmask fragments replace the single legacy freedom fragment.
+        options.fragmentEnabled && !authoredTcpMask(options) -> "fragment"
         else -> null
     }
 

@@ -1746,6 +1746,9 @@
     <string name="warp_failed">Registration failed: %1$s</string>
     <string name="warp_add_action">Register</string>
     <string name="warp_added">Cloudflare WARP added</string>
+    <string name="warp_add_body_wg">Registers a free WARP device with Cloudflare and adds it as a WireGuard server. If you are connected, registration goes through the current connection.</string>
+    <string name="warp_mode_masque">MASQUE (H3)</string>
+    <string name="warp_mode_wireguard">WireGuard</string>
     <string name="bento_palette_damavand">Damavand</string>
     <string name="bento_live_kill">kill switch on</string>
     <string name="bento_live_mode_proxy">Proxy only</string>
@@ -1756,4 +1759,43 @@
     <string name="onb_region_change">Region rules</string>
     <string name="onb_replay_sub">Language, country rules and look, step by step</string>
     <string name="onb_replay_title">Run setup again</string>
+    <!-- BPB port: finalmask authoring -->
+    <string name="mask_group">Finalmask (advanced)</string>
+    <string name="mask_enable">Enable finalmask</string>
+    <string name="mask_hint">Authored masks are attached to proxy outbounds as an Xray finalmask. Fragment entries here replace the single legacy fragment above.</string>
+    <string name="mask_fragments">TCP fragment entries</string>
+    <string name="mask_fragments_h2">H2 fragment entries</string>
+    <string name="mask_add_fragment">Add fragment entry</string>
+    <string name="mask_noises">UDP noise entries</string>
+    <string name="mask_noises_h3">H3 noise entries</string>
+    <string name="mask_add_noise">Add noise entry</string>
+    <string name="mask_lengths">Lengths</string>
+    <string name="mask_delays">Delays</string>
+    <string name="mask_remove">Remove entry</string>
+    <string name="mask_noise_kind">Noise type</string>
+    <string name="mask_noise_size">Noise size</string>
+    <string name="mask_noise_packet">Noise payload</string>
+    <string name="mask_noise_count">Repeat count</string>
+    <string name="mask_noise_delay">Noise delay</string>
+    <string name="mask_reset_min">Noise reset min (seconds)</string>
+    <string name="mask_reset_max">Noise reset max (seconds)</string>
+    <string name="mask_masque_group">MASQUE masks</string>
+    <string name="mask_masque_enable">Enable MASQUE masks</string>
+    <string name="mask_masque_hint">H2 MASQUE connections use the fragment entries, H3 connections use the noise entries.</string>
+    <string name="mask_masque_sni">MASQUE SNI override</string>
+    <!-- BPB port: Tor Moat bridges -->
+    <string name="tor_moat_fetch">Fetch fresh bridges</string>
+    <string name="tor_moat_fetched">Fetched %1$d fresh bridges from Tor Moat</string>
+    <string name="tor_moat_failed">Moat fetch failed — the bundled bridges are used instead</string>
+    <!-- BPB port: anti-sanction DNS -->
+    <string name="anti_sanction_dns">Anti-sanction DNS</string>
+    <string name="anti_sanction_dns_hint">Domains of "sanction" rules go direct and are resolved by this DNS (Shecan by default). Add the "Bypass sanctions" preset to use it.</string>
+    <string name="rule_outbound_sanction">Direct · anti-sanction DNS</string>
+    <!-- BPB port: ECH over DNS -->
+    <string name="ech_group">ECH</string>
+    <string name="ech_enabled">Fetch ECH over DNS</string>
+    <string name="ech_hint">For TLS servers without a built-in ECH config, the core fetches the ECH config of cloudflare-ech.com through this resolver when dialing.</string>
+    <string name="ech_dns">ECH resolver</string>
+    <string name="browser_dialer_title">Browser dialer</string>
+    <string name="browser_dialer_hint">Opens WebSocket connections through a hidden browser view, so their TLS handshake is the browser's. Applies while an Xray server is connected.</string>
 </resources>

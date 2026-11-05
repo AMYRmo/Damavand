@@ -233,6 +233,15 @@ class DamavandVpnService : VpnService() {
         hevLogLevel = settings.hevTunLogLevel.value
         hevRwTimeout = settings.hevTunRwTimeout
 
+        // Browser Dialer (BPB cluster 5): reconcile before any engine starts;
+        // only the Xray-core kinds can route WebSockets through the WebView.
+        BrowserDialer.apply(
+            this,
+            settings.browserDialer &&
+                (kind == VpnManager.KIND_XRAY || kind == VpnManager.KIND_SNISPOOF ||
+                    kind == VpnManager.KIND_CROSS_CHAIN),
+        )
+
         if (proxyOnly) {
             if (kind == VpnManager.KIND_XRAY) { startProxyOnly(configJson, socksPort); return }
             proxyOnly = false
@@ -1344,6 +1353,7 @@ class DamavandVpnService : VpnService() {
         ZepTunCore.stop()
         HevTunCore.stop()
         FrontCore.stop()
+        BrowserDialer.stop()
         XrayController.stop()
     }
 

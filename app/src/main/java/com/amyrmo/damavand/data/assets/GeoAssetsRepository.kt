@@ -75,9 +75,42 @@ class GeoAssetsRepository(private val context: Context) : GeoAssets {
         source: GeoFilesSource,
     ): Boolean = withContext(Dispatchers.IO) {
         FILES.all { name ->
-            val url = "https://github.com/${source.repo}/releases/latest/download/$name"
-            runCatching { download(url, File(assetDir, name)) }.isSuccess
+            val base = "https://github.com/${source.repo}/releases/latest/download"
+            runCatching {
+                // BPB port: pin every download to the SHA-256 published with
+                // the same release; a mismatch rejects the update and keeps
+                // the previously installed file.
+                val expected = fetchSha256("$base/$name.sha256sum")
+                download("$base/$name", File(assetDir, name), expected)
+            }.isSuccess
         }
+    }
+
+    /** Downloads a `<file>.sha256sum` asset and returns its validated hash token. */
+    private fun fetchSha256(url: String): String {
+        val temp = File(assetDir, "sha256sum.tmp")
+        try {
+            download(url, temp, expectedSha256 = null)
+            val token = temp.readText().trim()
+                .split(Regex("\\s+")).firstOrNull().orEmpty().lowercase()
+            require(token.matches(Regex("^[0-9a-f]{64}$"))) { "malformed sha256sum from $url" }
+            return token
+        } finally {
+            temp.delete()
+        }
+    }
+
+    private fun sha256Hex(file: File): String {
+        val digest = java.security.MessageDigest.getInstance("SHA-256")
+        file.inputStream().use { input ->
+            val buffer = ByteArray(64 * 1024)
+            while (true) {
+                val read = input.read(buffer)
+                if (read < 0) break
+                digest.update(buffer, 0, read)
+            }
+        }
+        return digest.digest().joinToString("") { "%02x".format(it) }
     }
 
     suspend fun importFrom(stream: InputStream, name: String): Boolean = withContext(Dispatchers.IO) {
@@ -96,21 +129,21 @@ class GeoAssetsRepository(private val context: Context) : GeoAssets {
         }.getOrDefault(false)
     }
 
-    private fun download(url: String, target: File) {
+    private fun download(url: String, target: File, expectedSha256: String?) {
         val socks = VpnManager.status.value.state
             .takeIf { it == ConnectionState.Connected }
             ?.let { VpnManager.activeSocksPort }
         if (socks != null) {
             val viaProxy = runCatching {
-                download(url, target, Proxy(Proxy.Type.SOCKS, InetSocketAddress.createUnresolved(LOCALHOST, socks)))
+                download(url, target, Proxy(Proxy.Type.SOCKS, InetSocketAddress.createUnresolved(LOCALHOST, socks)), expectedSha256)
             }
             if (viaProxy.isSuccess) return
             Log.w(TAG, "proxied geo download failed, retrying direct", viaProxy.exceptionOrNull())
         }
-        download(url, target, Proxy.NO_PROXY)
+        download(url, target, Proxy.NO_PROXY, expectedSha256)
     }
 
-    private fun download(url: String, target: File, proxy: Proxy) {
+    private fun download(url: String, target: File, proxy: Proxy, expectedSha256: String?) {
         val connection = (URL(url).openConnection(proxy) as HttpURLConnection).apply {
             connectTimeout = 15_000
             readTimeout = 60_000
@@ -125,6 +158,10 @@ class GeoAssetsRepository(private val context: Context) : GeoAssets {
             val temp = File(target.parentFile, "${target.name}.part")
             connection.inputStream.use { input -> temp.outputStream().use { input.copyTo(it) } }
             if (temp.length() <= 0) throw IllegalStateException("empty download")
+            if (expectedSha256 != null && !sha256Hex(temp).equals(expectedSha256, ignoreCase = true)) {
+                temp.delete()
+                throw IllegalStateException("SHA-256 mismatch for ${target.name}; update rejected")
+            }
             if (target.exists()) target.delete()
             temp.renameTo(target)
 

@@ -103,6 +103,7 @@ fun RuleEditSheet(
                 add(RulesetItem.OUTBOUND_PROXY to stringResource(Res.string.rule_outbound_proxy))
                 add(RulesetItem.OUTBOUND_DIRECT to stringResource(Res.string.rule_outbound_direct))
                 add(RulesetItem.OUTBOUND_BLOCK to stringResource(Res.string.rule_outbound_block))
+                add(RulesetItem.OUTBOUND_SANCTION to stringResource(Res.string.rule_outbound_sanction))
                 addAll(groupTargets)
                 serverTargets.forEach { (id, name) -> add(RulesetItem.profileTag(id) to name) }
             }

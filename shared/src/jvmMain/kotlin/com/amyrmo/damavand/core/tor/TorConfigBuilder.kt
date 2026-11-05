@@ -107,12 +107,22 @@ object TorConfigBuilder {
         } else if (transport == "snowflake") {
             SnowflakeConfigurator.bridgeLines(settings.torSnowflakeRendezvous, settings.torSnowflakeStun)
         } else {
-            val defaults = defaultBridges(torDir, transport)
+            // Moat-fetched bridges (BPB port) come first; the bundled list is
+            // the offline fallback and fills any gap.
+            val defaults = (fetchedBridges(settings, transport) + defaultBridges(torDir, transport)).distinct()
             val enabled = settings.torEnabledBridges.split('\n').map { it.trim() }.filter { it.isNotEmpty() }.toSet()
             val chosen = if (enabled.isEmpty()) defaults.take(8) else defaults.filter { it in enabled }
             chosen.ifEmpty { defaults.take(8) }
         }
         lines.forEach { appendLine("Bridge $it") }
+    }
+
+    /** Bridges previously fetched from the Moat API into settings (BPB port). */
+    private fun fetchedBridges(settings: AppSettings, transport: String): List<String> {
+        if (transport == "vanilla") return emptyList()
+        return settings.torMoatBridges.split('\n')
+            .map { it.trim() }
+            .filter { it.startsWith("$transport ") }
     }
 
     private fun defaultBridges(torDir: File, transport: String): List<String> {

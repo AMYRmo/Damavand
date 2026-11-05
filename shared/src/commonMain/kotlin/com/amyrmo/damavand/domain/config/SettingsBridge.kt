@@ -58,6 +58,20 @@ fun AppSettings.toBuildOptions(
     fakeDns = localDnsEnabled && fakeDnsEnabled,
     outboundDomainResolve = outboundDomainResolve.value,
     resolvedServerHosts = resolvedServerHosts,
+    maskEnabled = maskEnabled,
+    maskFragments = maskFragments,
+    maskNoises = maskNoises,
+    maskNoiseResetMin = maskNoiseResetMin,
+    maskNoiseResetMax = maskNoiseResetMax,
+    masqueMaskEnabled = masqueMaskEnabled,
+    masqueMaskFragments = masqueMaskFragments,
+    masqueMaskNoises = masqueMaskNoises,
+    masqueMaskNoiseResetMin = masqueMaskNoiseResetMin,
+    masqueMaskNoiseResetMax = masqueMaskNoiseResetMax,
+    masqueSni = masqueSni.trim(),
+    antiSanctionDns = antiSanctionDns.trim().ifBlank { "178.22.122.100" },
+    echEnabled = echEnabled,
+    echDns = echDns.trim().ifBlank { "8.8.8.8" },
 )
 
 val AppSettings.effectiveLanSocksPort: Int get() = LocalPorts.lanSocksPort(socksPort)

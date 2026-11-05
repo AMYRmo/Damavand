@@ -11,11 +11,13 @@ import com.amyrmo.damavand.domain.model.FragmentPackets
 import com.amyrmo.damavand.domain.model.GeoFilesSource
 import com.amyrmo.damavand.domain.model.HevLogLevel
 import com.amyrmo.damavand.domain.model.LogLevel
+import com.amyrmo.damavand.domain.model.MaskFragment
 import com.amyrmo.damavand.domain.model.OutboundDomainResolve
 import com.amyrmo.damavand.domain.model.RoutingMode
 import com.amyrmo.damavand.domain.model.RulesetItem
 import com.amyrmo.damavand.domain.model.RunMode
 import com.amyrmo.damavand.domain.model.ThemeMode
+import com.amyrmo.damavand.domain.model.UdpNoise
 import com.amyrmo.damavand.domain.model.VpnBypassLan
 import com.amyrmo.damavand.domain.model.VpnInterfaceAddress
 import com.amyrmo.damavand.domain.model.XudpQuic
@@ -207,6 +209,11 @@ class SettingsRepository(context: Context) {
             torBridgesMode = prefs.str("tor_bridges_mode", d.torBridgesMode),
             torBridgeTransport = prefs.str("tor_bridge_transport", d.torBridgeTransport),
             torOwnBridges = prefs.str("tor_own_bridges", d.torOwnBridges),
+            torMoatBridges = prefs.str("tor_moat_bridges", d.torMoatBridges),
+            antiSanctionDns = prefs.str("anti_sanction_dns", d.antiSanctionDns),
+            echEnabled = prefs.getBoolean("ech_enabled", d.echEnabled),
+            echDns = prefs.str("ech_dns", d.echDns),
+            browserDialer = prefs.getBoolean("browser_dialer", d.browserDialer),
             torEntryNodes = prefs.str("tor_entry", d.torEntryNodes),
             torExitNodes = prefs.str("tor_exit", d.torExitNodes),
             torExcludeNodes = prefs.str("tor_exclude", d.torExcludeNodes),
@@ -233,6 +240,26 @@ class SettingsRepository(context: Context) {
             torEnabledBridges = prefs.str("tor_enabled_bridges", d.torEnabledBridges),
             torFakeSniEnabled = prefs.getBoolean("tor_fakesni", d.torFakeSniEnabled),
             torFakeSniHosts = prefs.str("tor_fakesni_hosts", d.torFakeSniHosts),
+
+            maskEnabled = prefs.getBoolean("mask_enabled", d.maskEnabled),
+            maskFragments = prefs.getString("mask_fragments", null)
+                ?.let { runCatching { json.decodeFromString(MASK_FRAGMENTS, it) }.getOrNull() }
+                ?: d.maskFragments,
+            maskNoises = prefs.getString("mask_noises", null)
+                ?.let { runCatching { json.decodeFromString(MASK_NOISES, it) }.getOrNull() }
+                ?: d.maskNoises,
+            maskNoiseResetMin = prefs.getInt("mask_reset_min", d.maskNoiseResetMin),
+            maskNoiseResetMax = prefs.getInt("mask_reset_max", d.maskNoiseResetMax),
+            masqueMaskEnabled = prefs.getBoolean("masque_mask_enabled", d.masqueMaskEnabled),
+            masqueMaskFragments = prefs.getString("masque_mask_fragments", null)
+                ?.let { runCatching { json.decodeFromString(MASK_FRAGMENTS, it) }.getOrNull() }
+                ?: d.masqueMaskFragments,
+            masqueMaskNoises = prefs.getString("masque_mask_noises", null)
+                ?.let { runCatching { json.decodeFromString(MASK_NOISES, it) }.getOrNull() }
+                ?: d.masqueMaskNoises,
+            masqueMaskNoiseResetMin = prefs.getInt("masque_mask_reset_min", d.masqueMaskNoiseResetMin),
+            masqueMaskNoiseResetMax = prefs.getInt("masque_mask_reset_max", d.masqueMaskNoiseResetMax),
+            masqueSni = prefs.str("masque_sni", d.masqueSni),
 
             sshCipher = prefs.str("ssh_cipher", d.sshCipher),
             sshCompression = prefs.getBoolean("ssh_compression", d.sshCompression),
@@ -424,6 +451,11 @@ class SettingsRepository(context: Context) {
             putString("tor_bridges_mode", s.torBridgesMode)
             putString("tor_bridge_transport", s.torBridgeTransport)
             putString("tor_own_bridges", s.torOwnBridges)
+            putString("tor_moat_bridges", s.torMoatBridges)
+            putString("anti_sanction_dns", s.antiSanctionDns)
+            putBoolean("ech_enabled", s.echEnabled)
+            putString("ech_dns", s.echDns)
+            putBoolean("browser_dialer", s.browserDialer)
             putString("tor_entry", s.torEntryNodes)
             putString("tor_exit", s.torExitNodes)
             putString("tor_exclude", s.torExcludeNodes)
@@ -450,6 +482,18 @@ class SettingsRepository(context: Context) {
             putString("tor_enabled_bridges", s.torEnabledBridges)
             putBoolean("tor_fakesni", s.torFakeSniEnabled)
             putString("tor_fakesni_hosts", s.torFakeSniHosts)
+
+            putBoolean("mask_enabled", s.maskEnabled)
+            putString("mask_fragments", aiJson.encodeToString(MASK_FRAGMENTS, s.maskFragments))
+            putString("mask_noises", aiJson.encodeToString(MASK_NOISES, s.maskNoises))
+            putInt("mask_reset_min", s.maskNoiseResetMin)
+            putInt("mask_reset_max", s.maskNoiseResetMax)
+            putBoolean("masque_mask_enabled", s.masqueMaskEnabled)
+            putString("masque_mask_fragments", aiJson.encodeToString(MASK_FRAGMENTS, s.masqueMaskFragments))
+            putString("masque_mask_noises", aiJson.encodeToString(MASK_NOISES, s.masqueMaskNoises))
+            putInt("masque_mask_reset_min", s.masqueMaskNoiseResetMin)
+            putInt("masque_mask_reset_max", s.masqueMaskNoiseResetMax)
+            putString("masque_sni", s.masqueSni)
 
             putString("ssh_cipher", s.sshCipher)
             putBoolean("ssh_compression", s.sshCompression)
@@ -489,6 +533,8 @@ class SettingsRepository(context: Context) {
 
         private val json = Json { ignoreUnknownKeys = true }
         private val RULESETS = ListSerializer(RulesetItem.serializer())
+        private val MASK_FRAGMENTS = ListSerializer(MaskFragment.serializer())
+        private val MASK_NOISES = ListSerializer(UdpNoise.serializer())
 
         fun readLanguageTag(context: Context): String? {
             val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)

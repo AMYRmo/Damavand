@@ -29,6 +29,14 @@ data class RulesetItem(
         const val OUTBOUND_DIRECT = "direct"
         const val OUTBOUND_BLOCK = "block"
 
+        /**
+         * Pseudo-outbound (BPB port): routes direct like OUTBOUND_DIRECT, but
+         * the rule's domains are resolved by the anti-sanction DNS instead of
+         * the regular direct DNS. The Xray builder maps it to "direct" for
+         * routing and to a dedicated DNS server for resolution.
+         */
+        const val OUTBOUND_SANCTION = "sanction"
+
         val OUTBOUND_TAGS = listOf(OUTBOUND_PROXY, OUTBOUND_DIRECT, OUTBOUND_BLOCK)
 
         const val OUTBOUND_PROFILE_PREFIX = "profile:"
@@ -133,8 +141,38 @@ object RulesetPresets {
         "::1/128", "fc00::/7", "fe80::/10",
     )
 
+    /**
+     * BPB port: the sanction-bypass group. One toggleable rule per service,
+     * each routed direct and resolved through the anti-sanction DNS
+     * (Settings: anti-sanction DNS, Shecan by default). Geosite categories
+     * mirror BPB's _sanctionAssets.
+     */
+    fun bypassSanctions(): List<RulesetItem> = listOf(
+        "OpenAI" to "openai",
+        "Google AI" to "google-deepmind",
+        "Microsoft" to "microsoft",
+        "Oracle" to "oracle",
+        "Docker" to "docker",
+        "Adobe" to "adobe",
+        "Epic Games" to "epicgames",
+        "Intel" to "intel",
+        "AMD" to "amd",
+        "NVIDIA" to "nvidia",
+        "ASUS" to "asus",
+        "HP" to "hp",
+        "Lenovo" to "lenovo",
+    ).map { (name, site) ->
+        RulesetItem(
+            id = RulesetItem.newId(),
+            remarks = "Bypass sanctions: $name",
+            domain = listOf("geosite:$site"),
+            outboundTag = RulesetItem.OUTBOUND_SANCTION,
+        )
+    }
+
     fun all(): List<RulesetPreset> = listOf(
         RulesetPreset("Block ads", ::blockAds),
+        RulesetPreset("Bypass sanctions (anti-sanction DNS)", ::bypassSanctions),
         RulesetPreset("Bypass LAN", ::bypassLan),
         RulesetPreset("Bypass private (no geo assets)", ::bypassPrivate),
         RulesetPreset("Bypass Iran", ::bypassMainlandIran),

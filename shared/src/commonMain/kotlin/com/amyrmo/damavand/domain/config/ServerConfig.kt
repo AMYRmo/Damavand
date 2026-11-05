@@ -130,7 +130,36 @@ data class ServerConfig(
 
     val bandwidthUp: String? = null,
     val bandwidthDown: String? = null,
+
+    // BPB port, cluster 5: alternate endpoints of the same service
+    // ("host:port", IPv6 bracketed), e.g. every endpoint a WARP registration
+    // offered. When two or more distinct endpoints exist, the Xray builder
+    // balances over them best-ping in-config instead of dialing only
+    // [address]:[port].
+    val candidateAddresses: List<String> = emptyList(),
 ) {
+    /** Primary endpoint first, then the parsed candidates, de-duplicated. */
+    fun candidateEndpoints(): List<Pair<String, Int>> = buildList {
+        add(address to port)
+        candidateAddresses.forEach { entry -> parseEndpoint(entry)?.let { add(it) } }
+    }.distinct()
+
+    companion object {
+        /** Parses "host:port" / "[v6]:port"; the port splits at the LAST colon. */
+        fun parseEndpoint(entry: String): Pair<String, Int>? {
+            val e = entry.trim()
+            if (e.isEmpty()) return null
+            if (e.startsWith("[")) {
+                val host = e.substringAfter('[').substringBefore(']')
+                val p = e.substringAfter(']', "").removePrefix(":").toIntOrNull()
+                return if (host.isNotEmpty() && p != null) host to p else null
+            }
+            val i = e.lastIndexOf(':')
+            if (i <= 0) return null
+            val p = e.substring(i + 1).toIntOrNull() ?: return null
+            return e.substring(0, i) to p
+        }
+    }
     val transportLabel: String
         get() = buildString {
             append(protocol.label)

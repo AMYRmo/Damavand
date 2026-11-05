@@ -74,6 +74,7 @@ object ShareLink {
             s.wireguardMtu?.let { add("mtu" to it.toString()) }
             s.wireguardKeepalive?.let { add("keepalive" to it.toString()) }
             if (s.dnsServers.isNotEmpty()) add("dns" to s.dnsServers.joinToString(","))
+            if (s.candidateAddresses.isNotEmpty()) add("candidates" to s.candidateAddresses.joinToString(","))
             if (s.allowedIps.isNotEmpty()) add("allowedips" to s.allowedIps.joinToString(","))
             addAll(s.awg.entries)
         }.joinToString("&") { (k, v) -> "$k=${enc(v)}" }
