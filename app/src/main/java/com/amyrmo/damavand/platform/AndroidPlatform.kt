@@ -153,6 +153,18 @@ class AndroidPlatform(
     override val supportsDynamicColor: Boolean
         get() = android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.S
 
+    override val simCountry: String? get() = telephonyCountry { it.simCountryIso }
+
+    override val mobileNetworkCountry: String? get() = telephonyCountry { it.networkCountryIso }
+
+    private fun telephonyCountry(pick: (android.telephony.TelephonyManager) -> String?): String? = runCatching {
+        context.getSystemService(android.telephony.TelephonyManager::class.java)
+            ?.let(pick)
+            ?.trim()
+            ?.uppercase()
+            ?.takeIf { it.length == 2 && it.all { ch -> ch in 'A'..'Z' } }
+    }.getOrNull()
+
     override val supportsQrScan: Boolean
         get() = context.packageManager.hasSystemFeature(android.content.pm.PackageManager.FEATURE_CAMERA_ANY)
 

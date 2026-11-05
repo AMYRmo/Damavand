@@ -334,6 +334,8 @@ data class AppSettings(
 
     val rulesets: List<RulesetItem> = emptyList(),
 
+    val regionCode: String = "",
+
     val routingMigrated: Boolean = false,
 
     val routingSeeded: Boolean = false,
