@@ -72,15 +72,6 @@ sealed interface ProfileSource {
     @Serializable
     @SerialName("sing_box_config")
     data class SingBoxConfig(val json: String) : ProfileSource
-
-    @Serializable
-    @SerialName("aether")
-    data class Aether(
-        val mode: String = "tunnel",
-        val accessKey: String = "",
-        // adjustable config (PattNG-style screen)
-        val config: AetherProfile = AetherProfile(),
-    ) : ProfileSource
 }
 
 @Serializable
@@ -131,10 +122,6 @@ data class VpnProfile(
     val isSingBox: Boolean get() = source is ProfileSource.SingBox
 
     val isSingBoxConfig: Boolean get() = source is ProfileSource.SingBoxConfig
-
-    val isAether: Boolean get() = source is ProfileSource.Aether
-
-    fun aetherSettings(): ProfileSource.Aether? = source as? ProfileSource.Aether
 
     fun autoSelectSettings(): ProfileSource.AutoSelect? = source as? ProfileSource.AutoSelect
 
@@ -202,7 +189,6 @@ data class VpnProfile(
     fun rawPayload(): String? = when (val src = source) {
         is ProfileSource.Link -> src.link
         is ProfileSource.RawJson -> src.json
-        is ProfileSource.Aether -> null
 
         is ProfileSource.Sealed -> null
 
@@ -252,7 +238,6 @@ data class VpnProfile(
             )
 
         is ProfileSource.Psiphon -> throw IllegalStateException("Psiphon profiles do not build Xray config")
-        is ProfileSource.Aether -> throw IllegalStateException("Aether profiles do not build Xray config")
         is ProfileSource.DnsTunnel -> throw IllegalStateException("DNS-tunnel profiles do not build Xray config")
         is ProfileSource.MasterDns -> throw IllegalStateException("MasterDNS profiles do not build Xray config")
         is ProfileSource.OpenConnect -> throw IllegalStateException("OpenConnect profiles do not build Xray config")
@@ -441,48 +426,6 @@ data class VpnProfile(
             port = 0,
             transportLabel = "Tor",
             source = ProfileSource.Tor,
-            addedAt = addedAt,
-        )
-
-        fun fromAether(
-            id: String,
-            addedAt: Long,
-            name: String,
-            mode: String,
-            accessKey: String,
-        ): VpnProfile = VpnProfile(
-            id = id,
-            name = name.ifBlank { "Aether" },
-            protocol = "AETHER",
-            address = "aether",
-            port = 0,
-            transportLabel = when (mode) {
-                "psiphon" -> "Aether · Psiphon"
-                "tor" -> "Aether · Tor"
-                else -> "Aether"
-            },
-            source = ProfileSource.Aether(mode = mode, accessKey = accessKey),
-            addedAt = addedAt,
-        )
-
-        fun fromAetherConfig(
-            id: String,
-            addedAt: Long,
-            config: AetherProfile,
-        ): VpnProfile = VpnProfile(
-            id = id,
-            name = config.remarks.ifBlank { "Aether" },
-            protocol = "AETHER",
-            address = "aether",
-            port = 0,
-            transportLabel = when {
-                config.tor == "only" -> "Aether · Tor only"
-                config.tor != "off" -> "Aether · Tor"
-                config.psiphon == "only" -> "Aether · Psiphon only"
-                config.psiphon != "off" -> "Aether · Psiphon"
-                else -> "Aether · ${config.protocol}"
-            },
-            source = ProfileSource.Aether(mode = "tunnel", config = config),
             addedAt = addedAt,
         )
 

@@ -114,6 +114,3 @@ fun AppSettings.singBoxDeviceOptions(): SingBoxConfigs.DeviceOptions = SingBoxCo
     storeCache = singBoxStoreCache,
     ntpServer = singBoxNtpServer.trim().takeIf { singBoxNtpEnabled } ?: "",
 )
-
-/** Map a stored Aether profile source onto the engine's adjustable config. */
-fun com.amyrmo.damavand.domain.config.ProfileSource.Aether.toAetherProfile(): com.amyrmo.damavand.domain.config.AetherProfile = config

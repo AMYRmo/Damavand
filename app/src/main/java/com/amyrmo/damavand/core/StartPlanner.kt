@@ -127,7 +127,6 @@ class StartPlanner(context: Context) {
         profile.sshSettings() != null -> VpnManager.KIND_SSH
         profile.sniSpoofSettings() != null -> VpnManager.KIND_SNISPOOF
         profile.isSingBoxConfig -> VpnManager.KIND_SINGBOX
-        profile.isAether -> VpnManager.KIND_AETHER
         else -> VpnManager.KIND_XRAY
     }
 
@@ -150,9 +149,6 @@ class StartPlanner(context: Context) {
             }.toString()
         }
         if (profile.isTor) return "tor"
-        // The aether engine reads its settings from the active profile
-        // itself (startAether); the config payload is unused.
-        if (profile.isAether) return "{}"
         (profile.source as? com.amyrmo.damavand.domain.config.ProfileSource.SingBoxConfig)?.let { src ->
 
             val s = settingsRepository.settings.value

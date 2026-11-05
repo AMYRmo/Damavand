@@ -15,8 +15,6 @@ import com.amyrmo.damavand.R
 import com.amyrmo.damavand.data.settings.SettingsRepository
 import com.amyrmo.damavand.domain.config.LocalPorts
 import com.amyrmo.damavand.domain.config.RoutingMigration
-import com.amyrmo.damavand.domain.config.singBoxDeviceOptions
-import com.amyrmo.damavand.domain.config.toAetherProfile
 import com.amyrmo.damavand.domain.model.AppSettings
 import com.amyrmo.damavand.domain.model.RulesetItem
 import com.amyrmo.damavand.domain.model.VpnBypassLan
@@ -60,8 +58,6 @@ class DamavandVpnService : VpnService() {
     private var sniSpoofEdge: String? = null
     private var openConnect: OpenConnectController? = null
     private var singBox: SingBoxEngine? = null
-
-    private var aether: AetherEngine? = null
 
     private var singBoxLastUp = 0L
     private var singBoxLastDown = 0L
@@ -245,8 +241,6 @@ class DamavandVpnService : VpnService() {
         if (kind == VpnManager.KIND_OPENCONNECT) { startOpenConnect(configJson, settings); return }
 
         if (kind == VpnManager.KIND_SINGBOX) { startSingBox(configJson, settings); return }
-
-        if (kind == VpnManager.KIND_AETHER) { startAether(settings); return }
 
         val dnsInChain = kind == VpnManager.KIND_DNS_TUNNEL || kind == VpnManager.KIND_MASTERDNS ||
             (kind == VpnManager.KIND_CROSS_CHAIN && crossChainHasDnsTunnel(configJson))
@@ -607,97 +601,6 @@ class DamavandVpnService : VpnService() {
         if (!controller.start()) stopEverything()
     }
 
-    private fun startAether(appSettings: AppSettings) {
-        VpnManager.setActiveKind(kind)
-        if (!AetherEngine.available(this)) {
-            VpnManager.onError(getString(R.string.engine_aether_missing))
-            stopEverything()
-            return
-        }
-        val settings = activeAetherSettings() ?: run {
-            VpnManager.onError(getString(R.string.engine_aether_missing))
-            stopEverything()
-            return
-        }
-        advance(VpnNotifications.Stage.Engine)
-        val engine = AetherEngine(
-            context = this,
-            config = settings.toAetherProfile(),
-            onLog = { LogBus.append(it) },
-            onStopped = { reason -> onTunnelFailed(reason) },
-        )
-        aether = engine
-        if (engine.missingKeyFiles().isEmpty()) {
-            startAetherEngine(engine, appSettings)
-        } else {
-            // Keys first, PattNG's identity flow: the profile's keys are
-            // registered — into the staging folder, settled atomically over
-            // the keys in use — before the session core starts. A failed
-            // registration does not stop the start: the core provisions
-            // missing identities on its own as a last resort, and the
-            // readiness gate reports how the start actually went.
-            engine.registerKeys(engine.registrationKind().register) { ok, error ->
-                if (aether !== engine) return@registerKeys
-                if (!ok) LogBus.append("W/Aether key registration failed (${error ?: "unknown"}); the core will try on its own")
-                startAetherEngine(engine, appSettings)
-            }
-        }
-    }
-
-    private fun startAetherEngine(engine: AetherEngine, appSettings: AppSettings) {
-        engine.start()
-        if (!engine.isRunning) {
-            VpnManager.onError(engineFailed(R.string.engine_singbox_failed, "aether core did not start"))
-            stopEverything()
-            return
-        }
-
-        // Bridge the core's SOCKS listener into the TUN via sing-box, but
-        // only once the core actually serves its listener: it may still be
-        // scanning for endpoints or registering its identity for a while,
-        // or die a moment later, and reporting Connected before that would
-        // be a lie. Like PattNG's warm-up, the wait repeats in slices while
-        // the core runs; a core that dies is reported by its watcher
-        // through onTunnelFailed, and whichever comes first stops the start.
-        val bridgeJson = com.amyrmo.damavand.domain.config.SingBoxConfigs.aetherBridge(
-            engine.socksPort,
-            appSettings.singBoxDeviceOptions(),
-            dns = activeAetherSettings()?.config?.dns.orEmpty(),
-        )
-        scope.launch(kotlinx.coroutines.Dispatchers.IO) {
-            var ready = false
-            while (aether === engine && engine.isRunning && !ready) {
-                ready = engine.awaitReady(AETHER_READY_SLICE_MS)
-            }
-            if (aether !== engine || !ready) return@launch
-            startSingBox(preparedBridge(bridgeJson, appSettings), appSettings)
-        }
-    }
-
-    // Read fresh on every Aether start, the way the cross-chain paths
-    // already re-read the repository per start. This used to be `by lazy`
-    // (D3): the first profile read was pinned for the service instance's
-    // whole life, so a reused service instance connected with stale
-    // settings after the user switched profiles.
-    private fun activeAetherSettings(): com.amyrmo.damavand.domain.config.ProfileSource.Aether? =
-        (application as com.amyrmo.damavand.DamavandApp).container
-            .configRepository.activeProfile()?.aetherSettings()
-
-    // The Aether bridge JSON carries only the TUN inbound, and the
-    // engine runs whatever it is given verbatim — so without this step the
-    // session has no local listener at all, while startSingBox below still
-    // advertises the prepared config's local port (10808) as the session's
-    // proxy port, and the health probe and the geo lookup dial a port
-    // nothing listens on (a false "connection refused" banner on a healthy
-    // tunnel). Preparing the bridge here adds that local mixed inbound for
-    // real, so the advertised port names a live listener whose traffic
-    // leaves through the bridged core just like the TUN's does.
-    private fun preparedBridge(bridgeJson: String, appSettings: AppSettings): String =
-        com.amyrmo.damavand.domain.config.SingBoxConfigs.prepareForDevice(
-            bridgeJson,
-            device = appSettings.singBoxDeviceOptions(),
-        ).json
-
     private fun startSingBox(configJson: String, appSettings: AppSettings) {
         VpnManager.setActiveKind(kind)
         advance(VpnNotifications.Stage.Engine)
@@ -982,7 +885,6 @@ class DamavandVpnService : VpnService() {
 
     private fun protocolLabel(): String = when (kind) {
         VpnManager.KIND_PSIPHON -> "Psiphon"
-        VpnManager.KIND_AETHER -> "Aether"
         VpnManager.KIND_DNS_TUNNEL -> "DNS"
         VpnManager.KIND_MASTERDNS -> "MasterDNS"
         VpnManager.KIND_TOR -> "Tor"
@@ -1205,7 +1107,6 @@ class DamavandVpnService : VpnService() {
                     VpnManager.KIND_SSH -> ssh?.isRunning == true
                     VpnManager.KIND_OPENCONNECT -> openConnect?.isRunning == true
                     VpnManager.KIND_SINGBOX -> singBox?.isRunning == true
-                    VpnManager.KIND_AETHER -> aether?.isRunning == true
 
                     VpnManager.KIND_CROSS_CHAIN ->
                         engineAlive(crossInnerKind, outer = false) && engineAlive(crossOuterKind, outer = true)
@@ -1224,12 +1125,12 @@ class DamavandVpnService : VpnService() {
                     pollAutoSelect()
                 }
 
-                // Aether/Psiphon have no engine counters of their own;
-                // their UID traffic is sampled at the repaint cadence
-                // (E3) and their reported speed is the held sample rate.
+                // Psiphon has no engine counters of its own;
+                // its UID traffic is sampled at the repaint cadence
+                // (E3) and its reported speed is the held sample rate.
                 val frontCore = FrontCore.isRunning
                 val uidSampled = !frontCore &&
-                    (kind == VpnManager.KIND_PSIPHON || kind == VpnManager.KIND_AETHER)
+                    (kind == VpnManager.KIND_PSIPHON)
                 val (down, up) = if (frontCore) FrontCore.readTrafficDelta() else when (kind) {
                     VpnManager.KIND_XRAY, VpnManager.KIND_SNISPOOF -> XrayController.readTrafficDelta()
 
@@ -1243,8 +1144,6 @@ class DamavandVpnService : VpnService() {
                         singBoxLastUp = engine.uplinkTotal
                         down to up
                     } ?: (0L to 0L)
-
-                    VpnManager.KIND_AETHER -> uidTrafficSampled(elapsed, cadence.notifySeconds)
 
                     else -> XrayController.readTrafficDelta()
                 }
@@ -1438,7 +1337,6 @@ class DamavandVpnService : VpnService() {
         sniSpoof?.stop(); sniSpoof = null
         openConnect?.stop(); openConnect = null
         singBox?.stop(); singBox = null
-        aether?.stop(); aether = null
         outerPsiphon?.stop(); outerPsiphon = null
         outerTor?.stop(); outerTor = null
         outerSsh?.stop(); outerSsh = null
@@ -1797,21 +1695,6 @@ class DamavandVpnService : VpnService() {
                     onReady(c.start())
                 }
             }
-
-            VpnManager.KIND_AETHER -> {
-                val cfg = ((application as com.amyrmo.damavand.DamavandApp).container.configRepository.activeProfile()?.source
-                        as? com.amyrmo.damavand.domain.config.ProfileSource.Aether)?.config
-                if (cfg == null || !AetherEngine.available(this)) return onReady(-1)
-                val engine = AetherEngine(
-                    context = this,
-                    config = cfg,
-                    onLog = { LogBus.append(it) },
-                    onStopped = { reason -> onTunnelFailed(reason) },
-                )
-                aether = engine
-                engine.start()
-                onReady(if (engine.isRunning) engine.socksPort else -1)
-            }
             else -> {
                 val carrierPort = LocalPortPicker.pick(LocalPorts.CHAIN_CARRIER)
                 val carrier = XrayJsonBuilder.withSocksPort(config, LocalPorts.XRAY_SOCKS, carrierPort)
@@ -1914,25 +1797,6 @@ class DamavandVpnService : VpnService() {
                 psiphon = c
                 if (!c.start()) stopEverything()
             }
-
-            VpnManager.KIND_AETHER -> {
-                val cfg = ((application as com.amyrmo.damavand.DamavandApp).container.configRepository.activeProfile()?.source
-                        as? com.amyrmo.damavand.domain.config.ProfileSource.Aether)?.config
-                if (cfg == null || !AetherEngine.available(this)) {
-                    VpnManager.onError(getString(R.string.engine_aether_missing)); stopEverything(); return
-                }
-                val engine = AetherEngine(
-                    context = this,
-                    config = cfg.copy(upstream = "socks5://127.0.0.1:$carrierPort"),
-                    onLog = { LogBus.append(it) },
-                    onStopped = { reason -> onTunnelFailed(reason) },
-                )
-                aether = engine
-                engine.start()
-                if (!engine.isRunning) { VpnManager.onError(coreStartError()); stopEverything(); return }
-                // aether's socks then flows into the TUN through the sing-box bridge
-                bridgeEngine(descriptor, engine.socksPort, tunMtu)
-            }
             else -> {
                 val patched = runCatching {
                     com.amyrmo.damavand.domain.config.XrayJsonBuilder
@@ -1964,9 +1828,6 @@ class DamavandVpnService : VpnService() {
 
     companion object {
         private const val TAG = "DamavandVpnService"
-
-        /** One slice of the wait for the Aether core to serve its listener; the wait repeats while the core runs. */
-        private const val AETHER_READY_SLICE_MS = 30_000L
 
         private const val ZEPTUN_PROOF_MS = 6_000L
 

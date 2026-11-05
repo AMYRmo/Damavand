@@ -97,8 +97,6 @@ import com.amyrmo.damavand.domain.config.AutoSelectIds
 import com.amyrmo.damavand.domain.config.ConfigParseException
 import com.amyrmo.damavand.domain.config.ConfigParser
 import com.amyrmo.damavand.domain.config.VpnProfile
-import com.amyrmo.damavand.domain.config.AetherProfile
-import com.amyrmo.damavand.domain.config.toAetherProfile
 import com.amyrmo.damavand.ui.onboarding.TourTargets
 import com.amyrmo.damavand.ui.onboarding.tourTarget
 import com.amyrmo.damavand.ui.platform.LocalPlatform
@@ -327,7 +325,6 @@ fun ServersScreen(
     var showOpenConnect by remember { mutableStateOf(false) }
     var showIkev2 by remember { mutableStateOf(false) }
     var showSsh by remember { mutableStateOf(false) }
-    var showAether by remember { mutableStateOf(false) }
     var dmvTarget by remember { mutableStateOf<VpnProfile?>(null) }
     var showSniSpoof by remember { mutableStateOf(false) }
     var showProxyChain by remember { mutableStateOf(false) }
@@ -900,11 +897,6 @@ fun ServersScreen(
                                 ?.let { profile.name to it }
                         },
                         onShareDmv = { dmvTarget = profile },
-                        onShareAetherLink = {
-                            profile.aetherSettings()?.config?.let { cfg ->
-                                platform.shareText(cfg.toShareLink())
-                            }
-                        },
                         onRename = { renameTarget = profile },
                         onEdit = { editTarget = profile },
                         onMoveGroup = { moveTarget = profile },
@@ -1193,10 +1185,6 @@ fun ServersScreen(
 
                 toastRes(Res.string.tor_added)
             },
-            onAether = {
-                showAddSheet = false
-                showAether = true
-            },
             onSsh = {
                 showAddSheet = false
                 showSsh = true
@@ -1298,17 +1286,6 @@ fun ServersScreen(
             onSave = { name, settings ->
                 showSsh = false
                 repository.addSsh(settings, name)
-                onServerActivated()
-            },
-        )
-    }
-
-    if (showAether) {
-        AetherSheet(
-            onDismiss = { showAether = false },
-            onSave = { config ->
-                showAether = false
-                repository.addAetherProfile(config)
                 onServerActivated()
             },
         )
@@ -1498,17 +1475,6 @@ fun ServersScreen(
                     onDismiss = { editTarget = null },
                     onSave = { name, settings ->
                         repository.addPsiphon(settings, name, id = target.id)
-                        toastRes(Res.string.saved)
-                        editTarget = null
-                    },
-                )
-            }
-            target.isAether -> {
-                AetherSheet(
-                    initial = target.aetherSettings()?.toAetherProfile(),
-                    onDismiss = { editTarget = null },
-                    onSave = { config ->
-                        repository.addAetherProfile(config, id = target.id)
                         toastRes(Res.string.saved)
                         editTarget = null
                     },
@@ -1881,7 +1847,6 @@ private fun ServerCard(
     onShare: () -> Unit,
     onShareQr: () -> Unit,
     onShareDmv: () -> Unit = {},
-    onShareAetherLink: () -> Unit = {},
 
     shareLink: String?,
     onRename: () -> Unit,
@@ -2026,13 +1991,6 @@ private fun ServerCard(
                         enabled = shareLink != null,
                         onClick = { menuOpen = false; onShareDmv() },
                     )
-                    if (profile.isAether) {
-                        DropdownMenuItem(
-                            text = { Text(stringResource(Res.string.aether_share_link)) },
-                            leadingIcon = { Icon(painterResource(Res.drawable.ic_ios_share), null) },
-                            onClick = { menuOpen = false; onShareAetherLink() },
-                        )
-                    }
                     DropdownMenuItem(
                         text = { Text(stringResource(Res.string.action_edit)) },
                         leadingIcon = { Icon(painterResource(Res.drawable.ic_edit), null) },
@@ -2140,7 +2098,6 @@ private fun AddServerSheet(
     onOpenConnect: () -> Unit,
     onIkev2: () -> Unit,
     onTor: () -> Unit,
-    onAether: () -> Unit,
     onSsh: () -> Unit,
     onWarp: () -> Unit,
     onSniSpoof: () -> Unit,
@@ -2191,7 +2148,6 @@ private fun AddServerSheet(
             OptionGroup(Res.string.add_group_tunnels)
             Option(Res.drawable.ic_bolt, Res.string.psiphon_add_title, onPsiphon, free = true)
             Option(Res.drawable.ic_lock, Res.string.tor_add_title, onTor, free = true)
-            Option(Res.drawable.ic_bolt, Res.string.aether_add_title, onAether, free = true)
             Option(Res.drawable.ic_speed, Res.string.ssh_add_title, onSsh)
             Option(Res.drawable.ic_public, Res.string.warp_add_title, onWarp, free = true)
             if (LocalPlatform.current.supportsSniSpoof) Option(Res.drawable.ic_bolt, Res.string.snispoof_add_title, onSniSpoof)

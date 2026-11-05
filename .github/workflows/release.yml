@@ -42,7 +42,6 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           bash tools/get-cores.sh android
-          bash tools/get-aether.sh
           bash tools/fetch-psiphon-servers.sh
           bash tools/strip-cores.sh
 
@@ -51,7 +50,7 @@ jobs:
           set -e
           ls -l app/libs/zedcore.aar
           for abi in arm64-v8a armeabi-v7a x86_64; do
-            for lib in libtor libobfs4proxy libsnowflake libconjure libsnispoof libhev-socks5-tunnel libzeptun-jni libaether libpsiphon-tunnel-core liblyrebird; do
+            for lib in libtor libobfs4proxy libsnowflake libconjure libsnispoof libhev-socks5-tunnel libzeptun-jni libpsiphon-tunnel-core liblyrebird; do
               [ -f "app/src/main/jniLibs/$abi/$lib.so" ] || { echo "::error::$abi/$lib.so is missing"; exit 1; }
             done
             # Only JNI-loading cores need exports; the Go bridge libs (tor stack,
@@ -93,7 +92,7 @@ jobs:
           with zipfile.ZipFile(apk) as z:
               abis = sorted({p.split('/')[1] for p in z.namelist() if p.startswith('lib/')})
               assert abis, 'no ABIs in APK'
-              for lib in ('libgojni.so', 'libhev-socks5-tunnel.so', 'libaether.so', 'libpsiphon-tunnel-core.so', 'liblyrebird.so'):
+              for lib in ('libgojni.so', 'libhev-socks5-tunnel.so', 'libpsiphon-tunnel-core.so', 'liblyrebird.so'):
                   names = [p for p in z.namelist() if p.endswith('/' + lib)]
                   assert names, f'{lib} missing'
           print('APK verified:', '+'.join(abis), '- core libs present')

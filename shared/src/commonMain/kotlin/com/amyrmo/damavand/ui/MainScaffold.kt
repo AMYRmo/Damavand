@@ -451,7 +451,6 @@ private fun bentoEngineLabel(p: com.amyrmo.damavand.domain.config.VpnProfile): S
             if (com.amyrmo.damavand.domain.config.SingBoxLinks.handles(src.link)) "sing-box" else "Xray"
         is com.amyrmo.damavand.domain.config.ProfileSource.Tor -> "Tor"
         is com.amyrmo.damavand.domain.config.ProfileSource.Psiphon -> "Psiphon"
-        is com.amyrmo.damavand.domain.config.ProfileSource.Aether -> "Aether"
         is com.amyrmo.damavand.domain.config.ProfileSource.MasterDns -> "MasterDNS"
         is com.amyrmo.damavand.domain.config.ProfileSource.Ssh -> "SSH"
         is com.amyrmo.damavand.domain.config.ProfileSource.OpenConnect -> "OpenConnect"

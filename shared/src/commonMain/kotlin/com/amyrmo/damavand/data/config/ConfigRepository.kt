@@ -15,7 +15,6 @@ import com.amyrmo.damavand.crypto.ZsxSealRequest
 import com.amyrmo.damavand.domain.config.AmneziaLink
 import com.amyrmo.damavand.domain.config.AutoMember
 import com.amyrmo.damavand.domain.config.AutoSelectBuild
-import com.amyrmo.damavand.domain.config.AetherProfile
 import com.amyrmo.damavand.domain.config.AutoSelectIds
 import com.amyrmo.damavand.domain.config.AutoSelectTuning
 import com.amyrmo.damavand.domain.config.RuleGroup
@@ -102,14 +101,6 @@ class ConfigRepository(private val store: KeyValueStore) {
         }
 
         if (ZedLink.isZedLink(trimmed)) return@runCatching importZedLink(trimmed)
-
-        if (trimmed.startsWith("aether://")) {
-            val link = trimmed.lineSequence().firstOrNull { it.startsWith("aether://") } ?: trimmed
-            val cfg = AetherProfile.fromShareLink(link.trim())
-                ?: throw IllegalArgumentException("invalid aether:// link")
-            addAetherProfile(cfg)
-            return@runCatching 1
-        }
 
         if (SniSpoofLink.isSniSpoofLink(trimmed)) {
             val (nm, prof) = SniSpoofLink.parse(trimmed)
@@ -755,7 +746,6 @@ class ConfigRepository(private val store: KeyValueStore) {
             ?: throw IllegalArgumentException("invalid damavand:// link")
         val name = payload.name
         return when (val src = payload.source) {
-            is ProfileSource.Aether -> { addAether(name, src.mode, src.accessKey); 1 }
             is ProfileSource.Psiphon -> { addPsiphon(src.settings, name); 1 }
             is ProfileSource.DnsTunnel -> { addDnsTunnel(src.settings, name); 1 }
             is ProfileSource.Tor -> { addTor(name); 1 }
@@ -895,37 +885,6 @@ class ConfigRepository(private val store: KeyValueStore) {
             name = name,
         )
         _profiles.value = listOf(profile) + _profiles.value
-        persistProfiles()
-        if (_activeId.value == null) setActive(profile.id)
-        return profile
-    }
-
-    fun addAether(name: String, mode: String = "tunnel", accessKey: String = ""): VpnProfile {
-        val profile = VpnProfile.fromAether(
-            id = newId(),
-            addedAt = currentTimeMillis(),
-            name = name,
-            mode = mode,
-            accessKey = accessKey,
-        )
-        _profiles.value = listOf(profile) + _profiles.value
-        persistProfiles()
-        if (_activeId.value == null) setActive(profile.id)
-        return profile
-    }
-
-    fun addAetherProfile(config: com.amyrmo.damavand.domain.config.AetherProfile, id: String? = null): VpnProfile {
-        val existing = id?.let { profile(it) }
-        val profile = VpnProfile.fromAetherConfig(
-            id = existing?.id ?: newId(),
-            addedAt = existing?.addedAt ?: currentTimeMillis(),
-            config = config.copy(remarks = config.remarks.ifBlank { existing?.name ?: "" }),
-        ).let { carryOver(existing, it) }
-        _profiles.value = if (existing != null) {
-            _profiles.value.map { if (it.id == profile.id) profile else it }
-        } else {
-            listOf(profile) + _profiles.value
-        }
         persistProfiles()
         if (_activeId.value == null) setActive(profile.id)
         return profile
@@ -1474,8 +1433,8 @@ class ConfigRepository(private val store: KeyValueStore) {
         val loaded = runCatching { json.decodeFromString<List<VpnProfile>>(raw) }.getOrNull()
         if (loaded != null) return repairOpenVpnType(loaded)
         // The stored list no longer decodes as a whole — e.g. it still holds
-        // an entry whose kind this build cannot read (the Mihomo profile
-        // source was removed in v141-plus). Salvage every entry that still
+        // an entry whose kind this build cannot read (the Mihomo and Aether
+        // profile sources were removed in v141-plus). Salvage every entry that still
         // decodes and drop only the unreadable ones, instead of discarding
         // the user's whole list; write the cleaned list back once, the same
         // way repairOpenVpnType persists its repairs.
