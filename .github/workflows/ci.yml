@@ -58,4 +58,5 @@ jobs:
         with:
           name: Damavand-v141plus-debug
           if-no-files-found: error
+          retention-days: 7
           path: app/build/outputs/apk/debug/*.apk
