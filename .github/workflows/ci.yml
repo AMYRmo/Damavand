@@ -59,4 +59,4 @@ jobs:
           name: Damavand-v141plus-debug
           if-no-files-found: error
           retention-days: 7
-          path: app/build/outputs/apk/debug/*.apk
+          path: app/build/outputs/apk/debug/app-arm64-v8a-debug.apk
