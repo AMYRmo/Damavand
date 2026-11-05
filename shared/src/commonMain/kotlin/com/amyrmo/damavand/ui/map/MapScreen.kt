@@ -42,6 +42,7 @@ import com.amyrmo.damavand.core.VpnManager
 import com.amyrmo.damavand.data.map.WorldMap
 import com.amyrmo.damavand.domain.model.ConnectionState
 import com.amyrmo.damavand.shared.resources.Res
+import com.amyrmo.damavand.shared.resources.ipd_open
 import com.amyrmo.damavand.shared.resources.ic_info
 import com.amyrmo.damavand.shared.resources.map_exit
 import com.amyrmo.damavand.shared.resources.map_locating

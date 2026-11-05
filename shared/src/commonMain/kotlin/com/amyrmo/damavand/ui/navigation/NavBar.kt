@@ -54,7 +54,7 @@ fun ZedNavBar(
     onSelect: (TopDestination) -> Unit,
 ) {
     when (style) {
-        NavBarStyle.FloatingPill -> FloatingPillBar(current, onSelect, compact = false)
+        NavBarStyle.FloatingPill, NavBarStyle.Dock -> FloatingPillBar(current, onSelect, compact = false)
         NavBarStyle.CompactDock -> FloatingPillBar(current, onSelect, compact = true)
         NavBarStyle.ExpressivePill -> ExpressivePillBar(current, onSelect)
         NavBarStyle.FullBar -> MaterialBar(current, onSelect, underline = false)
