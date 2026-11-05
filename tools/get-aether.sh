@@ -14,10 +14,10 @@ fetch() {
   dir="$CACHE/aether/$AETHER_TAG"
   base="https://github.com/patterniha/Aether/releases/download/$AETHER_TAG"
   mkdir -p "$dir"
-  [ -s "$dir/$asset.sha256" ] || curl -fsSL --retry 3 -o "$dir/$asset.sha256" "$base/$asset.sha256"
+  [ -s "$dir/$asset.sha256" ] || curl -fsSL --retry 8 --retry-delay 10 --retry-all-errors -o "$dir/$asset.sha256" "$base/$asset.sha256"
   want="$(awk '{print $1}' "$dir/$asset.sha256")"
   if [ ! -s "$dir/$asset" ] || [ "$(digest "$dir/$asset")" != "$want" ]; then
-    curl -fsSL --retry 3 -o "$dir/$asset" "$base/$asset"
+    curl -fsSL --retry 8 --retry-delay 10 --retry-all-errors -o "$dir/$asset" "$base/$asset"
     [ "$(digest "$dir/$asset")" = "$want" ] || { echo "$asset checksum mismatch" >&2; exit 1; }
   fi
   printf '%s\n' "$dir/$asset"

@@ -11,7 +11,7 @@ digest() { sha256sum "$1" | awk '{print $1}'; }
 # mihomo releases ship no .sha256 sidecars; the GitHub API publishes a
 # sha256:<hex> digest per asset — use that as the trust anchor.
 want_digest() {
-  curl -fsSL --retry 3 -H "Authorization: token ${GITHUB_TOKEN:-}" \
+  curl -fsSL --retry 8 --retry-delay 10 --retry-all-errors -H "Authorization: token ${GITHUB_TOKEN:-}" \
     "https://api.github.com/repos/MetaCubeX/mihomo/releases/tags/$MIHOMO_TAG" \
     | python3 -c 'import json,sys
 for a in json.load(sys.stdin)["assets"]:
@@ -31,7 +31,7 @@ fetch() {
   want="$(want_digest "$asset")"
   [ -n "$want" ] || { echo "$asset has no API digest" >&2; exit 1; }
   if [ ! -s "$dir/$asset" ] || [ "$(digest "$dir/$asset")" != "$want" ]; then
-    curl -fsSL --retry 3 -o "$dir/$asset" "$base/$asset"
+    curl -fsSL --retry 8 --retry-delay 10 --retry-all-errors -o "$dir/$asset" "$base/$asset"
     [ "$(digest "$dir/$asset")" = "$want" ] || { echo "$asset checksum mismatch" >&2; exit 1; }
   fi
   printf '%s\n' "$dir/$asset"

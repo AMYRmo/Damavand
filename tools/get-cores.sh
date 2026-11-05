@@ -15,11 +15,11 @@ fetch() {
   dir="$CACHE/$repo/$tag"
   base="https://github.com/$repo/releases/download/$tag"
   mkdir -p "$dir"
-  [ -s "$dir/SHA256SUMS" ] || curl -fsSL --retry 3 -o "$dir/SHA256SUMS" "$base/SHA256SUMS"
+  [ -s "$dir/SHA256SUMS" ] || curl -fsSL --retry 8 --retry-delay 10 --retry-all-errors -o "$dir/SHA256SUMS" "$base/SHA256SUMS"
   want=$(awk -v a="$asset" '$2 == a || $2 == "*" a { print $1 }' "$dir/SHA256SUMS")
   [ -n "$want" ] || { echo "$asset is not in $repo $tag" >&2; exit 1; }
   if [ ! -s "$dir/$asset" ] || [ "$(digest "$dir/$asset")" != "$want" ]; then
-    curl -fsSL --retry 3 -o "$dir/$asset" "$base/$asset"
+    curl -fsSL --retry 8 --retry-delay 10 --retry-all-errors -o "$dir/$asset" "$base/$asset"
     [ "$(digest "$dir/$asset")" = "$want" ] || { echo "$asset from $repo $tag does not match its checksum" >&2; exit 1; }
   fi
   printf '%s\n' "$dir/$asset"
