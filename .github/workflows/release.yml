@@ -43,6 +43,7 @@ jobs:
         run: |
           bash tools/get-cores.sh android
           bash tools/get-aether.sh
+          bash tools/fetch-psiphon-servers.sh
           bash tools/get-mihomo.sh
           bash tools/strip-cores.sh
 

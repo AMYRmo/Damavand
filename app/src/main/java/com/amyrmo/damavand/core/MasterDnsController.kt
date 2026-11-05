@@ -128,6 +128,13 @@ class MasterDnsController(
     fun awaitReady(idleTimeoutMs: Long, maxTimeoutMs: Long): Boolean {
         val begin = System.currentTimeMillis()
         lastActivityAt = begin
+        // Poll briskly at first (the local listener usually opens soon
+        // after session setup), then back off x1.5 to a 2 s cap: a long
+        // MTU scan otherwise costs a socket probe every 500 ms for
+        // minutes (E5). The caller's budgets are 90 s idle / 300 s max,
+        // so the coarser failure/timeout granularity late in a long
+        // bootstrap is negligible.
+        var pollMs = READY_POLL_FIRST_MS
         while (true) {
             if (!started) return false
             if (portAccepts(listenHost, boundPort, timeoutMs = 500)) {
@@ -159,7 +166,8 @@ class MasterDnsController(
                 }
                 return false
             }
-            try { Thread.sleep(500) } catch (_: InterruptedException) { return false }
+            try { Thread.sleep(pollMs) } catch (_: InterruptedException) { return false }
+            pollMs = (pollMs * 3 / 2).coerceAtMost(READY_POLL_MAX_MS)
         }
     }
 
@@ -247,15 +255,21 @@ class MasterDnsController(
                         }
                         pos = logFile.length()
                     }
-                    Thread.sleep(700)
+                    Thread.sleep(tailPollMs())
                 } catch (_: InterruptedException) {
                     return@Thread
                 } catch (_: Exception) {
-                    try { Thread.sleep(700) } catch (_: InterruptedException) { return@Thread }
+                    try { Thread.sleep(tailPollMs()) } catch (_: InterruptedException) { return@Thread }
                 }
             }
         }.apply { isDaemon = true; start() }
     }
+
+    // The tail mirrors the client log into the in-app log and tracks
+    // bootstrap progress. Before readiness it polls briskly so the
+    // progress/failure tracking awaitReady consumes stays current; once
+    // the session is ready the tail only mirrors, so it slows down (E5).
+    private fun tailPollMs(): Long = if (ready) TAIL_POLL_IDLE_MS else TAIL_POLL_MS
 
     private fun mirror(line: String, pid: Int) {
         val m = FILE_LINE.find(line)
@@ -348,5 +362,13 @@ class MasterDnsController(
         const val PRESCREEN_KEEP = 32
 
         const val PROBE_CACHE_MS = 5_000L
+
+        const val READY_POLL_FIRST_MS = 500L
+
+        const val READY_POLL_MAX_MS = 2_000L
+
+        const val TAIL_POLL_MS = 700L
+
+        const val TAIL_POLL_IDLE_MS = 2_000L
     }
 }

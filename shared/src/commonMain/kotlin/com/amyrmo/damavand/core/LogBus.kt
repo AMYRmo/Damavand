@@ -3,7 +3,9 @@ package com.amyrmo.damavand.core
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.getAndUpdate
 import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.flow.updateAndGet
 
 object LogBus {
     private const val CAPACITY = 2_000
@@ -24,17 +26,40 @@ object LogBus {
         if (tag !in _ownTags.value) _ownTags.update { it + tag }
     }
 
+    // Appends are staged and published in batches (E4). Publishing is
+    // the expensive part — it copies the whole list (up to ~2,256
+    // lines) and emits a StateFlow update — so doing it per core log
+    // line made a chatty line rate cost O(lines) per line. Staging is a
+    // small-list append; the published list keeps the same capacity,
+    // the same merge ordering and the same content, just refreshed per
+    // batch instead of per line. attach() and snapshot() flush first,
+    // so a reader never misses the staged tail.
+    private const val FLUSH_WHEN_WATCHED = 8
+
+    private const val FLUSH_WHEN_UNWATCHED = 50
+
+    private val _staged = MutableStateFlow<List<String>>(emptyList())
+
     fun append(line: String) {
         appendAll(listOf(line))
     }
 
     fun appendAll(newLines: List<String>) {
         if (newLines.isEmpty()) return
+        val staged = _staged.updateAndGet { it + newLines }
+        val threshold = if (watchers > 0) FLUSH_WHEN_WATCHED else FLUSH_WHEN_UNWATCHED
+        if (staged.size >= threshold) flush()
+    }
+
+    /** Publishes any staged lines to [lines] now. */
+    fun flush() {
+        val batch = _staged.getAndUpdate { emptyList() }
+        if (batch.isEmpty()) return
         _lines.update { prev ->
-            val first = stampOf(newLines.first())
+            val first = stampOf(batch.first())
             val last = prev.asReversed().firstNotNullOfOrNull { stampOf(it) }
-            if (first == null || last == null || first >= last) trim(prev + newLines)
-            else trim(mergeByStamp(prev, newLines))
+            if (first == null || last == null || first >= last) trim(prev + batch)
+            else trim(mergeByStamp(prev, batch))
         }
     }
 
@@ -68,6 +93,7 @@ object LogBus {
         if (next.size > CAPACITY + SLACK) next.subList(next.size - CAPACITY, next.size) else next
 
     fun attach() {
+        flush()
         watchers++
         if (watchers == 1) source?.invoke(true)
     }
@@ -78,8 +104,12 @@ object LogBus {
     }
 
     fun clear() {
+        _staged.value = emptyList()
         _lines.value = emptyList()
     }
 
-    fun snapshot(): String = _lines.value.joinToString("\n")
+    fun snapshot(): String {
+        flush()
+        return _lines.value.joinToString("\n")
+    }
 }

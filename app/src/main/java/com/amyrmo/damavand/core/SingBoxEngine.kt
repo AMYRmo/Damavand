@@ -86,7 +86,11 @@ class SingBoxEngine(
         val options = CommandClientOptions().apply {
             addCommand(Libbox.CommandStatus)
             addCommand(Libbox.CommandLog)
-            statusInterval = 1_000_000_000L
+            // 3 s, not 1 s (E2): the status callback only refreshes the
+            // cumulative uplink/downlink totals the metrics loop diffs,
+            // and that loop now repaints at a 3 s cadence — polling the
+            // core every second for the whole session bought nothing.
+            statusInterval = 3_000_000_000L
         }
         val commandClient = CommandClient(clientHandler, options)
         client = commandClient

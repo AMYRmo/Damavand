@@ -31,6 +31,7 @@ import org.jetbrains.compose.resources.StringResource
 import org.jetbrains.compose.resources.stringResource
 import com.amyrmo.damavand.shared.resources.Res
 import com.amyrmo.damavand.shared.resources.*
+import com.amyrmo.damavand.domain.config.AetherCommands
 import com.amyrmo.damavand.domain.config.AetherEndpoint
 import com.amyrmo.damavand.domain.config.AetherFingerprint
 import com.amyrmo.damavand.domain.config.AetherIpVersion
@@ -93,47 +94,8 @@ fun AetherSheet(
     var finalMask by remember { mutableStateOf(initial?.finalMask ?: "") }
     var dialMode by remember { mutableStateOf(initial?.dialMode ?: "") }
     var extraArgs by remember { mutableStateOf(initial?.extraArgs ?: "") }
-    var rawCommand by remember { mutableStateOf("") }
+    var command by remember { mutableStateOf(initial?.command ?: "") }
     var showOther by remember { mutableStateOf(false) }
-
-    fun applyCommand() {
-        if (rawCommand.isBlank()) return
-        val parsed = AetherProfile.fromCommandLine(rawCommand)
-        remarks = parsed.remarks.ifBlank { remarks }
-        protocol = parsed.protocol
-        transport = parsed.transport
-        scanMode = parsed.scanMode
-        obfuscation = parsed.obfuscation
-        ipVersion = parsed.ipVersion
-        dns = parsed.dns
-        exitLoc = parsed.exitLoc
-        masqueSni = parsed.masqueSni
-        fragment = parsed.fragment
-        fragmentSize = parsed.fragmentSize
-        fragmentDelay = parsed.fragmentDelay
-        ech = parsed.ech
-        echDns = parsed.echDns
-        echDomain = parsed.echDomain
-        fingerprint = parsed.fingerprint
-        wiwOuter = parsed.wiwOuter
-        wiwInner = parsed.wiwInner
-        address = parsed.address
-        port = parsed.port
-        psiphon = parsed.psiphon
-        psiphonMode = parsed.psiphonMode
-        psiphonCdnIps = parsed.psiphonCdnIps
-        psiphonCdnSni = parsed.psiphonCdnSni
-        psiphonCdnSets = parsed.psiphonCdnSets
-        psiphonRegion = parsed.psiphonRegion
-        tor = parsed.tor
-        torBridges = parsed.torBridges
-        torRelays = parsed.torRelays
-        torBridgeLines = parsed.torBridgeLines
-        finalMask = parsed.finalMask
-        dialMode = parsed.dialMode
-        extraArgs = parsed.extraArgs
-        rawCommand = ""
-    }
 
     val protoEnum = AetherProtocol.fromString(protocol)
     val psiphonEnum = AetherPsiphon.fromString(psiphon)
@@ -172,7 +134,7 @@ fun AetherSheet(
         ) {
             Text(stringResource(Res.string.aether_add_title), style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
 
-            F(remarks, Res.string.aether_remarks)
+            F(remarks, Res.string.aether_remarks) { remarks = it }
             PickerField(
                 label = stringResource(Res.string.aether_protocol),
                 options = listOf(
@@ -232,7 +194,7 @@ fun AetherSheet(
                 selected = ipVersion,
                 onSelect = { ipVersion = it },
             )
-            F(dns, Res.string.aether_dns, placeholder = "1.1.1.1")
+            F(dns, Res.string.aether_dns, placeholder = "1.1.1.1") { dns = it }
 
             PickerField(
                 label = stringResource(Res.string.aether_exit_node),
@@ -248,13 +210,13 @@ fun AetherSheet(
                 onSelect = { exitLoc = it },
             )
             if (exitLoc.isNotBlank()) {
-                F(finalMask, Res.string.aether_exit_mask, minLines = 2)
-                F(dialMode, Res.string.aether_exit_dial)
+                F(finalMask, Res.string.aether_exit_mask, minLines = 2) { finalMask = it }
+                F(dialMode, Res.string.aether_exit_dial) { dialMode = it }
             }
 
             if (protoEnum.overMasque) {
                 Text(stringResource(Res.string.aether_masque_section), style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
-                F(masqueSni, Res.string.aether_masque_sni)
+                F(masqueSni, Res.string.aether_masque_sni) { masqueSni = it }
                 if (transport == AetherTransport.HTTP2.type) {
                     PickerField(
                         label = stringResource(Res.string.aether_fragment),
@@ -264,8 +226,8 @@ fun AetherSheet(
                     )
                     if (fragment) {
                         Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                            F(fragmentSize, Res.string.aether_fragment_size, modifier = Modifier.weight(1f))
-                            F(fragmentDelay, Res.string.aether_fragment_delay, modifier = Modifier.weight(1f))
+                            F(fragmentSize, Res.string.aether_fragment_size, modifier = Modifier.weight(1f)) { fragmentSize = it }
+                            F(fragmentDelay, Res.string.aether_fragment_delay, modifier = Modifier.weight(1f)) { fragmentDelay = it }
                         }
                     }
                 }
@@ -276,8 +238,8 @@ fun AetherSheet(
                     onSelect = { ech = it == "on" },
                 )
                 if (ech) {
-                    F(echDns, Res.string.aether_ech_dns)
-                    F(echDomain, Res.string.aether_ech_domain)
+                    F(echDns, Res.string.aether_ech_dns) { echDns = it }
+                    F(echDomain, Res.string.aether_ech_domain) { echDomain = it }
                 }
                 PickerField(
                     label = stringResource(Res.string.aether_fingerprint),
@@ -293,20 +255,34 @@ fun AetherSheet(
                 )
             }
 
+            // A typed endpoint that cannot parse (in practice: a missing or
+            // out-of-range port) used to be dropped silently at flag time and
+            // the session scanned instead. Surface it here and block Save.
+            val endpointProblem = when {
+                protoEnum.twoHops ->
+                    listOf(wiwOuter, wiwInner).firstOrNull { it.isNotBlank() && AetherEndpoint.parse(it) == null }
+                        ?.let { "Invalid endpoint: $it — use host:port with a port of 1-65535 (blank = scan)." }
+                address.isNotBlank() && AetherEndpoint.of(address, port) == null ->
+                    "Invalid endpoint — the address needs a port of 1-65535 (or clear both to scan)."
+                else -> null
+            }
             if (protoEnum.twoHops) {
                 Text(stringResource(Res.string.aether_hops_title), style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
-                F(wiwOuter, Res.string.aether_outer, placeholder = "1.2.3.4:443 (blank = scan)")
-                F(wiwInner, Res.string.aether_inner, placeholder = "5.6.7.8:443 (blank = scan)")
+                F(wiwOuter, Res.string.aether_outer, placeholder = "1.2.3.4:443 (blank = scan)") { wiwOuter = it }
+                F(wiwInner, Res.string.aether_inner, placeholder = "5.6.7.8:443 (blank = scan)") { wiwInner = it }
             } else {
                 Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                    F(address, Res.string.manual_address, modifier = Modifier.weight(1f))
-                    F(port, Res.string.ssh_port, numeric = true, modifier = Modifier.weight(1f))
+                    F(address, Res.string.manual_address, modifier = Modifier.weight(1f)) { address = it }
+                    F(port, Res.string.ssh_port, numeric = true, modifier = Modifier.weight(1f)) { port = it }
                 }
                 OutlinedButton(
                     onClick = { address = ""; port = "" },
                     shape = RoundedCornerShape(18.dp),
                     modifier = Modifier.fillMaxWidth().padding(vertical = 2.dp),
                 ) { Text(stringResource(Res.string.aether_scan_endpoint)) }
+            }
+            endpointProblem?.let {
+                Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error)
             }
 
             PickerField(
@@ -332,16 +308,16 @@ fun AetherSheet(
                     onSelect = { psiphonMode = it },
                 )
                 if (psiphonMode != AetherPsiphonMode.DIRECT.type) {
-                    F(psiphonCdnIps, Res.string.aether_cdn_ips, placeholder = " IPs")
-                    F(psiphonCdnSni, Res.string.aether_cdn_sni)
-                    F(psiphonCdnSets, Res.string.aether_cdn_sets, placeholder = "cloudflare,fastly,...")
+                    F(psiphonCdnIps, Res.string.aether_cdn_ips, placeholder = " IPs") { psiphonCdnIps = it }
+                    F(psiphonCdnSni, Res.string.aether_cdn_sni) { psiphonCdnSni = it }
+                    F(psiphonCdnSets, Res.string.aether_cdn_sets, placeholder = "cloudflare,fastly,...") { psiphonCdnSets = it }
                     OutlinedButton(
                         onClick = { psiphonCdnSets = AetherPsiphonCdnSet.entries.joinToString(",") { it.type } },
                         shape = RoundedCornerShape(18.dp),
                         modifier = Modifier.fillMaxWidth().padding(vertical = 2.dp),
                     ) { Text(stringResource(Res.string.aether_cdn_all)) }
                 }
-                F(psiphonRegion, Res.string.aether_psiphon_region, placeholder = "US")
+                F(psiphonRegion, Res.string.aether_psiphon_region, placeholder = "US") { psiphonRegion = it }
             }
 
             PickerField(
@@ -368,7 +344,7 @@ fun AetherSheet(
                     onSelect = { torBridges = it },
                 )
                 if (torBridges == AetherTorBridges.OWN.type) {
-                    F(torBridgeLines, Res.string.aether_bridge_lines, minLines = 3)
+                    F(torBridgeLines, Res.string.aether_bridge_lines, minLines = 3) { torBridgeLines = it }
                 }
                 if (torBridges == AetherTorBridges.AUTO.type || torBridges == AetherTorBridges.FIRST.type) {
                     PickerField(
@@ -392,19 +368,51 @@ fun AetherSheet(
                 ) { Text(stringResource(Res.string.aether_other)) }
             }
             if (showOther) {
-                F(extraArgs, Res.string.aether_extra, minLines = 2)
+                F(extraArgs, Res.string.aether_extra, minLines = 2) { extraArgs = it }
             }
 
+            // The command field is the profile's verbatim command (Narcic's
+            // model): it shows the command the settings generate, and editing
+            // it makes the profile carry that text and run it as written —
+            // there is no parse-back into fields, which is what used to reset
+            // every other setting and duplicate --bind/--log-level.
             Text(stringResource(Res.string.aether_command_title), style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
-            Text(preview, style = MaterialTheme.typography.bodySmall)
-            F(rawCommand, Res.string.aether_command_hint, minLines = 2)
-            OutlinedButton(
-                onClick = { applyCommand() },
-                shape = RoundedCornerShape(18.dp),
-                modifier = Modifier.fillMaxWidth().padding(vertical = 2.dp),
-            ) { Text(stringResource(Res.string.aether_command_apply)) }
+            val isCustom = command.isNotBlank() && command.trim() != preview
+            F(command.ifBlank { preview }, Res.string.aether_command_hint, minLines = 2) { command = it }
+            if (isCustom) {
+                Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                    Text(
+                        "Custom command — runs as written.",
+                        style = MaterialTheme.typography.bodySmall,
+                        modifier = Modifier.weight(1f),
+                    )
+                    OutlinedButton(onClick = { command = "" }) { Text("Use settings") }
+                }
+            }
+
+            val problem = AetherCommands.problemOf(
+                AetherProfile(
+                    protocol = protocol, tor = tor, psiphon = psiphon,
+                    torBridges = torBridges, torBridgeLines = torBridgeLines,
+                ),
+            )
+            problem?.let {
+                Text(
+                    when (it) {
+                        AetherCommands.Problem.CARRIER_NEEDS_MASQUE ->
+                            "A reverse Tor/Psiphon carrier needs a MASQUE-based protocol."
+                        AetherCommands.Problem.TOR_PSIPHON_CONFLICT ->
+                            "Tor and Psiphon together must be nested — one inside the tunnel, the other around it."
+                        AetherCommands.Problem.TOR_BRIDGES_MISSING ->
+                            "Own Tor bridges are chosen, but no bridge lines are given."
+                    },
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.error,
+                )
+            }
 
             Button(
+                enabled = endpointProblem == null && problem == null,
                 onClick = {
                     onSave(
                         AetherProfile(
@@ -441,6 +449,14 @@ fun AetherSheet(
                             finalMask = finalMask.trim(),
                             dialMode = dialMode.trim(),
                             extraArgs = extraArgs.trim(),
+                            // Fields this sheet does not edit must survive an
+                            // edit: Save used to reset psiphonBundledList to
+                            // true and wipe the cross-chain upstream.
+                            psiphonBundledList = initial?.psiphonBundledList ?: true,
+                            upstream = initial?.upstream.orEmpty(),
+                            // Stored only when it differs from the generated
+                            // command, so it can never drift stale.
+                            command = if (isCustom) command.trim() else "",
                         ),
                     )
                 },
@@ -459,7 +475,7 @@ private fun F(
     minLines: Int = 1,
     numeric: Boolean = false,
     modifier: Modifier = Modifier.fillMaxWidth(),
-    onChange: (String) -> Unit = {},
+    onChange: (String) -> Unit,
 ) {
     OutlinedTextField(
         value = value,

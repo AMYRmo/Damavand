@@ -245,9 +245,10 @@ object Ikev2Controller {
         val state = currentState(context) ?: return isActive
         val up = state == VpnProfileState.STATE_CONNECTED || state == VpnProfileState.STATE_CONNECTING
         if (up && activeRemark == null) {
-            activeRemark = context.getString(R.string.ikev2_adopted_session)
-            if (state == VpnProfileState.STATE_CONNECTED) VpnManager.onConnected(activeRemark).also { startMetrics() }
-            else VpnManager.onStarting(activeRemark!!)
+            val adopted = context.getString(R.string.ikev2_adopted_session)
+            activeRemark = adopted
+            if (state == VpnProfileState.STATE_CONNECTED) VpnManager.onConnected(adopted).also { startMetrics() }
+            else VpnManager.onStarting(adopted)
         } else if (!up && activeRemark != null) {
             activeRemark = null
             VpnManager.onDisconnected()

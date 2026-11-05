@@ -313,14 +313,26 @@ data class AetherRange(val min: Int, val max: Int) {
     }
 }
 
-/** An `ip:port` endpoint, IPv4 or bracketed IPv6, canonicalized the way PattNG does. */
+/**
+ * A `host:port` endpoint. The host is opaque text — a hostname
+ * (engage.cloudflareclient.com), an IPv4 literal, or an IPv6 literal —
+ * because that is how WARP endpoints are actually written and how the core
+ * accepts them; semantics follow Narcic Gateway's endpointOf/parseEndpoint.
+ *
+ * The previous version canonicalized the host through strict IPv4/IPv6
+ * grammars and silently discarded every hostname endpoint: the profile then
+ * scanned (with --quick-reconnect) instead of dialing what the user typed,
+ * with no error anywhere. It also stored the IPv6 host WITH brackets, so
+ * toString() bracketed it a second time ([[2001:db8::1]]:443). Brackets are
+ * now stripped on input, never stored, and added back exactly once.
+ */
 data class AetherEndpoint(val host: String, val port: Int) {
     override fun toString(): String = if (':' in host) "[$host]:$port" else "$host:$port"
 
     companion object {
         fun of(host: String?, port: String?): AetherEndpoint? {
-            val address = host?.trim()?.removeSurrounding("[", "]")?.let(::canonicalAddress) ?: return null
-            val number = port?.trim()?.let(::decimal)?.takeIf { it in 1..65535 } ?: return null
+            val address = host?.trim()?.removeSurrounding("[", "]")?.takeIf { it.isNotEmpty() } ?: return null
+            val number = port?.trim()?.toIntOrNull()?.takeIf { it in 1..65535 } ?: return null
             return AetherEndpoint(address, number)
         }
 
@@ -331,59 +343,6 @@ data class AetherEndpoint(val host: String, val port: Int) {
             val host = text.substring(0, separator)
             if (':' in host && !(host.startsWith('[') && host.endsWith(']'))) return null
             return of(host, text.substring(separator + 1))
-        }
-
-        private fun canonicalAddress(address: String): String? =
-            if (':' in address) {
-                ipv6Groups(address)?.let { groups ->
-                    groups.joinToString(":", prefix = "[", postfix = "]") { "%x".format(it) }
-                }
-            } else {
-                ipv4Octets(address)?.joinToString(".")
-            }
-
-        private fun decimal(text: String): Int? {
-            if (text.isEmpty() || text.length > 5) return null
-            return text.fold(0) { value, ch -> value * 10 + (ch.digitToIntOrNull() ?: return null) }
-        }
-
-        private fun ipv4Octets(address: String): List<Int>? {
-            val parts = address.split('.')
-            if (parts.size != 4) return null
-            return parts.map { part ->
-                if (part.length !in 1..3 || (part.length > 1 && part.first().digitToIntOrNull() == 0)) return null
-                decimal(part)?.takeIf { it <= 255 } ?: return null
-            }
-        }
-
-        private fun ipv6Groups(address: String): List<Int>? {
-            val halves = address.split("::")
-            if (halves.size > 2) return null
-            val compressed = halves.size == 2
-            val head = hexGroups(halves[0], allowIpv4 = !compressed) ?: return null
-            val tail = if (compressed) hexGroups(halves[1], allowIpv4 = true) ?: return null else emptyList()
-            val missing = 8 - head.size - tail.size
-            if (if (compressed) missing < 1 else missing != 0) return null
-            return head + List(missing) { 0 } + tail
-        }
-
-        private fun hexGroups(section: String, allowIpv4: Boolean): List<Int>? {
-            if (section.isEmpty()) return emptyList()
-            val pieces = section.split(':')
-            val out = mutableListOf<Int>()
-            pieces.forEachIndexed { index, piece ->
-                if (piece.isEmpty()) return null
-                if (piece.contains('.')) {
-                    if (!allowIpv4 || index != pieces.lastIndex) return null
-                    val v4 = ipv4Octets(piece) ?: return null
-                    out.add((v4[0] shl 8) or v4[1])
-                    out.add((v4[2] shl 8) or v4[3])
-                } else {
-                    if (piece.length > 4) return null
-                    out.add(piece.toIntOrNull(16) ?: return null)
-                }
-            }
-            return out
         }
     }
 }

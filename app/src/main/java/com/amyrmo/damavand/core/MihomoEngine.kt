@@ -110,8 +110,26 @@ class MihomoEngine(
                 "    url: https://www.gstatic.com/generate_204\n" +
                 "    interval: 300\n"
         } else ""
+        // Cross-chain carrier: when set, every rule chains through the local
+        // SOCKS upstream instead of dialling the network directly.
+        val upstream = config.upstreamSocks.takeIf { it in 1024..65535 }
+        val carrierSection = if (upstream != null) {
+            "\nproxies:\n" +
+                "  - name: carrier\n" +
+                "    type: socks5\n" +
+                "    server: 127.0.0.1\n" +
+                "    port: $upstream\n" +
+                "    udp: true\n" +
+                "\nproxy-groups:\n" +
+                "  - name: CHAIN\n" +
+                "    type: select\n" +
+                "    proxies:\n" +
+                "      - carrier\n"
+        } else ""
+        val exitGroup = if (upstream != null) "CHAIN" else groupName
         return doc +
             providerSection +
+            carrierSection +
             "\nmixed-port: $mixedPort" +
             "\nallow-lan: false" +
             "\nbind-address: 127.0.0.1" +
@@ -123,9 +141,10 @@ class MihomoEngine(
             "\ntcp-concurrent: true" +
             "\n" +
             "\nrules:" +
+            (if (upstream != null) "\n  - MATCH,$exitGroup" else "") +
             "\n  - GEOIP,IR,DIRECT" +
             "\n  - GEOIP,private,DIRECT" +
-            "\n  - MATCH,$groupName" +
+            (if (upstream == null) "\n  - MATCH,$exitGroup" else "") +
             "\n"
     }
 
