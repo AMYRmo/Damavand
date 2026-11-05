@@ -43,6 +43,9 @@ class MihomoEngine(
             val proc = ProcessBuilder(cmd)
                 .directory(workDir)
                 .redirectErrorStream(true)
+                // Soft heap cap for the Go runtime: GC works harder near
+                // 128 MiB instead of letting RSS grow unbounded.
+                .apply { environment()["GOMEMLIMIT"] = "128MiB" }
                 .start()
             process = proc
             onLog("mihomo core started (mixed=127.0.0.1:$mixedPort)")

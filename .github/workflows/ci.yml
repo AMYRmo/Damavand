@@ -63,3 +63,19 @@ jobs:
         run: |
           gh release view v141-plus-debug >/dev/null 2>&1 || gh release create v141-plus-debug --prerelease --title "Damavand v141-plus (debug)" --notes "Debug build of Damavand v1.4.1 + ZedSecure features (branch v141-plus). Install app-arm64-v8a-debug.apk on arm64 phones."
           gh release upload v141-plus-debug app/build/outputs/apk/debug/*.apk --clobber
+
+      # Optimized build: R8-minified release (unsigned in Gradle — no
+      # keystore.properties on this branch), signed here with a throwaway CI
+      # key purely so it can be installed for testing. Package is
+      # com.amyrmo.damavand (no .debug suffix): it does not update the
+      # installed v1 (different key) or the .debug builds (other package).
+      - name: Build and publish the optimized release APK (arm64)
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          ./gradlew :app:assembleRelease --no-daemon -x lint
+          BT=$(ls -d "$ANDROID_HOME"/build-tools/* | sort -V | tail -1)
+          keytool -genkeypair -keystore /tmp/ci-release.jks -alias ci -keyalg RSA -keysize 2048 -validity 3650 -storepass android -keypass android -dname "CN=Damavand CI"
+          "$BT/zipalign" -f -p 4 app/build/outputs/apk/release/app-arm64-v8a-release-unsigned.apk /tmp/arm64-aligned.apk
+          "$BT/apksigner" sign --ks /tmp/ci-release.jks --ks-pass pass:android --key-pass pass:android --out app-arm64-v8a-release.apk /tmp/arm64-aligned.apk
+          gh release upload v141-plus-debug app-arm64-v8a-release.apk --clobber

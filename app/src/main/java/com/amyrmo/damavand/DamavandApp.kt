@@ -28,6 +28,12 @@ class DamavandApp : Application(), SingletonImageLoader.Factory {
     override fun onCreate() {
         super.onCreate()
 
+        // Cap the Go cores' heap growth (Xray / sing-box / Psiphon all run
+        // in-process via gomobile): without a limit the Go GC lets the heap
+        // balloon well past working-set size. Must be set before the first
+        // core class loads (warmUp below), while the runtime still reads env.
+        runCatching { android.system.Os.setenv("GOMEMLIMIT", "192MiB", true) }
+
         container = AppContainer(this)
 
         XrayController.warmUp(this)
