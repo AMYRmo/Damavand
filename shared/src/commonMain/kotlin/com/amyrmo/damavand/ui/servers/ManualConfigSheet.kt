@@ -249,6 +249,15 @@ fun ManualConfigSheet(
                         onSelect = { alpn = it },
                     )
                 }
+                Protocol.MASQUE -> {
+                    Field(username, { username = it }, Res.string.manual_username)
+                    Field(userId, { userId = it }, Res.string.manual_password)
+                    Field(secretKey, { secretKey = it }, Res.string.manual_private_key)
+                    Field(peerPublicKey, { peerPublicKey = it }, Res.string.manual_peer_public_key)
+                    Field(localAddress, { localAddress = it }, Res.string.manual_local_address)
+                    Field(wgDns, { wgDns = it }, Res.string.manual_wg_dns)
+                    Field(pinnedCert, { pinnedCert = it }, Res.string.manual_pinned_cert)
+                }
                 Protocol.WIREGUARD, Protocol.AMNEZIAWG -> {
                     Field(secretKey, { secretKey = it }, Res.string.manual_private_key)
                     Field(peerPublicKey, { peerPublicKey = it }, Res.string.manual_peer_public_key)
@@ -481,7 +490,7 @@ fun ManualConfigSheet(
                     Protocol.SOCKS, Protocol.HTTP -> true
                     Protocol.WIREGUARD, Protocol.AMNEZIAWG ->
                         secretKey.isNotBlank() && peerPublicKey.isNotBlank()
-                    Protocol.HYSTERIA -> secretKey.isNotBlank()
+                    Protocol.HYSTERIA, Protocol.MASQUE -> secretKey.isNotBlank()
                     else -> userId.isNotBlank()
                 },
                 shape = RoundedCornerShape(18.dp),
