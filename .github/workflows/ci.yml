@@ -53,16 +53,17 @@ jobs:
       # Deliver the APK as a release asset instead; release assets do not
       # count against the Actions artifact quota.
       #
-      # Release policy (Amir, 2026-11-06): exactly ONE asset per release —
-      # the arm64 release build, named Damavand-<version>-arm64-v8a.apk.
-      # No debug APKs are published, and no "debug" appears in file names.
+      # Release policy (Amir, 2026-11-06): release builds only, named
+      # Damavand-<version>-<abi>.apk for arm64-v8a, armeabi-v7a and
+      # universal. No debug APKs are published, and no "debug" appears in
+      # file names.
       #
       # Optimized build: R8-minified release (unsigned in Gradle — no
       # keystore.properties on this branch), signed here with a throwaway CI
       # key purely so it can be installed for testing. Package is
       # com.amyrmo.damavand (no .debug suffix): it does not update the
       # installed v1 (different key).
-      - name: Build and publish the release APK (arm64)
+      - name: Build and publish the release APKs (arm64, armv7, universal)
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
@@ -70,7 +71,9 @@ jobs:
           VER=$(grep '^damavand.versionName=' gradle.properties | cut -d= -f2)
           BT=$(ls -d "$ANDROID_HOME"/build-tools/* | sort -V | tail -1)
           keytool -genkeypair -keystore /tmp/ci-release.jks -alias ci -keyalg RSA -keysize 2048 -validity 3650 -storepass android -keypass android -dname "CN=Damavand CI"
-          "$BT/zipalign" -f -p 4 app/build/outputs/apk/release/app-arm64-v8a-release-unsigned.apk /tmp/arm64-aligned.apk
-          "$BT/apksigner" sign --ks /tmp/ci-release.jks --ks-pass pass:android --key-pass pass:android --out "Damavand-$VER-arm64-v8a.apk" /tmp/arm64-aligned.apk
-          gh release view "v$VER" >/dev/null 2>&1 || gh release create "v$VER" --title "Damavand $VER" --notes "Damavand $VER — install Damavand-$VER-arm64-v8a.apk on arm64 phones."
-          gh release upload "v$VER" "Damavand-$VER-arm64-v8a.apk" --clobber
+          gh release view "v$VER" >/dev/null 2>&1 || gh release create "v$VER" --title "Damavand $VER" --notes "Damavand $VER — arm64-v8a for most phones, armeabi-v7a for older 32-bit phones, universal for any device."
+          for ABI in arm64-v8a armeabi-v7a universal; do
+            "$BT/zipalign" -f -p 4 "app/build/outputs/apk/release/app-$ABI-release-unsigned.apk" "/tmp/$ABI-aligned.apk"
+            "$BT/apksigner" sign --ks /tmp/ci-release.jks --ks-pass pass:android --key-pass pass:android --out "Damavand-$VER-$ABI.apk" "/tmp/$ABI-aligned.apk"
+            gh release upload "v$VER" "Damavand-$VER-$ABI.apk" --clobber
+          done
