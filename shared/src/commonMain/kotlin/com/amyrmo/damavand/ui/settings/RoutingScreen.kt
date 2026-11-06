@@ -415,7 +415,7 @@ fun RoutingScreen(
 
 private const val RULES_HEADER_ITEMS = 2
 
-private fun RulesetItem.sameMatcher(other: RulesetItem): Boolean =
+internal fun RulesetItem.sameMatcher(other: RulesetItem): Boolean =
     outboundTag == other.outboundTag &&
         domain == other.domain &&
         ip == other.ip &&
