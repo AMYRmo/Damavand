@@ -222,7 +222,19 @@ class StartPlanner(context: Context) {
             // The BPB worker is TCP-only: block UDP in-config like BPB does,
             // so QUIC/app UDP fails fast and falls back to TCP instead of
             // killing the WebSocket (2026-11-06 on-device fix).
-            val options = settings.buildOptions(geoReady, carrier).copy(blockUdp = true)
+            // BPB parity #2 (2026-11-06): with the original BPB app the same
+            // deployment serves YouTube/GitHub/Play on this phone, but our
+            // build did not — the remaining config deltas were DNS and the
+            // routing domain strategy. BPB's worker mode uses Google DoH by
+            // IP (https://8.8.8.8/dns-query — no hostname for the worker to
+            // resolve, and not a Cloudflare IP, which Workers refuse direct
+            // TCP to) and IPIfNonMatch; Damavand's defaults are the
+            // cloudflare-dns.com hostname DoH and AsIs. Match BPB for bpb.
+            val options = settings.buildOptions(geoReady, carrier).copy(
+                blockUdp = true,
+                remoteDns = "https://8.8.8.8/dns-query",
+                domainStrategy = "IPIfNonMatch",
+            )
             return XrayJsonBuilder.build(server, options = options)
         }
         if (profile.isAutoSelect) {
