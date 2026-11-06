@@ -884,12 +884,17 @@ class DamavandVpnService : VpnService() {
         DamavandWidgetProvider.refresh(this, force = true)
     }
 
+    /** The live notification's accent follows the app's current theme. */
+    private fun notifAccent(): Int =
+        VpnNotifications.themeAccent(this, SettingsRepository(this).settings.value)
+
     private fun connectingNotification(): android.app.Notification =
         notifications.build(
             server = remark,
             phase = VpnNotifications.Phase.Connecting(stage),
             protocolLabel = protocolLabel(),
             livePromotion = livePromotion,
+            accent = notifAccent(),
         )
 
     private fun protocolLabel(): String = when (kind) {
@@ -1040,6 +1045,7 @@ class DamavandVpnService : VpnService() {
         showSpeed = showSpeed,
         livePromotion = livePromotion,
         chip = notifChip,
+        accent = notifAccent(),
     )
 
     private var lastUidRx = -1L

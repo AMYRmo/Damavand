@@ -5,9 +5,16 @@ import android.app.NotificationManager
 import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
+import android.content.res.Configuration
 import android.os.Build
+import androidx.compose.ui.graphics.toArgb
 import androidx.core.app.NotificationCompat
+import androidx.core.graphics.ColorUtils
+import com.amyrmo.damavand.domain.model.AppDesign
+import com.amyrmo.damavand.domain.model.AppSettings
 import com.amyrmo.damavand.domain.model.NotifChip
+import com.amyrmo.damavand.ui.bento.BentoPalettes
+import com.amyrmo.damavand.ui.theme.accentSeed
 import androidx.core.graphics.drawable.IconCompat
 import com.amyrmo.damavand.R
 import com.amyrmo.damavand.ui.format.formatBytes
@@ -51,12 +58,13 @@ class VpnNotifications(private val ctx: Context) {
         showSpeed: Boolean = true,
         livePromotion: Boolean = true,
         chip: NotifChip = NotifChip.Speed,
+        accent: Int = BRAND,
     ): android.app.Notification {
         val title = BidiText.auto(server.ifBlank { ctx.getString(R.string.app_name) })
         val b = NotificationCompat.Builder(ctx, CHANNEL_ID)
             .setSmallIcon(R.drawable.ic_tile_damavand)
             .setContentTitle(title)
-            .setColor(BRAND)
+            .setColor(accent)
             .setOngoing(true)
             .setSilent(true)
             .setCategory(NotificationCompat.CATEGORY_SERVICE)
@@ -67,7 +75,7 @@ class VpnNotifications(private val ctx: Context) {
             .setRequestPromotedOngoing(livePromotion)
 
         return when (phase) {
-            is Phase.Connecting -> b.applyConnecting(phase.stage, protocolLabel).build()
+            is Phase.Connecting -> b.applyConnecting(phase.stage, protocolLabel, accent).build()
             Phase.Connected -> b.applyConnected(
                 protocolLabel, downBps, upBps, totalDown, totalUp, connectedAt, showSpeed, chip,
                 title,
@@ -79,6 +87,7 @@ class VpnNotifications(private val ctx: Context) {
     private fun NotificationCompat.Builder.applyConnecting(
         stage: Stage,
         protocolLabel: String,
+        accent: Int,
     ): NotificationCompat.Builder {
         val step = stage.ordinal.coerceIn(0, STAGE_COUNT)
         val progress = step * SEGMENT_LEN
@@ -86,7 +95,9 @@ class VpnNotifications(private val ctx: Context) {
 
         val style = NotificationCompat.ProgressStyle()
             .setProgressSegments(
-                SEGMENT_COLORS.map { NotificationCompat.ProgressStyle.Segment(SEGMENT_LEN).setColor(it) },
+                segmentShades(accent).map {
+                    NotificationCompat.ProgressStyle.Segment(SEGMENT_LEN).setColor(it)
+                },
             )
             .setProgressPoints(
                 (1 until STAGE_COUNT).map { i ->
@@ -245,11 +256,37 @@ class VpnNotifications(private val ctx: Context) {
         private const val BRAND = 0xFFE11D2E.toInt()
         private const val ERROR_COLOR = 0xFFB3261E.toInt()
         private const val POINT_COLOR = 0xFFFFFFFF.toInt()
-        private val SEGMENT_COLORS = listOf(
-            0xFF7A1010.toInt(),
-            0xFFB71C1C.toInt(),
-            0xFFE11D2E.toInt(),
-            0xFFFF5252.toInt(),
+
+        /** Four progress-segment shades derived from the accent, dark → light. */
+        fun segmentShades(accent: Int): List<Int> = listOf(
+            ColorUtils.blendARGB(accent, 0xFF000000.toInt(), 0.45f),
+            ColorUtils.blendARGB(accent, 0xFF000000.toInt(), 0.22f),
+            accent,
+            ColorUtils.blendARGB(accent, 0xFFFFFFFF.toInt(), 0.30f),
         )
+
+        /**
+         * The notification accent follows the app's own theme, resolved the
+         * same way the UI resolves it: the system dynamic color when the user
+         * enabled it, the Bento palette's action color ("lime" slot) under
+         * the Bento design, otherwise the chosen accent preset's seed.
+         * Falls back to the Damavand brand red.
+         */
+        fun themeAccent(ctx: Context, settings: AppSettings): Int {
+            if (settings.dynamicColor && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                return runCatching { ctx.getColor(android.R.color.system_accent1_500) }
+                    .getOrDefault(BRAND)
+            }
+            val seed = accentSeed(settings.accentColor)
+            return if (settings.appDesign == AppDesign.Bento) {
+                val night = (ctx.resources.configuration.uiMode and
+                    Configuration.UI_MODE_NIGHT_MASK) == Configuration.UI_MODE_NIGHT_YES
+                BentoPalettes.of(
+                    settings.bento.palette, night, seed, settings.amoledBlack,
+                ).lime.toArgb()
+            } else {
+                seed.toArgb()
+            }
+        }
     }
 }
