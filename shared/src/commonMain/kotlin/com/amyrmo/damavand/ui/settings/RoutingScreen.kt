@@ -67,6 +67,28 @@ import org.jetbrains.compose.resources.stringResource
 import sh.calvin.reorderable.ReorderableItem
 import sh.calvin.reorderable.rememberReorderableLazyListState
 
+/**
+ * Builds a settings update that applies [transform] to the effective
+ * rulesets of [current] and stores the result in the migrated form (legacy
+ * custom-rule fields cleared). Shared by the routing page and the BPB tab so
+ * both write rulesets identically.
+ */
+internal fun rulesetUpdate(
+    current: AppSettings,
+    transform: (List<RulesetItem>) -> List<RulesetItem>,
+): (AppSettings) -> AppSettings {
+    val next = transform(RoutingMigration.effectiveRulesets(current))
+    return {
+        it.copy(
+            rulesets = next,
+            routingMigrated = true,
+            customProxyRules = "",
+            customDirectRules = "",
+            customBlockRules = "",
+        )
+    }
+}
+
 @Composable
 fun RoutingScreen(
     settings: AppSettings,
@@ -89,16 +111,7 @@ fun RoutingScreen(
     }
 
     fun mutate(transform: (List<RulesetItem>) -> List<RulesetItem>) {
-        val next = transform(RoutingMigration.effectiveRulesets(settings))
-        onUpdate {
-            it.copy(
-                rulesets = next,
-                routingMigrated = true,
-                customProxyRules = "",
-                customDirectRules = "",
-                customBlockRules = "",
-            )
-        }
+        onUpdate(rulesetUpdate(settings, transform))
     }
 
     fun replaceAll(incoming: List<RulesetItem>) {

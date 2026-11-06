@@ -1,9 +1,11 @@
 package com.amyrmo.damavand.ui.navigation
 
 import com.amyrmo.damavand.shared.resources.Res
+import com.amyrmo.damavand.shared.resources.ic_bolt
 import com.amyrmo.damavand.shared.resources.ic_dns
 import com.amyrmo.damavand.shared.resources.ic_home
 import com.amyrmo.damavand.shared.resources.ic_settings
+import com.amyrmo.damavand.shared.resources.nav_bpb
 import com.amyrmo.damavand.shared.resources.nav_home
 import com.amyrmo.damavand.shared.resources.nav_servers
 import com.amyrmo.damavand.shared.resources.nav_settings
@@ -16,5 +18,6 @@ enum class TopDestination(
 ) {
     Home(Res.string.nav_home, Res.drawable.ic_home),
     Servers(Res.string.nav_servers, Res.drawable.ic_dns),
+    Bpb(Res.string.nav_bpb, Res.drawable.ic_bolt),
     Settings(Res.string.nav_settings, Res.drawable.ic_settings),
 }

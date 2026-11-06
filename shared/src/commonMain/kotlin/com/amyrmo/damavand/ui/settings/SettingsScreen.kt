@@ -1679,30 +1679,11 @@ private fun CorePage(
                 selected = s.outboundDomainResolve,
                 onSelected = { v -> onUpdate { it.copy(outboundDomainResolve = v) } },
             )
-            SettingsSwitchRow(
-                title = stringResource(Res.string.browser_dialer_title),
-                summary = stringResource(Res.string.browser_dialer_hint),
-                checked = s.browserDialer,
-                onCheckedChange = { v -> onUpdate { it.copy(browserDialer = v) } },
-            )
+            BrowserDialerRow(s, onUpdate)
         }
 
         SettingsGroup {
-            SettingsSwitchRow(
-                title = stringResource(Res.string.title_pref_enable_local_proxy),
-                summary = stringResource(Res.string.summary_pref_enable_local_proxy),
-                checked = s.enableLocalProxy,
-
-                enabled = !s.localProxyForced,
-                onCheckedChange = { v ->
-                    onUpdate {
-                        it.copy(
-                            enableLocalProxy = v,
-                            appendHttpProxy = if (!v) false else it.appendHttpProxy,
-                        )
-                    }
-                },
-            )
+            LocalProxyEnableRow(s, onUpdate)
 
             val portPlatform = LocalPlatform.current
             val badProxyPort = stringResource(Res.string.toast_local_proxy_port_invalid)
@@ -1722,90 +1703,7 @@ private fun CorePage(
                 },
             )
 
-            SettingsSwitchRow(
-                title = stringResource(Res.string.title_pref_proxy_sharing_enabled),
-                summary = stringResource(Res.string.summary_pref_proxy_sharing_enabled),
-                checked = s.proxySharing,
-                enabled = localProxy,
-                onCheckedChange = { v ->
-                    onUpdate {
-                        if (v && (it.socksUsername.isBlank() || it.socksPassword.isBlank())) {
-                            it.copy(
-                                proxySharing = true,
-                                socksUsername = it.socksUsername.ifBlank { LAN_DEFAULT_USER },
-                                socksPassword = it.socksPassword.ifBlank { secureRandomToken(LAN_PASSWORD_LENGTH) },
-                            )
-                        } else {
-                            it.copy(proxySharing = v)
-                        }
-                    }
-                },
-            )
-            if (s.proxySharing) LanShareAddressRow(s)
-            val platform = LocalPlatform.current
-            val invalidPort = stringResource(Res.string.toast_lan_port_invalid)
-            val credentialRequired = stringResource(Res.string.toast_lan_credential_required)
-            val sharing = localProxy && s.proxySharing
-            SettingsEditRow(
-                title = stringResource(Res.string.title_pref_lan_port),
-                value = s.effectiveLanSocksPort.toString(),
-                enabled = sharing,
-                numeric = true,
-                onValueChanged = { v ->
-                    val port = v.trim().toIntOrNull()
-
-                    if (port != null && LocalPorts.lanSocksPort(port) == port) {
-                        onUpdate { it.copy(socksPort = port) }
-                    } else {
-                        platform.toast(invalidPort)
-                    }
-                },
-            )
-            SettingsSwitchRow(
-                title = stringResource(Res.string.title_pref_lan_auth),
-                summary = stringResource(Res.string.summary_pref_lan_auth),
-                checked = s.lanShareAuth,
-                enabled = sharing,
-                onCheckedChange = { v ->
-                    onUpdate {
-                        if (v && (it.socksUsername.isBlank() || it.socksPassword.isBlank())) {
-                            it.copy(
-                                lanShareAuth = true,
-                                socksUsername = it.socksUsername.ifBlank { LAN_DEFAULT_USER },
-                                socksPassword = it.socksPassword.ifBlank { secureRandomToken(LAN_PASSWORD_LENGTH) },
-                            )
-                        } else {
-                            it.copy(lanShareAuth = v)
-                        }
-                    }
-                },
-            )
-            SettingsEditRow(
-                title = stringResource(Res.string.title_pref_lan_username),
-                value = s.socksUsername,
-                enabled = sharing && s.lanShareAuth,
-                onValueChanged = { v ->
-                    if (v.isBlank()) platform.toast(credentialRequired)
-                    else onUpdate { it.copy(socksUsername = v.trim()) }
-                },
-            )
-            SettingsEditRow(
-                title = stringResource(Res.string.title_pref_lan_password),
-                value = s.socksPassword,
-                enabled = sharing && s.lanShareAuth,
-                isPassword = true,
-                onValueChanged = { v ->
-                    if (v.isBlank()) platform.toast(credentialRequired)
-                    else onUpdate { it.copy(socksPassword = v) }
-                },
-            )
-            SettingsSwitchRow(
-                title = stringResource(Res.string.title_pref_socks_enable_udp),
-                summary = stringResource(Res.string.summary_pref_socks_enable_udp),
-                checked = s.socksEnableUdp,
-                enabled = sharing,
-                onCheckedChange = { v -> onUpdate { it.copy(socksEnableUdp = v) } },
-            )
+            LanSharingRows(s, onUpdate)
         }
 
         SettingsGroup {
@@ -1828,6 +1726,145 @@ private fun CorePage(
             )
         }
     }
+}
+
+/**
+ * Browser Dialer switch (BPB port, cluster 5). Shared by the Core page and
+ * the BPB tab — both edit the same setting.
+ */
+@Composable
+fun BrowserDialerRow(
+    s: AppSettings,
+    onUpdate: ((AppSettings) -> AppSettings) -> Unit,
+) {
+    SettingsSwitchRow(
+        title = stringResource(Res.string.browser_dialer_title),
+        summary = stringResource(Res.string.browser_dialer_hint),
+        checked = s.browserDialer,
+        onCheckedChange = { v -> onUpdate { it.copy(browserDialer = v) } },
+    )
+}
+
+/**
+ * Local-proxy master switch. Shared by the Core page and the BPB tab — both
+ * edit the same setting.
+ */
+@Composable
+fun LocalProxyEnableRow(
+    s: AppSettings,
+    onUpdate: ((AppSettings) -> AppSettings) -> Unit,
+) {
+    SettingsSwitchRow(
+        title = stringResource(Res.string.title_pref_enable_local_proxy),
+        summary = stringResource(Res.string.summary_pref_enable_local_proxy),
+        checked = s.enableLocalProxy,
+        enabled = !s.localProxyForced,
+        onCheckedChange = { v ->
+            onUpdate {
+                it.copy(
+                    enableLocalProxy = v,
+                    appendHttpProxy = if (!v) false else it.appendHttpProxy,
+                )
+            }
+        },
+    )
+}
+
+/**
+ * LAN proxy sharing rows (BPB port, cluster 5): share switch, share address,
+ * LAN port, auth switch and credentials. Shared by the Core page and the BPB
+ * tab — both edit the same settings.
+ */
+@Composable
+fun LanSharingRows(
+    s: AppSettings,
+    onUpdate: ((AppSettings) -> AppSettings) -> Unit,
+) {
+    val localProxy = s.effectiveLocalProxy
+    SettingsSwitchRow(
+        title = stringResource(Res.string.title_pref_proxy_sharing_enabled),
+        summary = stringResource(Res.string.summary_pref_proxy_sharing_enabled),
+        checked = s.proxySharing,
+        enabled = localProxy,
+        onCheckedChange = { v ->
+            onUpdate {
+                if (v && (it.socksUsername.isBlank() || it.socksPassword.isBlank())) {
+                    it.copy(
+                        proxySharing = true,
+                        socksUsername = it.socksUsername.ifBlank { LAN_DEFAULT_USER },
+                        socksPassword = it.socksPassword.ifBlank { secureRandomToken(LAN_PASSWORD_LENGTH) },
+                    )
+                } else {
+                    it.copy(proxySharing = v)
+                }
+            }
+        },
+    )
+    if (s.proxySharing) LanShareAddressRow(s)
+    val platform = LocalPlatform.current
+    val invalidPort = stringResource(Res.string.toast_lan_port_invalid)
+    val credentialRequired = stringResource(Res.string.toast_lan_credential_required)
+    val sharing = localProxy && s.proxySharing
+    SettingsEditRow(
+        title = stringResource(Res.string.title_pref_lan_port),
+        value = s.effectiveLanSocksPort.toString(),
+        enabled = sharing,
+        numeric = true,
+        onValueChanged = { v ->
+            val port = v.trim().toIntOrNull()
+
+            if (port != null && LocalPorts.lanSocksPort(port) == port) {
+                onUpdate { it.copy(socksPort = port) }
+            } else {
+                platform.toast(invalidPort)
+            }
+        },
+    )
+    SettingsSwitchRow(
+        title = stringResource(Res.string.title_pref_lan_auth),
+        summary = stringResource(Res.string.summary_pref_lan_auth),
+        checked = s.lanShareAuth,
+        enabled = sharing,
+        onCheckedChange = { v ->
+            onUpdate {
+                if (v && (it.socksUsername.isBlank() || it.socksPassword.isBlank())) {
+                    it.copy(
+                        lanShareAuth = true,
+                        socksUsername = it.socksUsername.ifBlank { LAN_DEFAULT_USER },
+                        socksPassword = it.socksPassword.ifBlank { secureRandomToken(LAN_PASSWORD_LENGTH) },
+                    )
+                } else {
+                    it.copy(lanShareAuth = v)
+                }
+            }
+        },
+    )
+    SettingsEditRow(
+        title = stringResource(Res.string.title_pref_lan_username),
+        value = s.socksUsername,
+        enabled = sharing && s.lanShareAuth,
+        onValueChanged = { v ->
+            if (v.isBlank()) platform.toast(credentialRequired)
+            else onUpdate { it.copy(socksUsername = v.trim()) }
+        },
+    )
+    SettingsEditRow(
+        title = stringResource(Res.string.title_pref_lan_password),
+        value = s.socksPassword,
+        enabled = sharing && s.lanShareAuth,
+        isPassword = true,
+        onValueChanged = { v ->
+            if (v.isBlank()) platform.toast(credentialRequired)
+            else onUpdate { it.copy(socksPassword = v) }
+        },
+    )
+    SettingsSwitchRow(
+        title = stringResource(Res.string.title_pref_socks_enable_udp),
+        summary = stringResource(Res.string.summary_pref_socks_enable_udp),
+        checked = s.socksEnableUdp,
+        enabled = sharing,
+        onCheckedChange = { v -> onUpdate { it.copy(socksEnableUdp = v) } },
+    )
 }
 
 private const val LAN_DEFAULT_USER = "zed"
@@ -2111,166 +2148,202 @@ private fun FragmentPage(
             )
         }
 
-        SettingsGroup(stringResource(Res.string.mask_group)) {
-            SettingsSwitchRow(
-                title = stringResource(Res.string.mask_enable),
-                summary = stringResource(Res.string.mask_hint),
-                checked = s.maskEnabled,
-                onCheckedChange = { v -> onUpdate { it.copy(maskEnabled = v) } },
-            )
-            if (s.maskEnabled) {
-                s.maskFragments.forEachIndexed { index, fragment ->
-                    MaskFragmentEditor(
-                        fragment = fragment,
-                        onChange = { next ->
-                            onUpdate { st ->
-                                st.copy(maskFragments = st.maskFragments.toMutableList().also { it[index] = next })
-                            }
-                        },
-                        onRemove = {
-                            onUpdate { st ->
-                                st.copy(maskFragments = st.maskFragments.filterIndexed { i, _ -> i != index })
-                            }
-                        },
-                    )
-                }
-                SettingsMenuRow(
-                    stringResource(Res.string.mask_add_fragment),
-                    stringResource(Res.string.mask_fragments),
-                ) { onUpdate { st -> st.copy(maskFragments = st.maskFragments + MaskFragment()) } }
-                s.maskNoises.forEachIndexed { index, noise ->
-                    MaskNoiseEditor(
-                        noise = noise,
-                        onChange = { next ->
-                            onUpdate { st ->
-                                st.copy(maskNoises = st.maskNoises.toMutableList().also { it[index] = next })
-                            }
-                        },
-                        onRemove = {
-                            onUpdate { st ->
-                                st.copy(maskNoises = st.maskNoises.filterIndexed { i, _ -> i != index })
-                            }
-                        },
-                    )
-                }
-                SettingsMenuRow(
-                    stringResource(Res.string.mask_add_noise),
-                    stringResource(Res.string.mask_noises),
-                ) { onUpdate { st -> st.copy(maskNoises = st.maskNoises + UdpNoise()) } }
-                SettingsEditRow(
-                    title = stringResource(Res.string.mask_reset_min),
-                    value = s.maskNoiseResetMin.toString(),
-                    numeric = true,
-                    onValueChanged = { v ->
-                        v.toIntOrNull()?.takeIf { it >= 0 }?.let { n ->
-                            onUpdate { it.copy(maskNoiseResetMin = n) }
-                        }
-                    },
-                )
-                SettingsEditRow(
-                    title = stringResource(Res.string.mask_reset_max),
-                    value = s.maskNoiseResetMax.toString(),
-                    numeric = true,
-                    onValueChanged = { v ->
-                        v.toIntOrNull()?.takeIf { it >= 0 }?.let { n ->
-                            onUpdate { it.copy(maskNoiseResetMax = n) }
-                        }
-                    },
-                )
-            }
-        }
+        FinalMaskGroup(s, onUpdate)
 
-        SettingsGroup(stringResource(Res.string.mask_masque_group)) {
-            SettingsSwitchRow(
-                title = stringResource(Res.string.mask_masque_enable),
-                summary = stringResource(Res.string.mask_masque_hint),
-                checked = s.masqueMaskEnabled,
-                onCheckedChange = { v -> onUpdate { it.copy(masqueMaskEnabled = v) } },
-            )
-            SettingsEditRow(
-                title = stringResource(Res.string.mask_masque_sni),
-                value = s.masqueSni,
-                placeholder = "consumer-masque.cloudflareclient.com",
-                onValueChanged = { v -> onUpdate { it.copy(masqueSni = v) } },
-            )
-            if (s.masqueMaskEnabled) {
-                s.masqueMaskFragments.forEachIndexed { index, fragment ->
-                    MaskFragmentEditor(
-                        fragment = fragment,
-                        onChange = { next ->
-                            onUpdate { st ->
-                                st.copy(masqueMaskFragments = st.masqueMaskFragments.toMutableList().also { it[index] = next })
-                            }
-                        },
-                        onRemove = {
-                            onUpdate { st ->
-                                st.copy(masqueMaskFragments = st.masqueMaskFragments.filterIndexed { i, _ -> i != index })
-                            }
-                        },
-                    )
-                }
-                SettingsMenuRow(
-                    stringResource(Res.string.mask_add_fragment),
-                    stringResource(Res.string.mask_fragments_h2),
-                ) { onUpdate { st -> st.copy(masqueMaskFragments = st.masqueMaskFragments + MaskFragment()) } }
-                s.masqueMaskNoises.forEachIndexed { index, noise ->
-                    MaskNoiseEditor(
-                        noise = noise,
-                        onChange = { next ->
-                            onUpdate { st ->
-                                st.copy(masqueMaskNoises = st.masqueMaskNoises.toMutableList().also { it[index] = next })
-                            }
-                        },
-                        onRemove = {
-                            onUpdate { st ->
-                                st.copy(masqueMaskNoises = st.masqueMaskNoises.filterIndexed { i, _ -> i != index })
-                            }
-                        },
-                    )
-                }
-                SettingsMenuRow(
-                    stringResource(Res.string.mask_add_noise),
-                    stringResource(Res.string.mask_noises_h3),
-                ) { onUpdate { st -> st.copy(masqueMaskNoises = st.masqueMaskNoises + UdpNoise()) } }
-                SettingsEditRow(
-                    title = stringResource(Res.string.mask_reset_min),
-                    value = s.masqueMaskNoiseResetMin.toString(),
-                    numeric = true,
-                    onValueChanged = { v ->
-                        v.toIntOrNull()?.takeIf { it >= 0 }?.let { n ->
-                            onUpdate { it.copy(masqueMaskNoiseResetMin = n) }
-                        }
-                    },
-                )
-                SettingsEditRow(
-                    title = stringResource(Res.string.mask_reset_max),
-                    value = s.masqueMaskNoiseResetMax.toString(),
-                    numeric = true,
-                    onValueChanged = { v ->
-                        v.toIntOrNull()?.takeIf { it >= 0 }?.let { n ->
-                            onUpdate { it.copy(masqueMaskNoiseResetMax = n) }
-                        }
-                    },
-                )
-            }
-        }
+        MasqueMaskGroup(s, onUpdate)
 
         // BPB port, cluster 5: ECH config fetched over DNS at dial time.
-        SettingsGroup(stringResource(Res.string.ech_group)) {
-            SettingsSwitchRow(
-                title = stringResource(Res.string.ech_enabled),
-                summary = stringResource(Res.string.ech_hint),
-                checked = s.echEnabled,
-                onCheckedChange = { v -> onUpdate { it.copy(echEnabled = v) } },
+        EchGroup(s, onUpdate)
+    }
+}
+
+/**
+ * Finalmask authoring group (BPB port, cluster 1). Shared by the
+ * Fragment page and the BPB tab — both edit the same settings.
+ */
+@Composable
+fun FinalMaskGroup(
+    s: AppSettings,
+    onUpdate: ((AppSettings) -> AppSettings) -> Unit,
+) {
+    SettingsGroup(stringResource(Res.string.mask_group)) {
+        SettingsSwitchRow(
+            title = stringResource(Res.string.mask_enable),
+            summary = stringResource(Res.string.mask_hint),
+            checked = s.maskEnabled,
+            onCheckedChange = { v -> onUpdate { it.copy(maskEnabled = v) } },
+        )
+        if (s.maskEnabled) {
+            s.maskFragments.forEachIndexed { index, fragment ->
+                MaskFragmentEditor(
+                    fragment = fragment,
+                    onChange = { next ->
+                        onUpdate { st ->
+                            st.copy(maskFragments = st.maskFragments.toMutableList().also { it[index] = next })
+                        }
+                    },
+                    onRemove = {
+                        onUpdate { st ->
+                            st.copy(maskFragments = st.maskFragments.filterIndexed { i, _ -> i != index })
+                        }
+                    },
+                )
+            }
+            SettingsMenuRow(
+                stringResource(Res.string.mask_add_fragment),
+                stringResource(Res.string.mask_fragments),
+            ) { onUpdate { st -> st.copy(maskFragments = st.maskFragments + MaskFragment()) } }
+            s.maskNoises.forEachIndexed { index, noise ->
+                MaskNoiseEditor(
+                    noise = noise,
+                    onChange = { next ->
+                        onUpdate { st ->
+                            st.copy(maskNoises = st.maskNoises.toMutableList().also { it[index] = next })
+                        }
+                    },
+                    onRemove = {
+                        onUpdate { st ->
+                            st.copy(maskNoises = st.maskNoises.filterIndexed { i, _ -> i != index })
+                        }
+                    },
+                )
+            }
+            SettingsMenuRow(
+                stringResource(Res.string.mask_add_noise),
+                stringResource(Res.string.mask_noises),
+            ) { onUpdate { st -> st.copy(maskNoises = st.maskNoises + UdpNoise()) } }
+            SettingsEditRow(
+                title = stringResource(Res.string.mask_reset_min),
+                value = s.maskNoiseResetMin.toString(),
+                numeric = true,
+                onValueChanged = { v ->
+                    v.toIntOrNull()?.takeIf { it >= 0 }?.let { n ->
+                        onUpdate { it.copy(maskNoiseResetMin = n) }
+                    }
+                },
             )
             SettingsEditRow(
-                title = stringResource(Res.string.ech_dns),
-                value = s.echDns,
-                enabled = s.echEnabled,
-                placeholder = "8.8.8.8",
-                onValueChanged = { v -> onUpdate { it.copy(echDns = v) } },
+                title = stringResource(Res.string.mask_reset_max),
+                value = s.maskNoiseResetMax.toString(),
+                numeric = true,
+                onValueChanged = { v ->
+                    v.toIntOrNull()?.takeIf { it >= 0 }?.let { n ->
+                        onUpdate { it.copy(maskNoiseResetMax = n) }
+                    }
+                },
             )
         }
+    }
+}
+
+/**
+ * MASQUE finalmask variants group (BPB port, cluster 1). Shared by
+ * the Fragment page and the BPB tab — both edit the same settings.
+ */
+@Composable
+fun MasqueMaskGroup(
+    s: AppSettings,
+    onUpdate: ((AppSettings) -> AppSettings) -> Unit,
+) {
+    SettingsGroup(stringResource(Res.string.mask_masque_group)) {
+        SettingsSwitchRow(
+            title = stringResource(Res.string.mask_masque_enable),
+            summary = stringResource(Res.string.mask_masque_hint),
+            checked = s.masqueMaskEnabled,
+            onCheckedChange = { v -> onUpdate { it.copy(masqueMaskEnabled = v) } },
+        )
+        SettingsEditRow(
+            title = stringResource(Res.string.mask_masque_sni),
+            value = s.masqueSni,
+            placeholder = "consumer-masque.cloudflareclient.com",
+            onValueChanged = { v -> onUpdate { it.copy(masqueSni = v) } },
+        )
+        if (s.masqueMaskEnabled) {
+            s.masqueMaskFragments.forEachIndexed { index, fragment ->
+                MaskFragmentEditor(
+                    fragment = fragment,
+                    onChange = { next ->
+                        onUpdate { st ->
+                            st.copy(masqueMaskFragments = st.masqueMaskFragments.toMutableList().also { it[index] = next })
+                        }
+                    },
+                    onRemove = {
+                        onUpdate { st ->
+                            st.copy(masqueMaskFragments = st.masqueMaskFragments.filterIndexed { i, _ -> i != index })
+                        }
+                    },
+                )
+            }
+            SettingsMenuRow(
+                stringResource(Res.string.mask_add_fragment),
+                stringResource(Res.string.mask_fragments_h2),
+            ) { onUpdate { st -> st.copy(masqueMaskFragments = st.masqueMaskFragments + MaskFragment()) } }
+            s.masqueMaskNoises.forEachIndexed { index, noise ->
+                MaskNoiseEditor(
+                    noise = noise,
+                    onChange = { next ->
+                        onUpdate { st ->
+                            st.copy(masqueMaskNoises = st.masqueMaskNoises.toMutableList().also { it[index] = next })
+                        }
+                    },
+                    onRemove = {
+                        onUpdate { st ->
+                            st.copy(masqueMaskNoises = st.masqueMaskNoises.filterIndexed { i, _ -> i != index })
+                        }
+                    },
+                )
+            }
+            SettingsMenuRow(
+                stringResource(Res.string.mask_add_noise),
+                stringResource(Res.string.mask_noises_h3),
+            ) { onUpdate { st -> st.copy(masqueMaskNoises = st.masqueMaskNoises + UdpNoise()) } }
+            SettingsEditRow(
+                title = stringResource(Res.string.mask_reset_min),
+                value = s.masqueMaskNoiseResetMin.toString(),
+                numeric = true,
+                onValueChanged = { v ->
+                    v.toIntOrNull()?.takeIf { it >= 0 }?.let { n ->
+                        onUpdate { it.copy(masqueMaskNoiseResetMin = n) }
+                    }
+                },
+            )
+            SettingsEditRow(
+                title = stringResource(Res.string.mask_reset_max),
+                value = s.masqueMaskNoiseResetMax.toString(),
+                numeric = true,
+                onValueChanged = { v ->
+                    v.toIntOrNull()?.takeIf { it >= 0 }?.let { n ->
+                        onUpdate { it.copy(masqueMaskNoiseResetMax = n) }
+                    }
+                },
+            )
+        }
+    }
+}
+
+/**
+ * ECH-over-DNS group (BPB port, cluster 5). Shared by the Fragment
+ * page and the BPB tab — both edit the same settings.
+ */
+@Composable
+fun EchGroup(
+    s: AppSettings,
+    onUpdate: ((AppSettings) -> AppSettings) -> Unit,
+) {
+    SettingsGroup(stringResource(Res.string.ech_group)) {
+        SettingsSwitchRow(
+            title = stringResource(Res.string.ech_enabled),
+            summary = stringResource(Res.string.ech_hint),
+            checked = s.echEnabled,
+            onCheckedChange = { v -> onUpdate { it.copy(echEnabled = v) } },
+        )
+        SettingsEditRow(
+            title = stringResource(Res.string.ech_dns),
+            value = s.echDns,
+            enabled = s.echEnabled,
+            placeholder = "8.8.8.8",
+            onValueChanged = { v -> onUpdate { it.copy(echDns = v) } },
+        )
     }
 }
 

@@ -39,6 +39,7 @@ import com.amyrmo.damavand.core.tor.MoatBridges
 import com.amyrmo.damavand.core.tor.TorBridges
 import com.amyrmo.damavand.domain.model.AppSettings
 import com.amyrmo.damavand.domain.model.ConnectionState
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.joinAll
 import kotlinx.coroutines.launch
@@ -63,9 +64,7 @@ fun TorBridgesScreen(
     }
     val pings = remember(transport) { SnapshotStateMap<String, Long>() }
     var pingingAll by remember { mutableStateOf(false) }
-    var fetching by remember { mutableStateOf(false) }
-    var fetchFailed by remember { mutableStateOf(false) }
-    var fetchedCount by remember { mutableStateOf(0) }
+    val moatFetch = rememberMoatFetchState()
 
     val enabled = remember(s.torEnabledBridges) {
         s.torEnabledBridges.split('\n').map { it.trim() }.filter { it.isNotEmpty() }.toSet()
@@ -112,46 +111,9 @@ fun TorBridgesScreen(
                         }
                     },
                 ) { Text(stringResource(Res.string.tor_bridges_ping_all)) }
-                FilledTonalButton(
-                    enabled = !fetching,
-                    onClick = {
-                        fetching = true
-                        fetchFailed = false
-                        scope.launch {
-                            val port = VpnManager.activeSocksPort
-                                .takeIf { VpnManager.status.value.state == ConnectionState.Connected }
-                            runCatching { MoatBridges.fetch(port) }
-                                .onSuccess { lines ->
-                                    fetchedCount = lines.size
-                                    onUpdate { it.copy(torMoatBridges = lines.joinToString("\n")) }
-                                }
-                                .onFailure { fetchFailed = true }
-                            fetching = false
-                        }
-                    },
-                ) {
-                    if (fetching) {
-                        CircularProgressIndicator(Modifier.padding(4.dp), strokeWidth = 2.dp)
-                    } else {
-                        Text(stringResource(Res.string.tor_moat_fetch))
-                    }
-                }
+                MoatFetchButton(moatFetch, onUpdate)
             }
-            if (fetchFailed) {
-                Text(
-                    stringResource(Res.string.tor_moat_failed),
-                    Modifier.padding(top = 8.dp),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.error,
-                )
-            } else if (fetchedCount > 0) {
-                Text(
-                    stringResource(Res.string.tor_moat_fetched, fetchedCount),
-                    Modifier.padding(top = 8.dp),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.primary,
-                )
-            }
+            MoatFetchStatus(moatFetch)
         }
 
         if (bridges.isEmpty()) {
@@ -230,5 +192,70 @@ private fun BridgeRow(
                 },
             )
         }
+    }
+}
+
+/**
+ * State of a Moat bridge fetch (BPB port, cluster 2): progress and result of
+ * the fetch action. Shared by the Tor bridges page and the BPB tab so both
+ * run the identical fetch and write the same `torMoatBridges` setting.
+ */
+class MoatFetchState {
+    var fetching by mutableStateOf(false)
+    var fetchFailed by mutableStateOf(false)
+    var fetchedCount by mutableStateOf(0)
+
+    fun fetch(scope: CoroutineScope, onUpdate: ((AppSettings) -> AppSettings) -> Unit) {
+        if (fetching) return
+        fetching = true
+        fetchFailed = false
+        scope.launch {
+            val port = VpnManager.activeSocksPort
+                .takeIf { VpnManager.status.value.state == ConnectionState.Connected }
+            runCatching { MoatBridges.fetch(port) }
+                .onSuccess { lines ->
+                    fetchedCount = lines.size
+                    onUpdate { it.copy(torMoatBridges = lines.joinToString("\n")) }
+                }
+                .onFailure { fetchFailed = true }
+            fetching = false
+        }
+    }
+}
+
+@Composable
+fun rememberMoatFetchState(): MoatFetchState = remember { MoatFetchState() }
+
+@Composable
+fun MoatFetchButton(state: MoatFetchState, onUpdate: ((AppSettings) -> AppSettings) -> Unit) {
+    val scope = rememberCoroutineScope()
+    FilledTonalButton(
+        enabled = !state.fetching,
+        onClick = { state.fetch(scope, onUpdate) },
+    ) {
+        if (state.fetching) {
+            CircularProgressIndicator(Modifier.padding(4.dp), strokeWidth = 2.dp)
+        } else {
+            Text(stringResource(Res.string.tor_moat_fetch))
+        }
+    }
+}
+
+@Composable
+fun MoatFetchStatus(state: MoatFetchState) {
+    if (state.fetchFailed) {
+        Text(
+            stringResource(Res.string.tor_moat_failed),
+            Modifier.padding(top = 8.dp),
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.error,
+        )
+    } else if (state.fetchedCount > 0) {
+        Text(
+            stringResource(Res.string.tor_moat_fetched, state.fetchedCount),
+            Modifier.padding(top = 8.dp),
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.primary,
+        )
     }
 }

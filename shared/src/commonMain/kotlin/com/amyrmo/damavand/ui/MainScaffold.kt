@@ -44,11 +44,14 @@ import com.amyrmo.damavand.domain.config.effectiveLocalProxyPort
 import com.amyrmo.damavand.shared.resources.Res
 import com.amyrmo.damavand.shared.resources.auto_group_all
 import com.amyrmo.damavand.shared.resources.auto_title_for
+import com.amyrmo.damavand.shared.resources.config_invalid
 import com.amyrmo.damavand.shared.resources.tour_done
 import com.amyrmo.damavand.shared.resources.tour_next
 import com.amyrmo.damavand.shared.resources.tour_skip
+import com.amyrmo.damavand.shared.resources.warp_added
 import com.amyrmo.damavand.domain.model.AppLanguage
 import com.amyrmo.damavand.domain.model.AppSettings
+import com.amyrmo.damavand.ui.bpb.BpbScreen
 import com.amyrmo.damavand.ui.servers.ServersScreen
 import com.amyrmo.damavand.ui.theme.toPersonalization
 import com.amyrmo.damavand.ui.connection.ConnectionViewModel
@@ -73,6 +76,8 @@ fun MainScaffold(
     appVersion: String = "",
 ) {
     val platform = com.amyrmo.damavand.ui.platform.LocalPlatform.current
+    val warpAddedMsg = stringResource(Res.string.warp_added)
+    val configInvalidMsg = stringResource(Res.string.config_invalid)
     var current by rememberSaveable { mutableStateOf(TopDestination.Home) }
 
     var setupDone by rememberSaveable {
@@ -310,6 +315,16 @@ fun MainScaffold(
                         onActiveServerChanged()
                     },
                 )
+                TopDestination.Bpb -> BpbScreen(
+                    settings = settings,
+                    contentPadding = contentPadding,
+                    onUpdate = onUpdateSettings,
+                    onWarpRegistered = { link ->
+                        configRepository.importText(link)
+                            .onSuccess { platform.toast(warpAddedMsg) }
+                            .onFailure { platform.toast(configInvalidMsg) }
+                    },
+                )
                 TopDestination.Settings -> SettingsScreen(
                     settings = settings,
                     contentPadding = contentPadding,
@@ -388,7 +403,7 @@ fun MainScaffold(
         )
         if (bento) {
             com.amyrmo.damavand.ui.bento.BentoDock(
-                tabs = listOf(TopDestination.Home, TopDestination.Servers, TopDestination.Settings),
+                tabs = listOf(TopDestination.Home, TopDestination.Servers, TopDestination.Bpb, TopDestination.Settings),
                 current = current,
                 onSelect = { current = it },
                 visible = true,

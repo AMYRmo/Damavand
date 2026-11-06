@@ -4,6 +4,7 @@
 
     <string name="nav_home">Home</string>
     <string name="nav_servers">Servers</string>
+    <string name="nav_bpb">BPB</string>
 
     <string name="servers_count">%1$d servers</string>
     <string name="servers_add">Add server</string>
@@ -1798,4 +1799,20 @@
     <string name="ech_dns">ECH resolver</string>
     <string name="browser_dialer_title">Browser dialer</string>
     <string name="browser_dialer_hint">Opens WebSocket connections through a hidden browser view, so their TLS handshake is the browser's. Applies while an Xray server is connected.</string>
+
+    <string name="bpb_subtitle">Every BPB-VPN feature in one place — the same settings as the Fragment, Routing, Core and Tor pages.</string>
+    <string name="bpb_section_warp">Warp</string>
+    <string name="bpb_section_global">Global</string>
+    <string name="bpb_section_dns">DNS</string>
+    <string name="bpb_section_tor">Tor</string>
+    <string name="bpb_warp_masque_summary">Register WARP as a MASQUE (H3) server</string>
+    <string name="bpb_warp_wireguard_summary">Register WARP as a WireGuard server</string>
+    <string name="bpb_best_ping_title">Best-ping balancer</string>
+    <string name="bpb_best_ping_note">Profiles with several endpoints — WARP over WireGuard registers all of them — are probed automatically and the fastest endpoint wins. Always on for multi-endpoint profiles; there is no separate switch.</string>
+    <string name="bpb_sanction_preset">Bypass sanctions</string>
+    <string name="bpb_sanction_preset_summary">Add rules for sanctioned services (OpenAI, Google AI, Microsoft, …) resolved via the anti-sanction DNS</string>
+    <string name="bpb_dns_bootstrap_title">Public DNS bootstrap</string>
+    <string name="bpb_dns_bootstrap_note">Well-known public DNS servers are pinned to their IP addresses in the generated config, so encrypted DNS resolves even when plain DNS is blocked. Built in — nothing to set up.</string>
+    <string name="bpb_geo_verified_title">Checksum-verified downloads</string>
+    <string name="bpb_geo_verified_note">Downloads are checked against the release SHA-256 checksums before the files are replaced — the same update as on the Assets page.</string>
 </resources>

@@ -41,13 +41,17 @@ import kotlinx.coroutines.launch
 import org.jetbrains.compose.resources.stringResource
 
 @Composable
-fun WarpDialog(onDismiss: () -> Unit, onRegistered: (link: String) -> Unit) {
+fun WarpDialog(
+    onDismiss: () -> Unit,
+    onRegistered: (link: String) -> Unit,
+    initialWireGuard: Boolean = false,
+) {
     val scope = rememberCoroutineScope()
     var busy by remember { mutableStateOf(false) }
     var error by remember { mutableStateOf<String?>(null) }
     // BPB port, cluster 4: WARP can enroll as MASQUE (existing) or as a
     // plain WireGuard device (new) — same dialog, two registrations.
-    var wireGuard by remember { mutableStateOf(false) }
+    var wireGuard by remember { mutableStateOf(initialWireGuard) }
 
     AlertDialog(
         onDismissRequest = { if (!busy) onDismiss() },

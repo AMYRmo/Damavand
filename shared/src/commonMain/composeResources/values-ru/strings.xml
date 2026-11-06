@@ -5,6 +5,7 @@
 
     <string name="nav_home">Главная</string>
     <string name="nav_servers">Серверы</string>
+    <string name="nav_bpb">BPB</string>
 
     <string name="servers_count">Серверов: %1$d</string>
     <string name="servers_add">Добавить сервер</string>
@@ -1719,4 +1720,20 @@
     <string name="ech_dns">Резолвер ECH</string>
     <string name="browser_dialer_title">Браузерный диалер</string>
     <string name="browser_dialer_hint">Открывает WebSocket-соединения через скрытое окно браузера, поэтому их TLS-рукопожатие выполняет браузер. Действует, пока подключён сервер Xray.</string>
+
+    <string name="bpb_subtitle">Все функции BPB-VPN в одном месте — те же настройки, что на страницах Fragment, Routing, Core и Tor.</string>
+    <string name="bpb_section_warp">Warp</string>
+    <string name="bpb_section_global">Общие</string>
+    <string name="bpb_section_dns">DNS</string>
+    <string name="bpb_section_tor">Tor</string>
+    <string name="bpb_warp_masque_summary">Зарегистрировать WARP как сервер MASQUE (H3)</string>
+    <string name="bpb_warp_wireguard_summary">Зарегистрировать WARP как сервер WireGuard</string>
+    <string name="bpb_best_ping_title">Балансировщик по лучшему пингу</string>
+    <string name="bpb_best_ping_note">Профили с несколькими конечными точками — WARP через WireGuard регистрирует их все — проверяются автоматически, и выбирается самая быстрая точка. Всегда включён для многоточечных профилей; отдельного переключателя нет.</string>
+    <string name="bpb_sanction_preset">Обход санкций</string>
+    <string name="bpb_sanction_preset_summary">Добавить правила для санкционных сервисов (OpenAI, Google AI, Microsoft, …), разрешаемых через антисанкционный DNS</string>
+    <string name="bpb_dns_bootstrap_title">Бутстрап публичных DNS</string>
+    <string name="bpb_dns_bootstrap_note">Известные публичные DNS-серверы закреплены за своими IP-адресами в генерируемой конфигурации, поэтому зашифрованный DNS работает, даже когда обычный DNS заблокирован. Встроено — настраивать нечего.</string>
+    <string name="bpb_geo_verified_title">Загрузки с проверкой контрольной суммы</string>
+    <string name="bpb_geo_verified_note">Перед заменой файлов загрузки сверяются с контрольными суммами SHA-256 из релиза — то же обновление, что и на странице файлов.</string>
 </resources>

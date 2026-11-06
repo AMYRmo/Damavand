@@ -3,6 +3,7 @@
 
     <string name="nav_home">خانه</string>
     <string name="nav_servers">سرورها</string>
+    <string name="nav_bpb">BPB</string>
 
     <string name="servers_count">%1$d سرور</string>
     <string name="servers_add">افزودن سرور</string>
@@ -1788,4 +1789,20 @@
     <string name="ech_dns">Resolver مربوط به ECH</string>
     <string name="browser_dialer_title">دایلر مرورگر</string>
     <string name="browser_dialer_hint">اتصال‌های WebSocket را از طریق یک نمای پنهان مرورگر باز می‌کند تا هندشیک TLS آن‌ها متعلق به مرورگر باشد. هنگام اتصال به سرور Xray اعمال می‌شود.</string>
+
+    <string name="bpb_subtitle">همه‌ی قابلیت‌های BPB-VPN در یک جا — همان تنظیمات صفحات Fragment، Routing، Core و Tor.</string>
+    <string name="bpb_section_warp">Warp</string>
+    <string name="bpb_section_global">سراسری</string>
+    <string name="bpb_section_dns">DNS</string>
+    <string name="bpb_section_tor">Tor</string>
+    <string name="bpb_warp_masque_summary">ثبت WARP به‌عنوان سرور MASQUE (H3)</string>
+    <string name="bpb_warp_wireguard_summary">ثبت WARP به‌عنوان سرور WireGuard</string>
+    <string name="bpb_best_ping_title">متعادل‌ساز بهترین پینگ</string>
+    <string name="bpb_best_ping_note">پروفایل‌های چندنقطه‌ای — WARP روی WireGuard همه‌ی نقطه‌ها را ثبت می‌کند — به‌صورت خودکار بررسی می‌شوند و سریع‌ترین نقطه انتخاب می‌شود. برای پروفایل‌های چندنقطه‌ای همیشه فعال است و کلید جداگانه‌ای ندارد.</string>
+    <string name="bpb_sanction_preset">دور زدن تحریم‌ها</string>
+    <string name="bpb_sanction_preset_summary">افزودن قوانین سرویس‌های تحریم‌شده (OpenAI، Google AI، Microsoft و …) با استفاده از DNS ضدتحریم</string>
+    <string name="bpb_dns_bootstrap_title">بوت‌استرپ DNS عمومی</string>
+    <string name="bpb_dns_bootstrap_note">سرورهای شناخته‌شده‌ی DNS عمومی در کانفیگ ساخته‌شده به آدرس IP خودشان پین می‌شوند تا DNS رمزنگاری‌شده حتی وقتی DNS معمولی مسدود است هم کار کند. داخلی است و نیازی به تنظیم ندارد.</string>
+    <string name="bpb_geo_verified_title">دانلود با بررسی چک‌سام</string>
+    <string name="bpb_geo_verified_note">دانلودها پیش از جایگزینی فایل‌ها با چک‌سام SHA-256 نسخه‌ی منتشرشده بررسی می‌شوند — همان به‌روزرسانی صفحه‌ی فایل‌ها.</string>
 </resources>
