@@ -61,6 +61,10 @@ jobs:
         run: |
           gh release view v141-plus-debug >/dev/null 2>&1 || gh release create v141-plus-debug --prerelease --title "Damavand v141-plus (debug)" --notes "Debug build of Damavand v1.4.1 + ZedSecure features (branch v141-plus). Install app-arm64-v8a-debug.apk on arm64 phones."
           gh release upload v141-plus-debug app/build/outputs/apk/debug/*.apk --clobber
+          # Damavand 1.5 release (Amir, 2026-11-06): the same APKs also ship
+          # as the proper v1.5.0 release.
+          gh release view v1.5.0 >/dev/null 2>&1 || gh release create v1.5.0 --title "Damavand 1.5" --notes "Damavand 1.5 — v1.4.1 base + ZedSecure features + BPB suite (incl. the BPB Cloudflare Worker/Pages connection), with Amir's Interface settings as the new defaults (Bento design, Damavand palette, Hold-to-connect). Install app-arm64-v8a-release.apk on arm64 phones."
+          gh release upload v1.5.0 app/build/outputs/apk/debug/*.apk --clobber
 
       # Optimized build: R8-minified release (unsigned in Gradle — no
       # keystore.properties on this branch), signed here with a throwaway CI
@@ -77,3 +81,4 @@ jobs:
           "$BT/zipalign" -f -p 4 app/build/outputs/apk/release/app-arm64-v8a-release-unsigned.apk /tmp/arm64-aligned.apk
           "$BT/apksigner" sign --ks /tmp/ci-release.jks --ks-pass pass:android --key-pass pass:android --out app-arm64-v8a-release.apk /tmp/arm64-aligned.apk
           gh release upload v141-plus-debug app-arm64-v8a-release.apk --clobber
+          gh release upload v1.5.0 app-arm64-v8a-release.apk --clobber

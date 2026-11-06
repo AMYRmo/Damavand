@@ -236,7 +236,9 @@ data class AppSettings(
     val customConfigCardColor: Long? = null,
     val customConfigCardTextColor: Long? = null,
 
-    val appDesign: AppDesign = AppDesign.Portal,
+    // Default design is Bento since Damavand 1.5 (Amir's chosen defaults
+    // from his Interface screenshot, 2026-11-06; Portal remains selectable).
+    val appDesign: AppDesign = AppDesign.Bento,
     val bento: BentoPrefs = BentoPrefs(),
     val detectServerLocation: Boolean = false,
 
@@ -257,7 +259,8 @@ data class AppSettings(
 
     val liveNotification: Boolean = true,
 
-    val notifChip: NotifChip = NotifChip.Speed,
+    // "Data used" chip by default (Amir's Interface defaults, 2026-11-06).
+    val notifChip: NotifChip = NotifChip.Total,
 
     val onboardingVersion: Int = 0,
 

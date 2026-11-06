@@ -23,7 +23,8 @@ enum class BentoConnect { Slide, Button, Morph, Rail, Hold, Tile }
 @Serializable
 data class BentoPrefs(
     val palette: BentoPalette = BentoPalette.Damavand,
-    val corners: BentoCorners = BentoCorners.Leaf,
+    // Round by default (Amir's Interface defaults for Damavand 1.5, 2026-11-06).
+    val corners: BentoCorners = BentoCorners.Round,
     val title: BentoTitle = BentoTitle.Large,
     val density: BentoDensity = BentoDensity.Comfortable,
     val motifs: Boolean = true,
@@ -34,7 +35,8 @@ data class BentoPrefs(
     val dockLabels: BentoDockLabels = BentoDockLabels.Active,
     val dockAutoHide: Boolean = true,
     val navStyle: NavBarStyle = NavBarStyle.Dock,
-    val connect: BentoConnect = BentoConnect.Slide,
+    // Hold-to-connect by default (Amir's Interface defaults, 2026-11-06).
+    val connect: BentoConnect = BentoConnect.Hold,
     val wave: Boolean = true,
     val homeSpeed: Boolean = true,
     val homeSession: Boolean = true,
