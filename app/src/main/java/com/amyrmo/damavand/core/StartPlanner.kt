@@ -219,7 +219,7 @@ class StartPlanner(context: Context) {
             // never a silent one.
             val server = container.cfRepository.resolvedServer()
                 ?: throw com.amyrmo.damavand.data.net.BpbNotReadyException()
-            return XrayJsonBuilder.build(server, settings.buildOptions(geoReady, carrier))
+            return XrayJsonBuilder.build(server, options = settings.buildOptions(geoReady, carrier))
         }
         if (profile.isAutoSelect) {
             val build = configRepository.buildAutoSelectConfig(
