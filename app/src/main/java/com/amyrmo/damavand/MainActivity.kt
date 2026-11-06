@@ -46,6 +46,9 @@ class MainActivity : ComponentActivity() {
     private val settingsRepository: SettingsRepository
         get() = (application as DamavandApp).container.settingsRepository
 
+    private val cfRepository: com.amyrmo.damavand.data.net.CfAccountsRepository
+        get() = (application as DamavandApp).container.cfRepository
+
     private var pendingStart: StartPlanner.Plan.Start? = null
 
     private val planner by lazy { StartPlanner(this) }
@@ -313,6 +316,7 @@ class MainActivity : ComponentActivity() {
                     MainScaffold(
                         settings = settings,
                         configRepository = configRepository,
+                        cfRepository = cfRepository,
                         onToggleConnection = ::toggleConnection,
                         onActiveServerChanged = ::switchActiveServer,
                         onUpdateSettings = repo::update,

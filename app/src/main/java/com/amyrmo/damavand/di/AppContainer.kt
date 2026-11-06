@@ -25,6 +25,11 @@ class AppContainer(context: Context) {
     val settingsRepository: SettingsRepository = SettingsRepository(context)
     val configRepository: ConfigRepository = ConfigRepository(AndroidKeyValueStore(context, "zed_configs"))
 
+    // BPB Cloudflare suite state (tokens/UUIDs) — its own private store, like
+    // the profile store; deliberately outside SettingsBackup's reach.
+    val cfRepository: com.amyrmo.damavand.data.net.CfAccountsRepository =
+        com.amyrmo.damavand.data.net.CfAccountsRepository(AndroidKeyValueStore(context, "zed_cf"))
+
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
 
     init {

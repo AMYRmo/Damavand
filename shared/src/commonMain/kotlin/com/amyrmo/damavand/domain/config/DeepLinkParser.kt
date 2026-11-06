@@ -194,6 +194,7 @@ data class DeepLinkPreview(
             is ProfileSource.CrossChain -> "Cross chain"
             is ProfileSource.SniSpoof -> "SNI spoof"
             is ProfileSource.AutoSelect -> "Auto-select"
+            is ProfileSource.Bpb -> "BPB"
             is ProfileSource.SingBox -> "sing-box"
             is ProfileSource.SingBoxConfig -> "sing-box config"
             is ProfileSource.Link, is ProfileSource.RawJson, is ProfileSource.Sealed -> "Config"

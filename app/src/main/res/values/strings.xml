@@ -216,6 +216,7 @@
     <string name="notif_totals">Session: %1$s down · %2$s up</string>
     <string name="notif_connected_to">Connected to %1$s</string>
     <string name="select_config_first">Select a config first</string>
+    <string name="bpb_needs_setup">The bpb profile needs a Cloudflare deployment first — set it up in the BPB tab</string>
     <string name="vpn_permission_denied">VPN permission denied</string>
     <string name="paste_empty">Clipboard is empty</string>
     <string name="config_added">Config added</string>

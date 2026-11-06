@@ -7,3 +7,5 @@ private val secureRandom by lazy { SecureRandom() }
 internal actual fun secureRandomToken(length: Int): String = buildString(length) {
     repeat(length) { append(TOKEN_ALPHABET[secureRandom.nextInt(TOKEN_ALPHABET.length)]) }
 }
+
+internal actual fun secureRandomBytes(count: Int): ByteArray = ByteArray(count).also { secureRandom.nextBytes(it) }

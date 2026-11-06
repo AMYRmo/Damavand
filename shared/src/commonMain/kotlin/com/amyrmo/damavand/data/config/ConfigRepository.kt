@@ -73,6 +73,24 @@ class ConfigRepository(private val store: KeyValueStore) {
     private val _profiles = MutableStateFlow(loadProfiles())
     val profiles: StateFlow<List<VpnProfile>> = _profiles.asStateFlow()
 
+    init {
+        seedBpbProfile()
+    }
+
+    /**
+     * The built-in "bpb" profile (BPB Cloudflare suite) is present from first
+     * launch: seeded into the stored list once when absent, like a stored
+     * Tor profile, but carrying no server data — it resolves live at connect
+     * time. If the user deletes it, it is re-seeded on the next launch: it
+     * is the Cloudflare suite's connection entry point, not user data.
+     */
+    private fun seedBpbProfile() {
+        if (_profiles.value.none { it.isBpb }) {
+            _profiles.value = _profiles.value + VpnProfile.fromBpb(currentTimeMillis())
+            persistProfiles()
+        }
+    }
+
     private val _subscriptions = MutableStateFlow(loadSubscriptions())
     val subscriptions: StateFlow<List<Subscription>> = _subscriptions.asStateFlow()
 

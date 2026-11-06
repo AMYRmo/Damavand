@@ -82,6 +82,7 @@ fun BpbScreen(
     contentPadding: PaddingValues,
     onUpdate: ((AppSettings) -> AppSettings) -> Unit,
     onWarpRegistered: (String) -> Unit,
+    cfRepository: com.amyrmo.damavand.data.net.CfAccountsRepository,
     modifier: Modifier = Modifier,
 ) {
     val platform = LocalPlatform.current
@@ -116,6 +117,10 @@ fun BpbScreen(
         modifier = modifier,
         titleIcon = Res.drawable.ic_bolt,
     ) {
+        // Cloudflare — BPB's deployment suite leads the tab (it is what the
+        // built-in "bpb" profile connects through).
+        CloudflareSection(cfRepository)
+
         // Warp — BPB has separate Warp and Masque sections, each with its
         // account registration; Damavand's one dialog covers both.
         SettingsGroup(stringResource(Res.string.bpb_section_warp)) {

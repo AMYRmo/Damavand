@@ -33,6 +33,17 @@ sealed interface ProfileSource {
     @SerialName("tor")
     data object Tor : ProfileSource
 
+    /**
+     * BPB Cloudflare suite: the built-in "bpb" profile. A synthetic entry
+     * like Tor — it stores no server data at all; StartPlanner resolves it
+     * live, at connect time, to the user's current BPB deployment (Worker or
+     * Pages, per the BPB tab's Connection choice), so redeploys and ENV
+     * edits apply without the profile ever changing.
+     */
+    @Serializable
+    @SerialName("bpb")
+    data object Bpb : ProfileSource
+
     @Serializable
     @SerialName("ssh")
     data class Ssh(val settings: SshProfile) : ProfileSource
@@ -107,6 +118,8 @@ data class VpnProfile(
 
     val isTor: Boolean get() = source is ProfileSource.Tor
 
+    val isBpb: Boolean get() = source is ProfileSource.Bpb
+
     val isSsh: Boolean get() = source is ProfileSource.Ssh
 
     val isSniSpoof: Boolean get() = source is ProfileSource.SniSpoof
@@ -140,7 +153,7 @@ data class VpnProfile(
 
     val isManagedTunnel: Boolean
         get() = isPsiphon || isDnsTunnel || isMasterDns || isTor || isSsh || isSniSpoof ||
-            isOpenConnect || isIkev2 || isCrossChain || isSingBoxConfig
+            isOpenConnect || isIkev2 || isCrossChain || isSingBoxConfig || isBpb
 
     val isDnsBasedTunnel: Boolean get() = isDnsTunnel || isMasterDns
 
@@ -205,6 +218,8 @@ data class VpnProfile(
         is ProfileSource.ProxyChain -> null
         is ProfileSource.CrossChain -> null
 
+        is ProfileSource.Bpb -> null
+
         is ProfileSource.AutoSelect -> null
 
         is ProfileSource.SingBox -> src.link ?: src.json
@@ -243,6 +258,7 @@ data class VpnProfile(
         is ProfileSource.OpenConnect -> throw IllegalStateException("OpenConnect profiles do not build Xray config")
         is ProfileSource.Ikev2 -> throw IllegalStateException("IKEv2 profiles do not build Xray config")
         is ProfileSource.Tor -> throw IllegalStateException("Tor profiles do not build Xray config")
+        is ProfileSource.Bpb -> throw IllegalStateException("BPB profiles are resolved live at connect time (StartPlanner)")
         is ProfileSource.Ssh -> throw IllegalStateException("SSH profiles do not build Xray config")
 
         is ProfileSource.ProxyChain ->
@@ -283,6 +299,9 @@ data class VpnProfile(
     }
 
     companion object {
+        /** Fixed id of the built-in BPB profile (see [fromBpb]). */
+        const val BPB_ID = "bpb"
+
         fun fromPsiphon(
             settings: PsiphonProfile,
             id: String,
@@ -362,6 +381,18 @@ data class VpnProfile(
             port = 0,
             transportLabel = "IKEv2",
             source = ProfileSource.Ikev2(settings),
+            addedAt = addedAt,
+        )
+
+        /** The built-in BPB profile: fixed id, display name exactly "bpb". */
+        fun fromBpb(addedAt: Long): VpnProfile = VpnProfile(
+            id = BPB_ID,
+            name = "bpb",
+            protocol = "VLESS",
+            address = "bpb",
+            port = 443,
+            transportLabel = "BPB",
+            source = ProfileSource.Bpb,
             addedAt = addedAt,
         )
 

@@ -113,6 +113,8 @@ class StartPlanner(context: Context) {
         )
         is com.amyrmo.damavand.domain.config.AutoSelectNoMembersException ->
             appContext.getString(R.string.auto_no_members)
+        is com.amyrmo.damavand.data.net.BpbNotReadyException ->
+            appContext.getString(R.string.bpb_needs_setup)
         else -> appContext.getString(R.string.config_invalid)
     }
 
@@ -210,6 +212,15 @@ class StartPlanner(context: Context) {
         }
         val geoReady = GeoAssetsRepository(appContext).allPresent()
         val settings = settingsRepository.settings.value
+        if (profile.isBpb) {
+            // BPB Cloudflare suite: the built-in "bpb" profile resolves live
+            // to the current deployment (Worker/Pages per the BPB tab's
+            // Connection choice); nothing deployed yet is a clear failure,
+            // never a silent one.
+            val server = container.cfRepository.resolvedServer()
+                ?: throw com.amyrmo.damavand.data.net.BpbNotReadyException()
+            return XrayJsonBuilder.build(server, settings.buildOptions(geoReady, carrier))
+        }
         if (profile.isAutoSelect) {
             val build = configRepository.buildAutoSelectConfig(
                 profile,

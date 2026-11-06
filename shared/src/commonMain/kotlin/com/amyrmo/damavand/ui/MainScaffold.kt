@@ -44,6 +44,7 @@ import com.amyrmo.damavand.domain.config.effectiveLocalProxyPort
 import com.amyrmo.damavand.shared.resources.Res
 import com.amyrmo.damavand.shared.resources.auto_group_all
 import com.amyrmo.damavand.shared.resources.auto_title_for
+import com.amyrmo.damavand.shared.resources.cf_bpb_needs_setup
 import com.amyrmo.damavand.shared.resources.config_invalid
 import com.amyrmo.damavand.shared.resources.tour_done
 import com.amyrmo.damavand.shared.resources.tour_next
@@ -66,6 +67,7 @@ import com.amyrmo.damavand.ui.update.NudgeHost
 fun MainScaffold(
     settings: AppSettings,
     configRepository: ConfigRepository,
+    cfRepository: com.amyrmo.damavand.data.net.CfAccountsRepository,
     onToggleConnection: () -> Unit,
 
     onActiveServerChanged: () -> Unit = {},
@@ -78,6 +80,7 @@ fun MainScaffold(
     val platform = com.amyrmo.damavand.ui.platform.LocalPlatform.current
     val warpAddedMsg = stringResource(Res.string.warp_added)
     val configInvalidMsg = stringResource(Res.string.config_invalid)
+    val bpbSetupMsg = stringResource(Res.string.cf_bpb_needs_setup)
     var current by rememberSaveable { mutableStateOf(TopDestination.Home) }
 
     var setupDone by rememberSaveable {
@@ -291,7 +294,20 @@ fun MainScaffold(
                         current = TopDestination.Settings
                     },
                     contentPadding = contentPadding,
-                    onToggleConnection = onToggleConnection,
+                    onToggleConnection = {
+                        // The built-in "bpb" profile with nothing deployed
+                        // yet: route to the BPB tab's Cloudflare section
+                        // instead of failing obscurely (BPB tab setup).
+                        val connState = connectionVm.ui.value.state
+                        if (activeProfile?.isBpb == true && !connState.isActive &&
+                            cfRepository.resolvedServer() == null
+                        ) {
+                            platform.toast(bpbSetupMsg)
+                            current = TopDestination.Bpb
+                        } else {
+                            onToggleConnection()
+                        }
+                    },
 
                     onBrowseConfigs = { current = TopDestination.Servers },
                     )
@@ -319,6 +335,7 @@ fun MainScaffold(
                     settings = settings,
                     contentPadding = contentPadding,
                     onUpdate = onUpdateSettings,
+                    cfRepository = cfRepository,
                     onWarpRegistered = { link ->
                         configRepository.importText(link)
                             .onSuccess { platform.toast(warpAddedMsg) }

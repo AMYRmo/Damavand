@@ -72,6 +72,7 @@ object ZedLink {
         is ProfileSource.RawJson,
         is ProfileSource.SniSpoof,
         is ProfileSource.Sealed,
+        is ProfileSource.Bpb,
 
         is ProfileSource.AutoSelect,
 

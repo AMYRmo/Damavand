@@ -1,0 +1,19 @@
+BPB worker script — attribution
+================================
+
+worker.js in this folder is the VLESS-over-WebSocket proxy worker bundled
+with BPB-VPN (https://github.com/bia-pain-bache/BPB-VPN), copied unchanged
+from that project's worker/worker.js.
+
+BPB-VPN is licensed under the GNU General Public License v3.0 (GPL-3.0).
+Damavand is licensed under AGPL-3.0; GPLv3 code may be combined into an
+AGPLv3 work, and Damavand's source — including this file — is public.
+
+The worker itself belongs to the edtunnel / VLESS-WS worker family; the
+upstream file carries no in-file attribution of its own.
+
+In Damavand the script is never modified: it is uploaded as-is to the
+user's own Cloudflare account (once as a Worker script, once as a Pages
+project's _worker.js) with a single ENV binding carrying the user's VLESS
+UUID, proxy IPs and fallback URL. Bundled script version: 1
+(CloudflareApi.WORKER_VERSION, mirroring BPB-VPN's workerVersion).
