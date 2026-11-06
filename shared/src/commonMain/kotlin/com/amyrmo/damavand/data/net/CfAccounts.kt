@@ -378,8 +378,9 @@ class CfAccountsRepository(private val store: KeyValueStore) {
  * endpoints = clean IPs ∪ domain over the chosen ports — which the Xray
  * builder's existing best-ping machinery (Tier 2) turns into an autoselect
  * balancer group, exactly BPB's Best-Ping shape mapped onto Damavand's.
- * BPB randomizes the SNI's letter casing per build; Damavand's builder owns
- * SNI handling, so the domain is passed as-is.
+ * BPB randomizes the SNI's letter casing per build; since the 2026-11-06
+ * on-device fix this is done here too (see the tls block below) — passing
+ * the domain as-is connected but passed no traffic from Iran.
  */
 fun bpbServerConfig(account: CfAccount, deployment: CfDeployment): ServerConfig {
     val domain = deployment.effectiveHost
@@ -398,12 +399,34 @@ fun bpbServerConfig(account: CfAccount, deployment: CfDeployment): ServerConfig 
         ),
         tls = SecurityConfig(
             security = "tls",
-            sni = domain,
+            // BPB parity (on-device fix, 2026-11-06): BPB randomizes the SNI's
+            // letter casing on every build (_randomUpperCase) — the known
+            // evasion for case-sensitive SNI filtering of *.workers.dev /
+            // *.pages.dev on Iranian ISPs, where the plain lowercase SNI
+            // connects but passes no traffic. DNS names are case-insensitive
+            // and Cloudflare's cert validates either way. The WS Host header
+            // above stays the plain domain, exactly like BPB.
+            sni = randomCase(domain),
             fingerprint = "chrome",
+            // BPB sets alpn http/1.1 explicitly on every worker outbound.
+            alpn = "http/1.1",
         ),
         candidateAddresses = buildList {
             account.cleanIps.forEach { ip -> ports.forEach { p -> add("$ip:$p") } }
             ports.forEach { p -> add("$domain:$p") }
         }.distinct(),
     )
+}
+
+/** BPB's _randomUpperCase: each letter independently upper/lower-cased. */
+private fun randomCase(host: String): String = buildString(host.length) {
+    for (c in host) {
+        append(
+            when {
+                c.isLetter() && kotlin.random.Random.nextBoolean() -> c.uppercaseChar()
+                c.isLetter() -> c.lowercaseChar()
+                else -> c
+            },
+        )
+    }
 }

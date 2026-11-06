@@ -219,7 +219,11 @@ class StartPlanner(context: Context) {
             // never a silent one.
             val server = container.cfRepository.resolvedServer()
                 ?: throw com.amyrmo.damavand.data.net.BpbNotReadyException()
-            return XrayJsonBuilder.build(server, options = settings.buildOptions(geoReady, carrier))
+            // The BPB worker is TCP-only: block UDP in-config like BPB does,
+            // so QUIC/app UDP fails fast and falls back to TCP instead of
+            // killing the WebSocket (2026-11-06 on-device fix).
+            val options = settings.buildOptions(geoReady, carrier).copy(blockUdp = true)
+            return XrayJsonBuilder.build(server, options = options)
         }
         if (profile.isAutoSelect) {
             val build = configRepository.buildAutoSelectConfig(

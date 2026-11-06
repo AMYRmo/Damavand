@@ -738,6 +738,14 @@ object XrayJsonBuilder {
                             put("outboundTag", "block")
                         }
                     }
+
+                    if (options.blockUdp) {
+                        addJsonObject {
+                            put("type", "field")
+                            put("network", "udp")
+                            put("outboundTag", "block")
+                        }
+                    }
                 }
             }
             if (!forSpeedtest) {
@@ -814,6 +822,13 @@ object XrayJsonBuilder {
         val dialerSocksPort: Int? = null,
 
         val engineFront: EngineFront? = null,
+
+        // BPB Cloudflare fix (2026-11-06): the bundled BPB worker is TCP-only
+        // (any VLESS UDP command closes the connection), and BPB's own config
+        // blocks all UDP for worker connections so apps fall back to TCP.
+        // When true, a trailing routing rule sends UDP to the block outbound;
+        // the DNS rules above it (DNS module, local DNS) keep precedence.
+        val blockUdp: Boolean = false,
 
         val useSystemCa: Boolean = false,
 
