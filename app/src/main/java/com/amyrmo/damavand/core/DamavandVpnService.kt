@@ -47,6 +47,7 @@ class DamavandVpnService : VpnService() {
     private var livePromotion: Boolean = true
     private var notifChip: com.amyrmo.damavand.domain.model.NotifChip =
         com.amyrmo.damavand.domain.model.NotifChip.Speed
+    private var bentoCard: Boolean = false
     private var psiphon: PsiphonController? = null
     private var dnsTunnel: DnsTunnelController? = null
     private var masterDns: MasterDnsController? = null
@@ -225,6 +226,8 @@ class DamavandVpnService : VpnService() {
         showSpeed = settings.speedInNotification
         livePromotion = settings.liveNotification
         notifChip = settings.notifChip
+        bentoCard = !settings.liveNotification &&
+            settings.notifStyle == com.amyrmo.damavand.domain.model.NotifStyle.Bento
         val iface = settings.vpnInterfaceAddress
         hevIpv4 = iface.ipv4Client
         hevIpv6 = if (settings.enableIpv6) iface.ipv6Client else null
@@ -884,17 +887,12 @@ class DamavandVpnService : VpnService() {
         DamavandWidgetProvider.refresh(this, force = true)
     }
 
-    /** The live notification's accent follows the app's current theme. */
-    private fun notifAccent(): Int =
-        VpnNotifications.themeAccent(this, SettingsRepository(this).settings.value)
-
     private fun connectingNotification(): android.app.Notification =
         notifications.build(
             server = remark,
             phase = VpnNotifications.Phase.Connecting(stage),
             protocolLabel = protocolLabel(),
             livePromotion = livePromotion,
-            accent = notifAccent(),
         )
 
     private fun protocolLabel(): String = when (kind) {
@@ -1045,7 +1043,7 @@ class DamavandVpnService : VpnService() {
         showSpeed = showSpeed,
         livePromotion = livePromotion,
         chip = notifChip,
-        accent = notifAccent(),
+        bentoCard = bentoCard,
     )
 
     private var lastUidRx = -1L

@@ -93,6 +93,8 @@ enum class NavBarStyle {
     Dock,
 }
 
+enum class NotifStyle { System, Bento }
+
 enum class NotifChip {
     Speed,
 
@@ -261,6 +263,8 @@ data class AppSettings(
 
     // "Data used" chip by default (Amir's Interface defaults, 2026-11-06).
     val notifChip: NotifChip = NotifChip.Total,
+
+    val notifStyle: NotifStyle = NotifStyle.Bento,
 
     val onboardingVersion: Int = 0,
 

@@ -1406,6 +1406,22 @@ private fun UiPage(
                 enabled = s.liveNotification,
                 onSelected = { v -> onUpdate { it.copy(notifChip = v) } },
             )
+            SettingsListRow(
+                title = stringResource(Res.string.notif_style_title),
+                options = listOf(
+                    com.amyrmo.damavand.domain.model.NotifStyle.Bento to stringResource(Res.string.notif_style_bento),
+                    com.amyrmo.damavand.domain.model.NotifStyle.System to stringResource(Res.string.notif_style_system),
+                ),
+                selected = s.notifStyle,
+                enabled = !s.liveNotification,
+                onSelected = { v -> onUpdate { it.copy(notifStyle = v) } },
+            )
+            if (s.liveNotification) {
+                SettingsInfoRow(
+                    title = stringResource(Res.string.notif_style_title),
+                    body = stringResource(Res.string.notif_style_note),
+                )
+            }
             SettingsSwitchRow(
                 title = stringResource(Res.string.title_pref_confirm_remove),
                 summary = stringResource(Res.string.summary_pref_confirm_remove),

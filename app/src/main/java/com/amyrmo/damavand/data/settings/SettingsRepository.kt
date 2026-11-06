@@ -79,6 +79,7 @@ class SettingsRepository(context: Context) {
             speedInNotification = prefs.getBoolean("speed_notif", d.speedInNotification),
             liveNotification = prefs.getBoolean("live_notif", d.liveNotification),
             notifChip = prefs.enum("notif_chip", d.notifChip),
+            notifStyle = prefs.enum("notif_style", d.notifStyle),
             onboardingVersion = prefs.getInt("onboarding_version", d.onboardingVersion),
             screenTransition = prefs.enum("screen_transition", d.screenTransition),
             confirmRemove = prefs.getBoolean("confirm_remove", d.confirmRemove),
@@ -318,6 +319,7 @@ class SettingsRepository(context: Context) {
             putBoolean("speed_notif", s.speedInNotification)
             putBoolean("live_notif", s.liveNotification)
             putString("notif_chip", s.notifChip.name)
+            putString("notif_style", s.notifStyle.name)
             putInt("onboarding_version", s.onboardingVersion)
             putString("screen_transition", s.screenTransition.name)
             putBoolean("confirm_remove", s.confirmRemove)

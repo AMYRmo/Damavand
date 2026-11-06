@@ -1207,6 +1207,10 @@
     <string name="notif_chip_opt_duration">Time connected</string>
     <string name="notif_chip_opt_total">Data used</string>
     <string name="notif_chip_opt_none">Nothing</string>
+    <string name="notif_style_title">Notification look</string>
+    <string name="notif_style_bento">Bento card</string>
+    <string name="notif_style_system">System</string>
+    <string name="notif_style_note">Android draws Live Update notifications itself, so the Bento card appears once Live Update is off.</string>
     <string name="nav_style_title">Navigation bar</string>
     <string name="nav_style_floating">Floating pill</string>
     <string name="nav_style_compact">Compact dock</string>

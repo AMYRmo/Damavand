@@ -1197,6 +1197,10 @@
     <string name="notif_chip_opt_duration">مدت اتصال</string>
     <string name="notif_chip_opt_total">مصرف داده</string>
     <string name="notif_chip_opt_none">هیچ‌چیز</string>
+    <string name="notif_style_title">ظاهر نوتیفیکیشن</string>
+    <string name="notif_style_bento">کارت بنتو</string>
+    <string name="notif_style_system">سیستمی</string>
+    <string name="notif_style_note">اندروید نوتیفیکیشن Live Update را خودش می‌کشد؛ کارت بنتو وقتی Live Update خاموش باشد نمایش داده می‌شود.</string>
     <string name="nav_style_title">نوار ناوبری</string>
     <string name="nav_style_floating">قرصی شناور</string>
     <string name="nav_style_compact">داک فشرده</string>
