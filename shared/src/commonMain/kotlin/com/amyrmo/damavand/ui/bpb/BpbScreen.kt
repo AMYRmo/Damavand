@@ -65,6 +65,7 @@ import com.amyrmo.damavand.ui.settings.SettingsPageScaffold
 import com.amyrmo.damavand.ui.settings.SettingsSegment
 import com.amyrmo.damavand.ui.settings.rememberMoatFetchState
 import com.amyrmo.damavand.ui.settings.rulesetUpdate
+import com.amyrmo.damavand.ui.settings.sameMatcher
 import kotlinx.coroutines.launch
 import org.jetbrains.compose.resources.stringResource
 
