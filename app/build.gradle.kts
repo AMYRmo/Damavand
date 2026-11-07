@@ -24,7 +24,9 @@ android {
     }
 
     defaultConfig {
-        applicationId = "com.amyrmo.damavand"
+        // TEST BUILD (Amir, 2026-11-07): side-by-side package so 1.5.1 installs next to 1.5.0.
+        // Revert to "com.amyrmo.damavand" before publishing.
+        applicationId = "com.amyrmo.damavand.test"
         minSdk = 24
         targetSdk = 36
         versionCode = (project.property("damavand.versionCode") as String).toInt()
