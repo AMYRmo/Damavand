@@ -335,7 +335,10 @@ fun ServersScreen(
     var showCrossChain by remember { mutableStateOf(false) }
     var showWarp by remember { mutableStateOf(false) }
 
-    val servers = profiles.filterNot { it.isLocked }
+    // Locked (Lock & Share) profiles ARE listed — buyers must see and connect them
+    // (same as Narcic). The candidate lists below still exclude them: they require a
+    // raw payload / chain capability a sealed profile does not have.
+    val servers = profiles
 
     val chainCandidates = servers.filter {
         it.rawPayload() != null && (!it.isCustom || it.isServerless) && !it.isManagedTunnel && !it.isProxyChain &&
@@ -346,8 +349,8 @@ fun ServersScreen(
         it.rawPayload() != null && !it.isManagedTunnel && !it.isProxyChain &&
             !it.isCrossChain && !it.isSniSpoof
     }
-    val crossCarriers = servers.filter { it.canCarryChain && !it.isCrossChain }
-    val crossExits = servers.filter { it.canDialThroughProxy && !it.isCrossChain }
+    val crossCarriers = servers.filter { !it.isLocked && it.canCarryChain && !it.isCrossChain }
+    val crossExits = servers.filter { !it.isLocked && it.canDialThroughProxy && !it.isCrossChain }
 
     val udpMismatchTemplate = stringResource(Res.string.crosschain_udp_unsupported)
     val crossPairError: (VpnProfile, VpnProfile) -> String? = { inner, outer ->
