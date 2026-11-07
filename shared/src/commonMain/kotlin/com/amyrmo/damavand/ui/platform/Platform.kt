@@ -50,6 +50,9 @@ interface Platform {
 
     fun saveFile(name: String, mime: String, bytes: ByteArray) {}
 
+    /** Route a .dmv container (or a relay short link) to the platform's locked-import dialog, if it has one. */
+    fun requestDmvImport(bytes: ByteArray?, relay: com.amyrmo.damavand.crypto.DmvLink.Relay?, fileName: String) {}
+
     fun liveStats(): LiveStats = LiveStats()
 
     val isComputer: Boolean get() = false

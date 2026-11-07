@@ -2,6 +2,7 @@
 
 package com.amyrmo.damavand.domain.config
 
+import com.amyrmo.damavand.crypto.DmvCrypto
 import com.amyrmo.damavand.crypto.ZsxCrypto
 import kotlin.io.encoding.Base64
 import kotlinx.serialization.SerialName
@@ -247,7 +248,7 @@ data class VpnProfile(
         )
         is ProfileSource.Sealed ->
             configJsonFromPayload(
-                ZsxCrypto.open(Base64.decode(src.zsxBase64), password = null),
+                openSealedPayload(Base64.decode(src.zsxBase64)),
                 options,
                 forSpeedtest,
             )
@@ -301,6 +302,8 @@ data class VpnProfile(
     companion object {
         /** Fixed id of the built-in BPB profile (see [fromBpb]). */
         const val BPB_ID = "bpb"
+
+        private val DMV_MAGIC = "DMV1".encodeToByteArray()
 
         fun fromPsiphon(
             settings: PsiphonProfile,
@@ -531,6 +534,14 @@ data class VpnProfile(
             source = ProfileSource.Ssh(settings),
             addedAt = addedAt,
         )
+
+        /** Sealed profiles are stored re-locked with no password; the container flavour is picked by magic. */
+        internal fun openSealedPayload(bytes: ByteArray): String =
+            if (bytes.size >= 4 && bytes.copyOfRange(0, 4).contentEquals(DMV_MAGIC)) {
+                DmvCrypto.open(bytes, password = null)
+            } else {
+                ZsxCrypto.open(bytes, password = null)
+            }
 
         internal fun configJsonFromPayload(
             payload: String,

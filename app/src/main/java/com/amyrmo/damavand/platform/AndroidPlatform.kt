@@ -222,14 +222,27 @@ class AndroidPlatform(
     ) {
         runCatching {
             val bytes = com.amyrmo.damavand.crypto.DmvCrypto.seal(
-                payload = payload,
-                name = fileName.removeSuffix(".dmv"),
-                password = password,
-                expiresAt = expiresAt,
-                maxSizeBytes = maxSizeBytes,
+                com.amyrmo.damavand.crypto.DmvSealRequest(
+                    configPayload = payload,
+                    name = fileName.removeSuffix(".dmv"),
+                    note = "",
+                    expiresAt = expiresAt,
+                    password = password.ifBlank { null },
+                    maxSizeBytes = maxSizeBytes,
+                ),
             )
             ZsxSharing.share(context, com.amyrmo.damavand.crypto.dmvFileName(fileName), bytes)
         }.onFailure { toast(it.message ?: "dmv failed") }
+    }
+
+    override fun requestDmvImport(
+        bytes: ByteArray?,
+        relay: com.amyrmo.damavand.crypto.DmvLink.Relay?,
+        fileName: String,
+    ) {
+        com.amyrmo.damavand.core.DmvImportBus.request(
+            com.amyrmo.damavand.core.DmvImportBus.Request(fileName, bytes, relay),
+        )
     }
 
     override fun saveFile(name: String, mime: String, bytes: ByteArray) {

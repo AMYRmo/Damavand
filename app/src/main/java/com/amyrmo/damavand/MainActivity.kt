@@ -219,6 +219,12 @@ class MainActivity : ComponentActivity() {
         } else {
             intent.data
         } ?: return
+        if (uri.scheme?.lowercase() == "damavand") {
+            val linkText = intent.dataString.orEmpty()
+            if (com.amyrmo.damavand.crypto.DmvLink.findRelay(linkText) != null ||
+                com.amyrmo.damavand.crypto.DmvLink.findContainer(linkText) != null
+            ) return
+        }
         runCatching {
             val bytes = contentResolver.openInputStream(uri)?.use { it.readBytes() } ?: return
             val name = uri.lastPathSegment ?: "config.dmv"
@@ -232,6 +238,23 @@ class MainActivity : ComponentActivity() {
         if (intent?.action != Intent.ACTION_VIEW) return false
         val data = intent.data ?: return false
         val scheme = data.scheme?.lowercase() ?: return false
+        if (scheme == "damavand") {
+            val text = intent.dataString.orEmpty()
+            val relay = com.amyrmo.damavand.crypto.DmvLink.findRelay(text)
+            val bytes = if (relay == null) {
+                com.amyrmo.damavand.crypto.DmvLink.findContainer(text)
+                    ?.takeIf { runCatching { com.amyrmo.damavand.crypto.DmvCrypto.peek(it) }.isSuccess }
+            } else {
+                null
+            }
+            if (relay != null || bytes != null) {
+                com.amyrmo.damavand.core.DmvImportBus.request(
+                    com.amyrmo.damavand.core.DmvImportBus.Request("config.dmv", bytes, relay),
+                )
+                return true
+            }
+            // Not a locked link: fall through to the normal damavand:// profile-link parser.
+        }
         if (scheme !in com.amyrmo.damavand.domain.config.DeepLinkParser.SCHEMES) return false
         val request = com.amyrmo.damavand.domain.config.DeepLinkParser.parse(intent.dataString.orEmpty())
         if (request == null) {

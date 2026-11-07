@@ -145,6 +145,10 @@ fun ServersScreen(
     val lockedCannotShare = stringResource(Res.string.locked_cannot_share)
 
     fun toastImportFailure(e: Throwable) {
+        if (e is com.amyrmo.damavand.data.config.LockedDmvPendingException) {
+            platform.requestDmvImport(e.bytes, e.relay, "config.dmv")
+            return
+        }
         if (e is ConfigRepository.SubscriptionNotFetchedException) {
             scope.launch {
                 platform.toast(
@@ -1292,23 +1296,15 @@ fun ServersScreen(
     }
 
     dmvTarget?.let { target ->
-        DmvShareSheet(
-            profileName = target.name,
-            onDismiss = { dmvTarget = null },
-            onShare = { password, expiresHours, sizeKiB ->
-                val link = runCatching { repository.shareLinkOf(target) }.getOrNull()
-                if (link != null) {
-                    platform.shareDmvFile(
-                    fileName = target.name,
-                    payload = link,
-                    password = password,
-                    expiresAt = expiresHours?.let { com.amyrmo.damavand.platform.currentTimeMillis() + it * 3600_000L },
-                        maxSizeBytes = sizeKiB?.let { it.toLong() * 1024 },
-                    )
-                }
-                dmvTarget = null
-            },
-        )
+        val link = runCatching { repository.shareLinkOf(target) }.getOrNull()
+        if (link != null) {
+            LockShareSheet(
+                profileName = target.name,
+                rawPayload = link,
+                repository = repository,
+                onDismiss = { dmvTarget = null },
+            )
+        }
     }
 
     if (showSniSpoof) {

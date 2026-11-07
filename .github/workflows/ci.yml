@@ -53,6 +53,9 @@ jobs:
       # Deliver the APK as a release asset instead; release assets do not
       # count against the Actions artifact quota.
       #
+      # DRAFT MODE (Amir, 2026-11-07): the release is created as a DRAFT
+      # (not published) until Amir says to publish; flip by removing --draft
+      # from the gh release create line below and undrafting the release.
       # Release policy (Amir, 2026-11-06): release builds only, named
       # Damavand-<version>-<abi>.apk for arm64-v8a, armeabi-v7a and
       # universal. No debug APKs are published, and no "debug" appears in
@@ -71,7 +74,7 @@ jobs:
           VER=$(grep '^damavand.versionName=' gradle.properties | cut -d= -f2)
           BT=$(ls -d "$ANDROID_HOME"/build-tools/* | sort -V | tail -1)
           keytool -genkeypair -keystore /tmp/ci-release.jks -alias ci -keyalg RSA -keysize 2048 -validity 3650 -storepass android -keypass android -dname "CN=Damavand CI"
-          gh release view "v$VER" >/dev/null 2>&1 || gh release create "v$VER" --title "Damavand $VER" --notes "Damavand $VER — arm64-v8a for most phones, armeabi-v7a for older 32-bit phones, universal for any device."
+          gh release view "v$VER" >/dev/null 2>&1 || gh release create "v$VER" --draft --title "Damavand $VER" --notes "Damavand $VER — arm64-v8a for most phones, armeabi-v7a for older 32-bit phones, universal for any device."
           for ABI in arm64-v8a armeabi-v7a universal; do
             "$BT/zipalign" -f -p 4 "app/build/outputs/apk/release/app-$ABI-release-unsigned.apk" "/tmp/$ABI-aligned.apk"
             "$BT/apksigner" sign --ks /tmp/ci-release.jks --ks-pass pass:android --key-pass pass:android --out "Damavand-$VER-$ABI.apk" "/tmp/$ABI-aligned.apk"

@@ -8,6 +8,12 @@ import com.amyrmo.damavand.platform.currentTimeMillis
 import com.amyrmo.damavand.platform.HttpTextResponse
 import com.amyrmo.damavand.platform.httpGetResponse
 import com.amyrmo.damavand.platform.newId
+import com.amyrmo.damavand.crypto.DmvCrypto
+import com.amyrmo.damavand.crypto.DmvExpiredException
+import com.amyrmo.damavand.crypto.DmvKeyConsumedException
+import com.amyrmo.damavand.crypto.DmvLink
+import com.amyrmo.damavand.crypto.DmvMetadata
+import com.amyrmo.damavand.crypto.DmvSealRequest
 import com.amyrmo.damavand.crypto.ZsxCrypto
 import com.amyrmo.damavand.crypto.ZsxExpiredException
 import com.amyrmo.damavand.crypto.ZsxMetadata
@@ -116,6 +122,26 @@ class ConfigRepository(private val store: KeyValueStore) {
             }
             if (added > 0) return@runCatching added
             throw IllegalArgumentException("no usable ssh:// config found")
+        }
+
+        // Lock & Share: damavand:// locked links (full or relay short links) go through the
+        // locked-import flow. Only payloads that really are .dmv containers are claimed here;
+        // plain damavand:// profile links fall through to the ZedLink branch below.
+        DmvLink.findRelay(trimmed)?.let { relay ->
+            throw LockedDmvPendingException(null, relay)
+        }
+        val dmvBytes = DmvLink.findContainer(trimmed)
+        val dmvMeta = dmvBytes?.let { runCatching { DmvCrypto.peek(it) }.getOrNull() }
+        if (dmvBytes != null && dmvMeta != null) {
+            if (dmvMeta.deviceBound) {
+                // Opens silently when this device is the lock target; otherwise the dialog explains.
+                runCatching { importLockedDmv(dmvBytes, null).getOrThrow() }
+                    .onSuccess { return@runCatching 1 }
+                    .onFailure { throw LockedDmvPendingException(dmvBytes, null) }
+            }
+            if (dmvMeta.passwordProtected) throw LockedDmvPendingException(dmvBytes, null)
+            importLockedDmv(dmvBytes, null).getOrThrow()
+            return@runCatching 1
         }
 
         if (ZedLink.isZedLink(trimmed)) return@runCatching importZedLink(trimmed)
@@ -1438,6 +1464,107 @@ class ConfigRepository(private val store: KeyValueStore) {
         profile
     }
 
+    // -- Lock & Share (.dmv) ---------------------------------------------------
+
+    fun createLockedDmv(request: DmvSealRequest): ByteArray = DmvCrypto.seal(request)
+
+    fun peekDmv(bytes: ByteArray): DmvMetadata = DmvCrypto.peek(bytes)
+
+    /** Random id of this installation; device-locked configs and the relay use it to tell devices apart. */
+    fun dmvDeviceId(): String {
+        store.getString(KEY_DMV_DEVICE)?.takeIf { it.isNotBlank() }?.let { return it }
+        val id = DmvLink.toUrlSafe(DmvCrypto.secureRandomBytes(12))
+        store.putString(KEY_DMV_DEVICE, id)
+        return id
+    }
+
+    private fun isDmvKeyConsumed(key: String): Boolean {
+        val clean = key.trim().uppercase()
+        if (clean.isBlank()) return false
+        val current = store.getString(KEY_DMV_CONSUMED)?.split(",")?.map { it.trim() } ?: emptyList()
+        return clean in current
+    }
+
+    private fun markDmvKeyConsumed(key: String) {
+        val clean = key.trim().uppercase()
+        if (clean.isBlank()) return
+        val current = store.getString(KEY_DMV_CONSUMED)?.split(",")?.filter { it.isNotBlank() }?.toMutableSet() ?: mutableSetOf()
+        current.add(clean)
+        store.putString(KEY_DMV_CONSUMED, current.joinToString(","))
+    }
+
+    /** The relay endpoint the user last used for short links, kept so the sheet can prefill it. */
+    fun dmvRelaySettings(): Pair<String, String> =
+        (store.getString(KEY_DMV_RELAY_URL) ?: "") to (store.getString(KEY_DMV_RELAY_TOKEN) ?: "")
+
+    fun saveDmvRelaySettings(url: String, token: String) {
+        store.putString(KEY_DMV_RELAY_URL, url.trim())
+        store.putString(KEY_DMV_RELAY_TOKEN, token.trim())
+    }
+
+    /** Downloads the sealed blob behind a damavand://r.<id>@<host> short link. */
+    suspend fun fetchDmvRelay(relay: DmvLink.Relay, key: String?): ByteArray =
+        DmvRelay.download(relay, key?.trim()?.takeIf { it.isNotBlank() }, dmvDeviceId())
+
+    /**
+     * Opens a .dmv container and stores it as a locked profile, re-sealed with no
+     * password (the same storage shape as [importLocked]). Device-bound containers
+     * only open on the device they were locked for; a one-time key is consumed on use.
+     */
+    fun importLockedDmv(bytes: ByteArray, key: String?): Result<VpnProfile> = runCatching {
+        val meta = DmvCrypto.peek(bytes)
+        if (meta.isExpired) throw DmvExpiredException()
+        val cleanKey = key?.trim()?.takeIf { it.isNotBlank() }
+        if (cleanKey != null && isDmvKeyConsumed(cleanKey)) {
+            throw DmvKeyConsumedException()
+        }
+        val payload = if (meta.deviceBound) {
+            val myDevice = dmvDeviceId()
+            if (cleanKey != null) {
+                runCatching { DmvCrypto.open(bytes, cleanKey) }
+                    .getOrElse {
+                        runCatching { DmvCrypto.open(bytes, cleanKey + "\u0000" + myDevice) }
+                            .getOrElse { DmvCrypto.open(bytes, myDevice) }
+                    }
+            } else {
+                DmvCrypto.open(bytes, myDevice)
+            }
+        } else {
+            DmvCrypto.open(bytes, cleanKey)
+        }
+        if (cleanKey != null) {
+            markDmvKeyConsumed(cleanKey)
+        }
+        val resealed = DmvCrypto.seal(
+            DmvSealRequest(
+                configPayload = payload,
+                name = meta.name,
+                note = meta.note,
+                expiresAt = meta.expiresAt,
+                password = null,
+                maxSizeBytes = meta.maxSizeBytes,
+            ),
+        )
+        val name = meta.name.ifBlank { "Locked config" }
+        val profile = VpnProfile(
+            id = newId(),
+            name = name,
+            protocol = "LOCKED",
+            address = "•••",
+            port = 0,
+            transportLabel = "Locked · .dmv",
+            source = ProfileSource.Sealed(Base64.encode(resealed)),
+            addedAt = currentTimeMillis(),
+            isLocked = true,
+            note = meta.note.takeIf { it.isNotBlank() },
+        )
+        profile.toXrayConfigJson()
+        _profiles.value = _profiles.value + profile
+        persistProfiles()
+        if (_activeId.value == null) setActive(profile.id)
+        profile
+    }
+
     private fun persistProfiles() {
         store.putString(KEY_PROFILES, json.encodeToString(_profiles.value))
     }
@@ -1502,6 +1629,10 @@ class ConfigRepository(private val store: KeyValueStore) {
         private const val KEY_PROFILES = "profiles"
         private const val KEY_SUBS = "subscriptions"
         private const val KEY_ACTIVE = "active_id"
+        private const val KEY_DMV_DEVICE = "dmv_device_id"
+        private const val KEY_DMV_CONSUMED = "dmv_consumed_keys"
+        private const val KEY_DMV_RELAY_URL = "dmv_relay_url"
+        private const val KEY_DMV_RELAY_TOKEN = "dmv_relay_token"
         private const val KEY_AUTO_PICK = "auto_pick:"
 
         val DEFAULT_UA = "v2rayNG/${AppInfo.versionName}"
