@@ -48,10 +48,14 @@ object DmvLink {
      * container (DMV1 magic). Plain damavand:// profile links (ZedLink) return null,
      * so callers can fall through to the normal link parser.
      */
+    // The payload is captured as ONE token: when a whole share message is pasted, the
+    // words after the link (e.g. "To activate, import…") are separated by whitespace and
+    // must not be glued onto the base64 — decoding those extra bytes breaks the GCM tag.
+    private val CONTAINER = Regex("damavand://([A-Za-z0-9\\-_+/=]+)", RegexOption.IGNORE_CASE)
+
     fun findContainer(text: String): ByteArray? {
-        val idx = text.indexOf("damavand://", ignoreCase = true)
-        if (idx < 0) return null
-        val bytes = runCatching { decode(text.substring(idx)) }.getOrNull() ?: return null
+        val payload = CONTAINER.find(text)?.groupValues?.get(1) ?: return null
+        val bytes = runCatching { decode(payload) }.getOrNull() ?: return null
         return bytes.takeIf { it.size >= 4 && it.copyOfRange(0, 4).contentEquals(DMV_MAGIC) }
     }
 
