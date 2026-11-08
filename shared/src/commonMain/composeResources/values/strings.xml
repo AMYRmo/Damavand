@@ -1680,6 +1680,7 @@
     <string name="bento_playful_sum">Tiles squash and badges spin when pressed</string>
     <string name="bento_reset">Reset</string>
     <string name="bento_reset_look">Reset Bento look</string>
+    <string name="bento_search_servers">Search servers</string>
     <string name="bento_reset_tiles">Reset tile layout</string>
     <string name="bento_resize_tile">Resize %1$s</string>
     <string name="bento_search_settings">Search settings</string>

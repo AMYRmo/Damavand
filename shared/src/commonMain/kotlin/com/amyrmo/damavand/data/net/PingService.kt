@@ -112,6 +112,7 @@ object PingService {
         delayUrl: String = NetworkInfoRepository.DELAY_TEST_URL,
 
         chainConfig: (VpnProfile) -> String? = { null },
+        detectCountry: Boolean = false,
         onProgress: (done: Int, total: Int) -> Unit = { _, _ -> },
         onResult: (id: String, ms: Int?, countryCode: String?) -> Unit,
 
@@ -142,7 +143,7 @@ object PingService {
                 onResult(profile.id, latency, profile.countryCode)
                 doneLock.withPermit { onProgress(++done, total) }
 
-                if (latency > 0 && profile.countryCode == null) {
+                if (detectCountry && latency > 0 && profile.countryCode == null) {
                     geoScope.launch {
                         val country = geoPermits.withPermit { GeoLookup.countryOf(profile.address) }
                         if (country != null) onResult(profile.id, latency, country)

@@ -1670,6 +1670,7 @@
     <string name="bento_playful_sum">کاشی‌ها موقع لمس فشرده می‌شوند و نشان‌ها می‌چرخند</string>
     <string name="bento_reset">بازنشانی</string>
     <string name="bento_reset_look">بازنشانی ظاهر بنتو</string>
+    <string name="bento_search_servers">جستجوی سرورها</string>
     <string name="bento_reset_tiles">بازنشانی چیدمان کاشی‌ها</string>
     <string name="bento_resize_tile">تغییر اندازه %1$s</string>
     <string name="bento_search_settings">جستجوی تنظیمات</string>

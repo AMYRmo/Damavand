@@ -31,6 +31,13 @@ class SettingsRepository(context: Context) {
     private val prefs: SharedPreferences = context.applicationContext
         .getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
 
+    // Must be initialized before _settings: read() (called from the _settings
+    // initializer) decodes bento_prefs/ai_settings with it. Declared later in
+    // the class it would still be null during read(), the decode would throw
+    // inside runCatching, and bento/ai settings would silently fall back to
+    // defaults on every cold start (the "palette resets" bug, 2026-11-08).
+    private val aiJson = kotlinx.serialization.json.Json { ignoreUnknownKeys = true; encodeDefaults = true }
+
     private val _settings = MutableStateFlow(read())
     val settings: StateFlow<AppSettings> = _settings.asStateFlow()
 
@@ -277,8 +284,6 @@ class SettingsRepository(context: Context) {
                 ?: d.ai,
         )
     }
-
-    private val aiJson = kotlinx.serialization.json.Json { ignoreUnknownKeys = true; encodeDefaults = true }
 
     fun update(transform: (AppSettings) -> AppSettings) {
         val next = transform(_settings.value)
