@@ -94,6 +94,7 @@ import com.amyrmo.damavand.data.net.PingService
 import com.amyrmo.damavand.core.AutoSelect
 import com.amyrmo.damavand.domain.config.AutoSelectIds
 import com.amyrmo.damavand.domain.config.ConfigParseException
+import com.amyrmo.damavand.domain.config.ConfigParser
 import com.amyrmo.damavand.domain.config.VpnProfile
 import com.amyrmo.damavand.ui.onboarding.TourTargets
 import com.amyrmo.damavand.ui.onboarding.tourTarget
