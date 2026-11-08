@@ -1129,7 +1129,11 @@ fun ServersScreen(
                                 )
                             }
                         }
-                        val needle = query.trim().lowercase()
+                        // Damavand: the search field only exists in the Bento
+                        // header; in classic designs a stale query would filter
+                        // the grid with no way to clear it, so only apply it
+                        // while Bento is active.
+                        val needle = if (bento) query.trim().lowercase() else ""
                         val visibleOrder = if (needle.isEmpty()) order else order.filter { p ->
                             p.name.lowercase().contains(needle) || p.address.lowercase().contains(needle) ||
                                 p.transportLabel.lowercase().contains(needle) || p.protocol.lowercase().contains(needle)
@@ -1851,7 +1855,7 @@ fun ServersScreen(
                 TextButton(onClick = {
                     confirmDeleteAll = false
 
-                    val removed = servers.size
+                    val removed = servers.count { !it.isLocked }
                     repository.removeAll { !it.isLocked }
                     toastRes(Res.string.removed_count, removed)
                 }) { Text(stringResource(Res.string.action_delete)) }
