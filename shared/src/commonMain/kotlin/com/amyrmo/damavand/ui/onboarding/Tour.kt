@@ -123,7 +123,10 @@ object TourTargets {
     const val CONFIG_CARD = "config-card"
     const val HOME_TOOLS = "home-tools"
     const val NAV_SERVERS = "nav-Servers"
+    const val NAV_BPB = "nav-Bpb"
     const val NAV_SETTINGS = "nav-Settings"
+    const val BPB_CLOUDFLARE = "bpb-cloudflare"
+    const val BPB_WARP = "bpb-warp"
     const val SERVERS_ADD = "servers-add"
     const val SERVERS_SUBS = "servers-subs"
     const val SERVERS_PING = "servers-ping"
@@ -190,7 +193,7 @@ data class TourStep(
     val destination: TourDestination,
 )
 
-enum class TourDestination { Home, Servers, Settings }
+enum class TourDestination { Home, Servers, Bpb, Settings }
 
 private const val TARGET_WAIT_MS = 1_600L
 

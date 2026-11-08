@@ -1549,6 +1549,12 @@
     <string name="tour_tools_body">See which country you come out of, and measure the real speed through the tunnel. Drag these two anywhere.</string>
     <string name="tour_servers_tab_title">Your servers</string>
     <string name="tour_servers_tab_body">Everything about servers lives in this tab. Let us go there.</string>
+    <string name="tour_bpb_tab_title">The BPB tab</string>
+    <string name="tour_bpb_tab_body">BPB's toolbox has its own tab: Cloudflare deploys, Warp and more. Let us take a look.</string>
+    <string name="tour_bpb_cf_title">Cloudflare, built in</string>
+    <string name="tour_bpb_cf_body">Deploy the BPB worker to Cloudflare Workers or Pages with your own token, then connect through the built-in bpb profile.</string>
+    <string name="tour_bpb_tools_title">Warp and friends</string>
+    <string name="tour_bpb_tools_body">Warp and MASQUE live here — and finalmask, ECH, custom DNS and Tor bridges are further down this page.</string>
     <string name="tour_add_title">Add a server</string>
     <string name="tour_add_body">Paste a link, scan a QR code, open a file (.ovpn, .json), add one by hand, or set up Psiphon, Tor, a DNS tunnel, OpenConnect and the rest.</string>
     <string name="tour_subs_title">Subscriptions</string>

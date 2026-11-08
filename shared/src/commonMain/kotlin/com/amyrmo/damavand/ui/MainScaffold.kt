@@ -443,6 +443,7 @@ fun MainScaffold(
             current = when (step.destination) {
                 com.amyrmo.damavand.ui.onboarding.TourDestination.Home -> TopDestination.Home
                 com.amyrmo.damavand.ui.onboarding.TourDestination.Servers -> TopDestination.Servers
+                com.amyrmo.damavand.ui.onboarding.TourDestination.Bpb -> TopDestination.Bpb
                 com.amyrmo.damavand.ui.onboarding.TourDestination.Settings -> TopDestination.Settings
             }
         }

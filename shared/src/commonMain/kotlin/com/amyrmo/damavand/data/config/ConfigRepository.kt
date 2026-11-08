@@ -1378,14 +1378,23 @@ class ConfigRepository(private val store: KeyValueStore) {
     }
 
     private fun Subscription.withMeta(meta: SubscriptionMeta): Subscription {
-        val unnamed = name.isBlank() || name == url.take(40)
+        // A stored name that itself contains U+FFFD was adopted from a
+        // mangled title earlier — treat it as unnamed so a clean title can
+        // replace it on the next refresh.
+        val unnamed = name.isBlank() || name == url.take(40) || '�' in name
+        // A title that still contains U+FFFD after decoding was mangled by
+        // the platform's header decoding; never let it overwrite a clean
+        // name/title we already have.
+        val incomingTitle = meta.title
+        val titleCorrupt = incomingTitle != null && '�' in incomingTitle
+        val keepTitle = titleCorrupt && !title.isNullOrBlank() && '�' !in title.orEmpty()
         return copy(
-            name = if (unnamed && meta.title != null) meta.title else name,
+            name = if (unnamed && incomingTitle != null && !titleCorrupt) incomingTitle else name,
             upload = meta.upload,
             download = meta.download,
             total = meta.total,
             expireAt = meta.expireAt,
-            title = meta.title,
+            title = if (keepTitle) title else incomingTitle,
             updateIntervalHours = meta.updateIntervalHours,
             supportUrl = meta.supportUrl,
             webPageUrl = meta.webPageUrl,

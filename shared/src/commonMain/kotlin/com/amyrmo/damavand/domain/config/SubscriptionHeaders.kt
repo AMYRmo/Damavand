@@ -83,7 +83,14 @@ object SubscriptionHeaders {
         } else {
             raw
         }
-        return decoded.trim().replace(Regex("\\s+"), " ").take(MAX_TITLE).takeIf { it.isNotEmpty() }
+        // Some panels (Node-based ones especially) send profile-title as raw
+        // Latin-1 bytes. Android's HTTP stack decodes header bytes as UTF-8,
+        // so a lone Latin-1 byte (e.g. 0xB7, the "·" separator) arrives here
+        // already destroyed as U+FFFD and the original byte is unrecoverable.
+        // When the destroyed char sits between spaces it was a separator —
+        // restore it as a middle dot instead of showing the replacement glyph.
+        val restored = if ('�' in decoded) decoded.replace(" � ", " · ") else decoded
+        return restored.trim().replace(Regex("\\s+"), " ").take(MAX_TITLE).takeIf { it.isNotEmpty() }
     }
 
     private fun parseInterval(value: String): Int? =

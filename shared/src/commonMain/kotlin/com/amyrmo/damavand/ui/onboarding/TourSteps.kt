@@ -74,10 +74,28 @@ fun rememberTourSteps(): List<TourStep> = listOf(
         destination = TourDestination.Servers,
     ),
     TourStep(
+        target = TourTargets.NAV_BPB,
+        title = stringResource(Res.string.tour_bpb_tab_title),
+        body = stringResource(Res.string.tour_bpb_tab_body),
+        destination = TourDestination.Servers,
+    ),
+    TourStep(
+        target = TourTargets.BPB_CLOUDFLARE,
+        title = stringResource(Res.string.tour_bpb_cf_title),
+        body = stringResource(Res.string.tour_bpb_cf_body),
+        destination = TourDestination.Bpb,
+    ),
+    TourStep(
+        target = TourTargets.BPB_WARP,
+        title = stringResource(Res.string.tour_bpb_tools_title),
+        body = stringResource(Res.string.tour_bpb_tools_body),
+        destination = TourDestination.Bpb,
+    ),
+    TourStep(
         target = TourTargets.NAV_SETTINGS,
         title = stringResource(Res.string.tour_settings_title),
         body = stringResource(Res.string.tour_settings_body),
-        destination = TourDestination.Servers,
+        destination = TourDestination.Bpb,
     ),
 
     TourStep(

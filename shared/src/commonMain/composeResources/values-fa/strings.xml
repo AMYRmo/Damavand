@@ -1539,6 +1539,12 @@
     <string name="tour_tools_body">ببین از کدام کشور بیرون می‌آیی و سرعت واقعی تونل را اندازه بگیر. این دو را هرجا خواستی بکش و جابه‌جا کن.</string>
     <string name="tour_servers_tab_title">سرورهای تو</string>
     <string name="tour_servers_tab_body">هر چیزی دربارهٔ سرورها در این تب است. برویم آنجا.</string>
+    <string name="tour_bpb_tab_title">تب BPB</string>
+    <string name="tour_bpb_tab_body">ابزارهای BPB تب خودشون رو دارن: دیپلوی کلودفلر، وارپ و بقیه. برویم ببینیم.</string>
+    <string name="tour_bpb_cf_title">کلودفلر، داخل خود برنامه</string>
+    <string name="tour_bpb_cf_body">ورکر BPB رو با توکن خودت روی Cloudflare Workers یا Pages نصب کن و با پروفایل آمادهٔ bpb وصل شو.</string>
+    <string name="tour_bpb_tools_title">وارپ و رفقاش</string>
+    <string name="tour_bpb_tools_body">وارپ و MASQUE اینجان — و فاینال‌مسک، ECH، DNS سفارشی و پل‌های تور پایین‌ترِ همین صفحه‌ان.</string>
     <string name="tour_add_title">افزودن سرور</string>
     <string name="tour_add_body">لینک را paste کن، QR اسکن کن، فایل باز کن (‎.ovpn، ‎.json)، دستی بساز، یا Psiphon و Tor و تونل DNS و OpenConnect و بقیه را اضافه کن.</string>
     <string name="tour_subs_title">اشتراک‌ها</string>

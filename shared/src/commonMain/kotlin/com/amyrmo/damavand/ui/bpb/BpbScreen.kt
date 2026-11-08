@@ -1,5 +1,6 @@
 package com.amyrmo.damavand.ui.bpb
 
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.padding
@@ -61,6 +62,7 @@ import com.amyrmo.damavand.ui.settings.SettingsEditRow
 import com.amyrmo.damavand.ui.settings.SettingsGroup
 import com.amyrmo.damavand.ui.settings.SettingsInfoRow
 import com.amyrmo.damavand.ui.settings.SettingsMenuRow
+import com.amyrmo.damavand.ui.onboarding.tourTargetInPage
 import com.amyrmo.damavand.ui.settings.SettingsPageScaffold
 import com.amyrmo.damavand.ui.settings.SettingsSegment
 import com.amyrmo.damavand.ui.settings.rememberMoatFetchState
@@ -119,11 +121,16 @@ fun BpbScreen(
     ) {
         // Cloudflare — BPB's deployment suite leads the tab (it is what the
         // built-in "bpb" profile connects through).
-        CloudflareSection(cfRepository)
+        Box(Modifier.tourTargetInPage(com.amyrmo.damavand.ui.onboarding.TourTargets.BPB_CLOUDFLARE)) {
+            CloudflareSection(cfRepository)
+        }
 
         // Warp — BPB has separate Warp and Masque sections, each with its
         // account registration; Damavand's one dialog covers both.
-        SettingsGroup(stringResource(Res.string.bpb_section_warp)) {
+        SettingsGroup(
+            stringResource(Res.string.bpb_section_warp),
+            modifier = Modifier.tourTargetInPage(com.amyrmo.damavand.ui.onboarding.TourTargets.BPB_WARP),
+        ) {
             SettingsMenuRow(
                 title = stringResource(Res.string.warp_mode_masque),
                 subtitle = stringResource(Res.string.bpb_warp_masque_summary),
