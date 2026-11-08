@@ -86,6 +86,7 @@ fun AutoSelectCard(
     onSelect: () -> Unit,
     onDetails: () -> Unit,
     personalization: Personalization = Personalization.Default,
+    modifier: Modifier = Modifier,
 ) {
     val container = if (active) {
         personalization.serverActiveColor ?: MaterialTheme.colorScheme.primaryContainer
@@ -104,7 +105,7 @@ fun AutoSelectCard(
         shape = RoundedCornerShape(personalization.cornerStyle.serverCardDp.dp),
         color = container,
         contentColor = onContainer,
-        modifier = Modifier.fillMaxWidth(),
+        modifier = modifier.fillMaxWidth(),
     ) {
         Row(
             Modifier.fillMaxWidth().padding(start = 12.dp, end = 4.dp, top = 12.dp, bottom = 12.dp),
