@@ -1739,12 +1739,31 @@ private fun statsPolicy(slowUpstream: Boolean = false) = buildJsonObject {
     ) = buildJsonObject {
         put("network", "masque")
         put("security", "tls")
-        val alpn = s.tls.alpn?.split(",")?.map(String::trim)?.filter(String::isNotEmpty)
+        // WARP TEST (2026-11-09): on Amir's carrier the H3/QUIC handshake is
+        // dropped even under the finalmask UDP noises (0 bytes, core restart
+        // loop), while WARP-over-WireGuard works — so for WARP profiles force
+        // MASQUE over HTTP/2 (TCP/TLS, no QUIC on the wire) with a camouflaged
+        // ClientHello SNI (www.cloudflare.com, the same name PattNG's Aether
+        // uses), while certificate verification still checks the real
+        // endpoint name. Applied at build time, so stored profiles pick it
+        // up without re-registering. Revert: drop the eff copy below.
+        val eff = if (s.isWarp) {
+            s.copy(
+                tls = s.tls.copy(
+                    alpn = "h2",
+                    sni = "www.cloudflare.com",
+                    verifyPeerCertByName = WARP_MASQUE_SNI,
+                ),
+            )
+        } else {
+            s
+        }
+        val alpn = eff.tls.alpn?.split(",")?.map(String::trim)?.filter(String::isNotEmpty)
             ?.firstOrNull { it == "h3" || it == "h2" } ?: "h3"
-        val sni = s.tls.sni?.takeIf { it.isNotBlank() }
+        val sni = eff.tls.sni?.takeIf { it.isNotBlank() }
             ?: options.masqueSni.takeIf { it.isNotBlank() }
-            ?: if (s.isWarp) WARP_MASQUE_SNI else s.transport.host?.takeIf { it.isNotBlank() }
-        put("tlsSettings", tlsSettingsOf(s, sni, options, alpnOverride = listOf(alpn), fingerprint = alpn == "h2"))
+            ?: if (eff.isWarp) WARP_MASQUE_SNI else eff.transport.host?.takeIf { it.isNotBlank() }
+        put("tlsSettings", tlsSettingsOf(eff, sni, options, alpnOverride = listOf(alpn), fingerprint = alpn == "h2"))
         putJsonObject("masqueSettings") {
             (runCatching { Json.parseToJsonElement(s.transport.xhttpExtra.orEmpty()) }.getOrNull() as? JsonObject)
                 ?.forEach { (k, v) -> if (k !in MASQUE_TYPED_KEYS) put(k, v) }
@@ -1884,7 +1903,9 @@ private fun statsPolicy(slowUpstream: Boolean = false) = buildJsonObject {
      */
     private fun masqueFinalMask(s: ServerConfig, options: BuildOptions): JsonObject? {
         if (!options.masqueMaskEnabled) return null
-        val alpn = s.tls.alpn?.split(",")?.map(String::trim)?.filter(String::isNotEmpty)
+        // WARP profiles are forced to h2 in masqueStreamSettings (2026-11-09
+        // test) — the mask must agree, so they take the fragment branch.
+        val alpn = if (s.isWarp) "h2" else s.tls.alpn?.split(",")?.map(String::trim)?.filter(String::isNotEmpty)
             ?.firstOrNull { it == "h3" || it == "h2" } ?: "h3"
         return if (alpn == "h3") {
             FinalMaskJson.build(
