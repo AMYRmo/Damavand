@@ -358,9 +358,6 @@ fun MainScaffold(
                         current = TopDestination.Home
                         tourStep = 0
                     },
-                    onReplaySetup = {
-                        setupDone = false
-                    },
                     onInitialPageConsumed = {
                         pendingSettingsPage = com.amyrmo.damavand.ui.settings.SettingsPage.Root
                     },

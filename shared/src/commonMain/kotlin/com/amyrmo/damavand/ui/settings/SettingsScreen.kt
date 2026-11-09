@@ -104,8 +104,6 @@ fun SettingsScreen(
 
     onReplayTour: (() -> Unit)? = null,
 
-    onReplaySetup: (() -> Unit)? = null,
-
     mtuHint: com.amyrmo.damavand.data.net.MtuServerHint? = null,
 
     ai: com.amyrmo.damavand.ui.settings.AiSection? = null,
@@ -190,7 +188,6 @@ fun SettingsScreen(
                 onOpen = { page = it },
                 onAbout = { showAbout = true },
                 onReplayTour = onReplayTour,
-                onReplaySetup = onReplaySetup,
                 hasAi = ai != null,
                 onUpdate = onUpdate,
             )
@@ -299,7 +296,6 @@ private fun RootPage(
     onOpen: (SettingsPage) -> Unit,
     onAbout: () -> Unit,
     onReplayTour: (() -> Unit)?,
-    onReplaySetup: (() -> Unit)?,
     hasAi: Boolean,
 ) {
     val platform = LocalPlatform.current
@@ -353,13 +349,7 @@ private fun RootPage(
                     art = SettingsArts.Tour,
                 ) { onReplayTour() }
             }
-            if (onReplaySetup != null) {
-                SettingsMenuRow(
-                    stringResource(Res.string.onb_replay_title),
-                    stringResource(Res.string.onb_replay_sub),
-                    art = SettingsArts.Routing,
-                ) { onReplaySetup() }
-            }
+
         }
 
         SettingsGroup(
@@ -518,7 +508,6 @@ private fun BentoRoot(
     onOpen: (SettingsPage) -> Unit,
     onAbout: () -> Unit,
     onReplayTour: (() -> Unit)?,
-    onReplaySetup: (() -> Unit)?,
     hasAi: Boolean,
     onUpdate: ((AppSettings) -> AppSettings) -> Unit,
 ) {
@@ -772,15 +761,7 @@ private fun BentoRoot(
                 art = SettingsArts.Tour,
             ) { onReplayTour() })
         }
-        if (onReplaySetup != null) {
-            add(com.amyrmo.damavand.ui.bento.BentoHubEntry(
-                key = "setup",
-                title = stringResource(Res.string.onb_replay_title),
-                summary = stringResource(Res.string.onb_replay_sub),
-                art = SettingsArts.Routing,
-                keywords = listOf(stringResource(Res.string.onb_region_change), stringResource(Res.string.onb_region_title)),
-            ) { onReplaySetup() })
-        }
+
         add(com.amyrmo.damavand.ui.bento.BentoHubEntry(
             key = "update",
             title = stringResource(Res.string.update_check_title),
