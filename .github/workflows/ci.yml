@@ -62,10 +62,13 @@ jobs:
       # file names.
       #
       # Optimized build: R8-minified release (unsigned in Gradle — no
-      # keystore.properties on this branch), signed here with a throwaway CI
-      # key purely so it can be installed for testing. Package is
-      # com.amyrmo.damavand (no .debug suffix): it does not update the
-      # installed v1 (different key).
+      # keystore.properties on this branch), signed here with the STABLE
+      # release keystore kept in the pre-provisioned repo secrets
+      # APP_KEYSTORE_BASE64 / APP_KEYSTORE_PASSWORD / APP_KEYSTORE_ALIAS
+      # / APP_KEY_PASSWORD (Amir's order, 2026-11-10: app updates must
+      # install in place). Every build carries the same signature, so a
+      # new build installs over the previous one with data and settings
+      # preserved — as long as versionCode keeps increasing.
       - name: Build and publish the release APKs (arm64, armv7, universal)
         env:
           GH_TOKEN: ${{ github.token }}
@@ -73,10 +76,11 @@ jobs:
           ./gradlew :app:assembleRelease --no-daemon -x lint
           VER=$(grep '^damavand.versionName=' gradle.properties | cut -d= -f2)
           BT=$(ls -d "$ANDROID_HOME"/build-tools/* | sort -V | tail -1)
-          keytool -genkeypair -keystore /tmp/ci-release.jks -alias ci -keyalg RSA -keysize 2048 -validity 3650 -storepass android -keypass android -dname "CN=Damavand CI"
+          echo "${{ secrets.APP_KEYSTORE_BASE64 }}" | base64 -d > /tmp/release.jks
+          KEYPASS="${{ secrets.APP_KEY_PASSWORD }}"; [ -z "$KEYPASS" ] && KEYPASS="${{ secrets.APP_KEYSTORE_PASSWORD }}"
           gh release view "v$VER" >/dev/null 2>&1 || gh release create "v$VER" --draft --title "Damavand $VER" --notes "Damavand $VER — arm64-v8a for most phones, armeabi-v7a for older 32-bit phones, universal for any device."
           for ABI in arm64-v8a armeabi-v7a universal; do
             "$BT/zipalign" -f -p 4 "app/build/outputs/apk/release/app-$ABI-release-unsigned.apk" "/tmp/$ABI-aligned.apk"
-            "$BT/apksigner" sign --ks /tmp/ci-release.jks --ks-pass pass:android --key-pass pass:android --out "Damavand-$VER-$ABI.apk" "/tmp/$ABI-aligned.apk"
+            "$BT/apksigner" sign --ks /tmp/release.jks --ks-key-alias "${{ secrets.APP_KEYSTORE_ALIAS }}" --ks-pass "pass:${{ secrets.APP_KEYSTORE_PASSWORD }}" --key-pass "pass:$KEYPASS" --out "Damavand-$VER-$ABI.apk" "/tmp/$ABI-aligned.apk"
             gh release upload "v$VER" "Damavand-$VER-$ABI.apk" --clobber
           done
