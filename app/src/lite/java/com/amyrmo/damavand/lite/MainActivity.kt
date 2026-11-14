@@ -56,32 +56,43 @@ class MainActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        setContent {
-            MaterialTheme(
-                colorScheme = androidx.compose.material3.darkColorScheme(
-                    background = LiteColors.bg,
-                    surface = LiteColors.surface,
-                    onBackground = LiteColors.text,
-                    onSurface = LiteColors.text,
-                    primary = LiteColors.accent,
-                ),
-                typography = androidx.compose.material3.Typography(
-                    bodyLarge = androidx.compose.ui.text.TextStyle(fontFamily = Vazirmatn),
-                    bodyMedium = androidx.compose.ui.text.TextStyle(fontFamily = Vazirmatn),
-                    bodySmall = androidx.compose.ui.text.TextStyle(fontFamily = Vazirmatn),
-                    titleLarge = androidx.compose.ui.text.TextStyle(fontFamily = Vazirmatn),
-                    titleMedium = androidx.compose.ui.text.TextStyle(fontFamily = Vazirmatn),
-                    titleSmall = androidx.compose.ui.text.TextStyle(fontFamily = Vazirmatn),
-                    labelLarge = androidx.compose.ui.text.TextStyle(fontFamily = Vazirmatn),
-                    labelMedium = androidx.compose.ui.text.TextStyle(fontFamily = Vazirmatn),
-                    labelSmall = androidx.compose.ui.text.TextStyle(fontFamily = Vazirmatn),
-                )
-            ) {
-                LiteRoot(vm = vm, onConnectRequest = { requestConnect() })
+        // 1.1.1: if the first Compose frame throws, show a plain error
+        // view instead of dying — and the crash handler in LiteApp has
+        // already written the full stack trace to crash-<time>.txt.
+        try {
+            setContent {
+                MaterialTheme(
+                    colorScheme = androidx.compose.material3.darkColorScheme(
+                        background = LiteColors.bg,
+                        surface = LiteColors.surface,
+                        onBackground = LiteColors.text,
+                        onSurface = LiteColors.text,
+                        primary = LiteColors.accent,
+                    ),
+                    typography = androidx.compose.material3.Typography(
+                        bodyLarge = androidx.compose.ui.text.TextStyle(fontFamily = Vazirmatn),
+                        bodyMedium = androidx.compose.ui.text.TextStyle(fontFamily = Vazirmatn),
+                        bodySmall = androidx.compose.ui.text.TextStyle(fontFamily = Vazirmatn),
+                        titleLarge = androidx.compose.ui.text.TextStyle(fontFamily = Vazirmatn),
+                        titleMedium = androidx.compose.ui.text.TextStyle(fontFamily = Vazirmatn),
+                        titleSmall = androidx.compose.ui.text.TextStyle(fontFamily = Vazirmatn),
+                        labelLarge = androidx.compose.ui.text.TextStyle(fontFamily = Vazirmatn),
+                        labelMedium = androidx.compose.ui.text.TextStyle(fontFamily = Vazirmatn),
+                        labelSmall = androidx.compose.ui.text.TextStyle(fontFamily = Vazirmatn),
+                    )
+                ) {
+                    LiteRoot(vm = vm, onConnectRequest = { requestConnect() })
+                }
             }
+        } catch (t: Throwable) {
+            val tv = android.widget.TextView(this)
+            tv.text = "Damavand Lite failed to start.\n\n$t\n\nSee crash-*.txt in the app files folder."
+            tv.setPadding(48, 48, 48, 48)
+            setContentView(tv)
+            return
         }
         // One auto-connect attempt on launch (spec §7.1).
-        vm.autoConnectOnce()
+        runCatching { vm.autoConnectOnce() }
     }
 
     /** Connect, requesting the system VPN permission first if needed. */
