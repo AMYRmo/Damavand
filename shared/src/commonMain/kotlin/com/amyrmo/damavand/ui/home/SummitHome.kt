@@ -54,12 +54,14 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.amyrmo.damavand.data.net.NetworkInfo
-import com.amyrmo.damavand.domain.model.ConnectionFault
+import com.amyrmo.damavand.core.ConnectionFault
 import com.amyrmo.damavand.domain.model.ConnectionState
 import com.amyrmo.damavand.ui.bento.BentoServerPick
 import com.amyrmo.damavand.ui.components.FlagBadge
 import com.amyrmo.damavand.ui.connection.ConnectionUiState
 import com.amyrmo.damavand.ui.format.formatElapsed
+import com.amyrmo.damavand.ui.theme.LocalMotionBudget
+import com.amyrmo.damavand.ui.theme.MotionBudget
 import org.jetbrains.compose.resources.stringResource
 
 // Summit home, rebuilt spec-by-spec from the approved prototype:
