@@ -10,14 +10,16 @@ import java.util.Date
 import java.util.Locale
 
 /**
- * Lite application — warms up the Xray core in the background.
+ * Lite application — deliberately does almost nothing at launch.
  *
- * 1.1.1: installs a global uncaught-exception handler FIRST, so that even
- * a crash during launch leaves a readable stack trace on the device
- * (internal filesDir + external files dir, readable from a file manager
- * or Termux at /sdcard/Android/data/com.amyrmo.damavand.lite/files/).
- * The handler chains to the previous (system) handler, so the normal
- * "keeps stopping" dialog still appears.
+ * 2.0.0 (full rewrite): the 1.1.x builds died on launch twice with a
+ * black screen and no UI. The launch path now contains NO native-code
+ * loading at all: the Xray core (libgojni) is loaded lazily on the first
+ * connect / ping test, via XrayController.ready(). A broken native lib
+ * can therefore never kill the launch — it can only fail a connect
+ * attempt, with a readable error. The only work done here is installing
+ * the global crash handler (which writes crash-<time>.txt) and handing
+ * the application context to the controller for that lazy init.
  */
 class LiteApp : Application() {
     override fun onCreate() {
@@ -40,6 +42,7 @@ class LiteApp : Application() {
             previous?.uncaughtException(thread, throwable)
         }
         super.onCreate()
-        XrayController.warmUp(this)
+        // Context only — no native code is touched here (see class doc).
+        XrayController.setAppContext(this)
     }
 }
