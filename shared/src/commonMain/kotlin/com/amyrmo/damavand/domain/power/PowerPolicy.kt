@@ -21,6 +21,8 @@ object PowerPolicy {
         // every 3 s and the widget at most every 30 s.
         Cadence(tickMs = 1_000L, notifySeconds = 3, autoPollSeconds = 3, widgetSeconds = 30)
     } else {
-        Cadence(tickMs = 10_000L, notifySeconds = 30, autoPollSeconds = 45, widgetSeconds = 60)
+        // Lite: the notification and widget freeze while the screen is off;
+        // the 10 s tick stays so tunnel-failure detection keeps working.
+        Cadence(tickMs = 10_000L, notifySeconds = 3600, autoPollSeconds = 45, widgetSeconds = 3600)
     }
 }
