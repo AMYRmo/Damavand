@@ -1,0 +1,136 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">دماوند لایت</string>
+
+    <!-- Header -->
+    <string name="lite_subtitle">نسخه سبک — تک‌هسته در هر اتصال</string>
+
+    <!-- Status pill -->
+    <string name="status_disconnected">قطع</string>
+    <string name="status_connecting">در حال اتصال…</string>
+    <string name="status_connected">متصل</string>
+    <string name="status_error">خطا در اتصال</string>
+
+    <!-- Tabs -->
+    <string name="tab_home">خانه</string>
+    <string name="tab_servers">سرورها</string>
+    <string name="tab_stats">آمار</string>
+    <string name="tab_settings">تنظیمات</string>
+
+    <!-- Ring -->
+    <string name="ring_tap_to_connect">برای اتصال بزنید</string>
+    <string name="ring_auto_fastest">سریع‌ترین سرور به‌صورت خودکار انتخاب می‌شود</string>
+    <string name="ring_step_keys">مذاکره کلیدها</string>
+    <string name="ring_step_route">بررسی مسیر</string>
+    <string name="ring_step_finish">تکمیل اتصال</string>
+
+    <!-- Under-ring caption -->
+    <string name="caption_idle_title">متصل نیستید</string>
+    <string name="caption_idle_body">ترافیک شما در حال حاضر بدون تونل عبور می‌کند</string>
+    <string name="caption_connecting_title">در حال اتصال…</string>
+    <string name="caption_connecting_body">لطفاً صبر کنید</string>
+    <string name="caption_connected_title">به قله رسیدید</string>
+    <string name="caption_connected_body">برای قطع اتصال، دوباره روی حلقه بزنید</string>
+    <string name="caption_error_title">اتصال برقرار نشد</string>
+
+    <!-- Stats row -->
+    <string name="stat_ping">پینگ</string>
+    <string name="stat_download">دانلود</string>
+    <string name="stat_upload">آپلود</string>
+    <string name="stat_session">حجم جلسه</string>
+
+    <!-- Fastest button -->
+    <string name="btn_fastest">اتصال به سریع‌ترین سرور</string>
+    <string name="btn_disconnect">قطع اتصال</string>
+    <string name="btn_connecting">در حال اتصال…</string>
+
+    <!-- Connect errors -->
+    <string name="err_no_profiles">سروری برای اتصال نیست — اول یک سرور انتخاب کنید</string>
+    <string name="err_no_network">به شبکه دسترسی نیست — اتصال اینترنت را بررسی کنید</string>
+    <string name="err_server_timeout">سرور پاسخ نداد — سرور دیگری را امتحان کنید</string>
+    <string name="err_generic">اتصال برقرار نشد — دوباره تلاش کنید</string>
+
+    <!-- Servers -->
+    <string name="btn_test_all">تست همه سرورها</string>
+    <string name="btn_testing">در حال تست…</string>
+    <string name="test_note">تست فقط هنگام باز بودن این صفحه اجرا می‌شود</string>
+    <string name="badge_fastest">سریع‌ترین</string>
+    <string name="ping_untested">تست نشده</string>
+    <string name="ping_failed">ناموفق</string>
+    <string name="servers_empty_title">سروری نیست</string>
+    <string name="servers_empty_body">هنوز سابسکریپشن یا سروری اضافه نشده است — بعد از اضافه کردن، سرورها اینجا نمایش داده می‌شوند</string>
+    <string name="servers_test_all_failed">تست هیچ سروری موفق نبود — اتصال اینترنت را بررسی کنید و دوباره تلاش کنید</string>
+    <string name="servers_add_subscription">افزودن سابسکریپشن</string>
+    <string name="servers_unavailable">این سرور در دسترس نیست</string>
+    <string name="home_empty_title">هنوز سروری انتخاب نشده است</string>
+    <string name="home_empty_body">از تب سرورها یک سرور انتخاب کنید یا سابسکریپشن را وارد کنید</string>
+
+    <!-- Stats -->
+    <string name="stats_live_label">سرعت دانلود — زنده</string>
+    <string name="stats_axis_60">۶۰ ثانیه پیش</string>
+    <string name="stats_axis_30">۳۰ ثانیه پیش</string>
+    <string name="stats_axis_now">اکنون</string>
+    <string name="stats_empty">برای دیدن نمودار زنده، از صفحه خانه متصل شوید</string>
+    <string name="stats_best_ping">بهترین پینگ جلسه</string>
+    <string name="stats_best_ping_sub">کمترین پینگ ثبت‌شده در این اتصال</string>
+    <string name="stats_session_volume">حجم جلسه</string>
+    <string name="stats_session_volume_sub">مجموع دانلود و آپلود این اتصال</string>
+
+    <!-- Settings groups -->
+    <string name="settings_group_connection">اتصال</string>
+    <string name="settings_group_battery">باتری و حجم</string>
+    <string name="settings_group_core">هسته اتصال</string>
+    <string name="settings_group_about">درباره</string>
+
+    <!-- Kill switch / auto-connect -->
+    <string name="kill_switch">کیل‌سوئیچ</string>
+    <string name="kill_switch_desc">اگر اتصال VPN قطع شود، اینترنت دستگاه هم قطع می‌شود تا ترافیک بدون تونل عبور نکند</string>
+    <string name="auto_connect">اتصال خودکار</string>
+    <string name="auto_connect_desc">با باز شدن برنامه، به سریع‌ترین سرور وصل شو</string>
+
+    <!-- Battery / volume -->
+    <string name="battery_saver">حالت کم‌مصرف</string>
+    <string name="battery_saver_desc">با خاموش شدن صفحه، به‌روزرسانی آمار متوقف می‌شود؛ حلقه سرعت فقط وقتی شنونده دارد می‌چرخد</string>
+    <string name="battery_saver_off_note">مصرف باتری بیشتر می‌شود</string>
+    <string name="sub_auto_update">به‌روزرسانی خودکار سابسکریپشن</string>
+    <string name="sub_auto_update_desc">سابسکریپشن‌ها به‌صورت دوره‌ای در پس‌زمینه به‌روز می‌شوند</string>
+
+    <!-- Preferred core -->
+    <string name="preferred_core">هسته ترجیحی</string>
+    <string name="preferred_core_desc">هسته‌ای که برای هر اتصال استفاده می‌شود — تک‌هسته در هر اتصال</string>
+    <string name="preferred_core_auto">خودکار (توصیه‌شده)</string>
+    <string name="preferred_core_applies_next">از اتصال بعدی اعمال می‌شود</string>
+
+    <!-- Geo download -->
+    <string name="geo_title">داده موقعیت</string>
+    <string name="geo_desc">برای تشخیص کشور و شهر سرورها لازم است — یک‌بار دانلود می‌شود</string>
+    <string name="geo_download">دانلود</string>
+    <string name="geo_cancel">لغو</string>
+    <string name="geo_ready">آماده</string>
+    <string name="geo_update">به‌روزرسانی</string>
+    <string name="geo_retry">تلاش دوباره</string>
+    <string name="geo_update_available">نسخه جدید داده موقعیت در دسترس است</string>
+    <string name="geo_err_network">دانلود ناموفق بود — اتصال اینترنت را بررسی کنید</string>
+    <string name="geo_err_corrupt">فایل دانلودشده خراب است — دوباره تلاش کنید</string>
+
+    <!-- About -->
+    <string name="about_version">نسخه</string>
+    <string name="about_version_code">کد نسخه %1$s</string>
+    <string name="geo_version">نسخه: %1$s</string>
+    <string name="about_package">بسته برنامه</string>
+    <string name="about_core">هسته</string>
+    <string name="about_repo">مخزن</string>
+    <string name="about_repo_value">AMYRmo/Damavand — شاخه lite</string>
+    <string name="about_copy">دماوند لایت — نسخه سبک دماوند. برای اتصال سریع و کم‌مصرف ساخته شده است.</string>
+
+    <!-- Subscription import -->
+    <string name="sub_import_title">افزودن سابسکریپشن</string>
+    <string name="sub_import_hint">پیوند سابسکریپشن را وارد کنید</string>
+    <string name="sub_import_add">افزودن</string>
+    <string name="sub_import_cancel">لغو</string>
+    <string name="sub_import_failed">افزودن سابسکریپشن ناموفق بود — پیوند را بررسی کنید</string>
+
+    <!-- Misc -->
+    <string name="vpn_permission_title">برای اتصال، اجازه VPN لازم است</string>
+    <string name="notif_disconnect">قطع</string>
+</resources>
