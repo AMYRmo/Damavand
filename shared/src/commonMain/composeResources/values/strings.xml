@@ -1711,6 +1711,9 @@
     <string name="bento_wave">Wave on the bar</string>
     <string name="bento_wave_sum">Moves only while connecting</string>
     <string name="home_design_bento">Bento</string>
+    <string name="home_design_summit">Summit</string>
+    <string name="summit_ping">Ping</string>
+    <string name="summit_session">Session</string>
     <string name="ipd_abuse_no">No abuse reports</string>
     <string name="ipd_abuse_yes">Abuse reported</string>
     <string name="ipd_asn">ASN</string>
