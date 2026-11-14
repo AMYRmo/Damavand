@@ -143,7 +143,7 @@ class LiteViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     init {
-        // 1.1.1: every step is guarded — a failure in any one of them
+        // 2.0.0: every step is guarded — a failure in any one of them
         // (receiver, DataStore, WorkManager, broadcast) must never kill
         // the launch. Each is best-effort; the UI works without it.
         runCatching {
