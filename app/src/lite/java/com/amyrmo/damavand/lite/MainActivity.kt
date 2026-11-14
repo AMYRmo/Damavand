@@ -12,16 +12,18 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.alpha
 import com.amyrmo.damavand.lite.ui.ConnState
 import com.amyrmo.damavand.lite.ui.ConnectionUiState
 import com.amyrmo.damavand.lite.ui.LiteViewModel
@@ -38,6 +40,11 @@ import com.amyrmo.damavand.lite.ui.theme.Vazirmatn
  * Damavand Lite — single activity, four Summit tabs (Home / Servers /
  * Stats / Settings). No onboarding, no login, no design picker.
  * Android back from any tab goes to Home; back from Home exits.
+ *
+ * 2.0.0: only the VISIBLE tab is composed. The 1.1.x build composed all
+ * four tabs at once (invisible ones at alpha 0), so a composition crash
+ * in ANY tab killed the launch. Each tab's scroll state is hoisted here
+ * so tabs still keep their scroll position across switches.
  */
 class MainActivity : ComponentActivity() {
 
@@ -56,7 +63,7 @@ class MainActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        // 1.1.1: if the first Compose frame throws, show a plain error
+        // 2.0.0: if the first Compose frame throws, show a plain error
         // view instead of dying — and the crash handler in LiteApp has
         // already written the full stack trace to crash-<time>.txt.
         try {
@@ -114,8 +121,16 @@ private fun LiteRoot(vm: LiteViewModel, onConnectRequest: () -> Unit) {
     val profiles by vm.profiles.collectAsState()
     val selectedId by vm.selectedId.collectAsState()
 
+    // Scroll states hoisted here so each tab keeps its position while
+    // only the visible tab is composed (see class doc).
+    val homeScroll = rememberScrollState()
+    val serversList = rememberLazyListState()
+    val statsScroll = rememberScrollState()
+    val settingsScroll = rememberScrollState()
+
     // The chart only samples while the Stats tab is visible and connected.
-    vm.setStatsVisible(tab == 2)
+    // (LaunchedEffect, not a call during composition.)
+    LaunchedEffect(tab) { vm.setStatsVisible(tab == 2) }
 
     // Android back from any tab goes to Home; back from Home exits the app.
     BackHandler(enabled = tab != 0) { tab = 0 }
@@ -134,13 +149,21 @@ private fun LiteRoot(vm: LiteViewModel, onConnectRequest: () -> Unit) {
                     .weight(1f)
                     .background(LiteColors.bg)
             ) {
-                // All four tabs stay composed (each keeps its own scroll
-                // position); only the selected one is visible, rendered
-                // last so it is on top and receives touches.
-                for (i in listOf(0, 1, 2, 3).filter { it != tab }) {
-                    TabPage(visible = false) { TabContent(i, vm, connection, profiles, selectedId, onConnectRequest) { tab = 1 } { tab = 3 } }
-                }
-                TabPage(visible = true) { TabContent(tab, vm, connection, profiles, selectedId, onConnectRequest) { tab = 1 } { tab = 3 } }
+                // Only the selected tab is composed (2.0.0 launch safety).
+                TabContent(
+                    tab = tab,
+                    vm = vm,
+                    connection = connection,
+                    profiles = profiles,
+                    selectedId = selectedId,
+                    onConnectRequest = onConnectRequest,
+                    onGoToServers = { tab = 1 },
+                    onGoToSettingsGeo = { tab = 3 },
+                    homeScroll = homeScroll,
+                    serversList = serversList,
+                    statsScroll = statsScroll,
+                    settingsScroll = settingsScroll,
+                )
             }
             LiteBottomBar(
                 selected = tab,
@@ -148,17 +171,6 @@ private fun LiteRoot(vm: LiteViewModel, onConnectRequest: () -> Unit) {
                 onSelect = { tab = it },
             )
         }
-    }
-}
-
-@Composable
-private fun TabPage(visible: Boolean, content: @Composable () -> Unit) {
-    Box(
-        modifier = Modifier
-            .fillMaxSize()
-            .alpha(if (visible) 1f else 0f)
-    ) {
-        content()
     }
 }
 
@@ -172,6 +184,10 @@ private fun TabContent(
     onConnectRequest: () -> Unit,
     onGoToServers: () -> Unit,
     onGoToSettingsGeo: () -> Unit,
+    homeScroll: androidx.compose.foundation.ScrollState,
+    serversList: androidx.compose.foundation.lazy.LazyListState,
+    statsScroll: androidx.compose.foundation.ScrollState,
+    settingsScroll: androidx.compose.foundation.ScrollState,
 ) {
     when (tab) {
         0 -> SummitHomeScreen(
@@ -182,14 +198,16 @@ private fun TabContent(
             onConnectRequest = onConnectRequest,
             onGoToServers = onGoToServers,
             onGoToSettingsGeo = onGoToSettingsGeo,
+            scrollState = homeScroll,
         )
         1 -> ServersScreen(
             vm = vm,
             profiles = profiles,
             selectedId = selectedId,
             isConnected = connection.state == ConnState.CONNECTED,
+            listState = serversList,
         )
-        2 -> StatsScreen(vm = vm, connection = connection)
-        3 -> SettingsScreen(vm = vm)
+        2 -> StatsScreen(vm = vm, connection = connection, scrollState = statsScroll)
+        3 -> SettingsScreen(vm = vm, scrollState = settingsScroll)
     }
 }
