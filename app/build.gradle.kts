@@ -1,3 +1,5 @@
+import org.jetbrains.kotlin.gradle.dsl.JvmTarget
+
 plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.plugin.compose")
@@ -23,11 +25,15 @@ android {
     // fetch location (app/src/main/jniLibs).
     sourceSets {
         getByName("main") {
-            java.srcDirs("src/lite/java")
-            res.srcDirs("src/lite/res")
+            java.directories.clear()
+            java.directories.add("src/lite/java")
+            res.directories.clear()
+            res.directories.add("src/lite/res")
             manifest.srcFile("src/lite/AndroidManifest.xml")
-            assets.srcDirs("src/lite/assets")
-            jniLibs.srcDirs("src/main/jniLibs")
+            assets.directories.clear()
+            assets.directories.add("src/lite/assets")
+            jniLibs.directories.clear()
+            jniLibs.directories.add("src/main/jniLibs")
         }
     }
 
@@ -46,8 +52,10 @@ android {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
     }
-    kotlinOptions {
-        jvmTarget = "17"
+    kotlin {
+        compilerOptions {
+            jvmTarget = JvmTarget.JVM_17
+        }
     }
 
     // Keep the unused core .so files (fetched by tools/get-cores.sh so the
