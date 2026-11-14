@@ -63,6 +63,10 @@ android {
     // (libgojni, from zedcore.aar) and the hev tun bridge.
     packaging {
         jniLibs {
+            // AGP 9.x forbids android:extractNativeLibs in the manifest;
+            // this is the sanctioned equivalent (native libs stored
+            // uncompressed so the JNI loader can extract them).
+            useLegacyPackaging = true
             excludes += setOf(
                 "lib/arm64-v8a/libtor.so",
                 "lib/arm64-v8a/libobfs4proxy.so",
