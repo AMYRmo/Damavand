@@ -142,16 +142,31 @@ fun HomeScreen(
                 activeLocked = activeLocked,
                 lockedNote = lockedNote,
                 localProxyAddress = localProxyAddress,
-                showConnectionInfo = showConnectionInfo,
                 reduceMotion = reduceMotion,
                 contentPadding = contentPadding,
                 pingLabel = stringResource(Res.string.summit_ping),
                 downloadLabel = stringResource(Res.string.home_download),
                 uploadLabel = stringResource(Res.string.home_upload),
                 sessionLabel = stringResource(Res.string.summit_session),
+                subtitle = stringResource(Res.string.summit_subtitle),
+                tapToConnectLabel = stringResource(Res.string.summit_tap_to_connect),
+                autoFastestLabel = stringResource(Res.string.summit_auto_fastest),
+                stepKeysLabel = stringResource(Res.string.summit_step_keys),
+                stepRouteLabel = stringResource(Res.string.summit_step_route),
+                stepFinishLabel = stringResource(Res.string.summit_step_finish),
+                statusIdleLabel = stringResource(Res.string.summit_status_idle),
+                trafficDirectLabel = stringResource(Res.string.summit_traffic_direct),
+                connectedLabel = activeConfigName?.let {
+                    "${stringResource(Res.string.state_connected)} — $it"
+                } ?: stringResource(Res.string.state_connected),
+                fastestLabel = stringResource(Res.string.summit_fastest_server),
+                fastestPick = bentoPicks.firstOrNull(),
+                engineLabel = bentoActive?.engine,
+                countryCode = bentoActive?.country,
                 onToggleConnection = onToggleConnection,
                 onBrowseConfigs = onBrowseConfigs,
                 onShowLogs = { showLogs = true },
+                onPickServer = onPickServer,
                 onStatusTap = {
                     val now = System.currentTimeMillis()
                     statusTaps = if (now - statusLastTap < TAP_WINDOW_MS) statusTaps + 1 else 1
