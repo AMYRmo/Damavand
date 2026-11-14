@@ -111,7 +111,7 @@ class VpnNotifications(private val ctx: Context) {
             CHANNEL_ID,
             ctx.getString(R.string.notif_channel_name),
 
-            NotificationManager.IMPORTANCE_LOW,
+            NotificationManager.IMPORTANCE_MIN,
         ).apply {
             description = ctx.getString(R.string.notif_channel_desc)
             setShowBadge(false)
@@ -143,9 +143,10 @@ class VpnNotifications(private val ctx: Context) {
             .setColor(colors.accent)
             .setOngoing(true)
             .setSilent(true)
+            .setOnlyAlertOnce(true)
             .setCategory(NotificationCompat.CATEGORY_SERVICE)
             .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
-            .setPriority(NotificationCompat.PRIORITY_LOW)
+            .setPriority(NotificationCompat.PRIORITY_MIN)
             .setContentIntent(openApp())
 
             .setRequestPromotedOngoing(livePromotion && !bentoCard)
