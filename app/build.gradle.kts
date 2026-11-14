@@ -70,6 +70,7 @@ android {
                 "lib/arm64-v8a/libconjure.so",
                 "lib/arm64-v8a/libsnispoof.so",
                 "lib/arm64-v8a/libzeptun-jni.so",
+                "lib/arm64-v8a/libzeptun.so",
                 "lib/arm64-v8a/libpsiphon-tunnel-core.so",
                 "lib/arm64-v8a/liblyrebird.so",
                 "lib/armeabi-v7a/libtor.so",
@@ -78,6 +79,7 @@ android {
                 "lib/armeabi-v7a/libconjure.so",
                 "lib/armeabi-v7a/libsnispoof.so",
                 "lib/armeabi-v7a/libzeptun-jni.so",
+                "lib/armeabi-v7a/libzeptun.so",
                 "lib/armeabi-v7a/libpsiphon-tunnel-core.so",
                 "lib/armeabi-v7a/liblyrebird.so",
                 "lib/x86_64/libtor.so",
@@ -86,6 +88,7 @@ android {
                 "lib/x86_64/libconjure.so",
                 "lib/x86_64/libsnispoof.so",
                 "lib/x86_64/libzeptun-jni.so",
+                "lib/x86_64/libzeptun.so",
                 "lib/x86_64/libpsiphon-tunnel-core.so",
                 "lib/x86_64/liblyrebird.so",
             )
