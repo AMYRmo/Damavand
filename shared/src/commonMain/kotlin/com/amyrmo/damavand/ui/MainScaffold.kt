@@ -83,6 +83,8 @@ fun MainScaffold(
     val bpbSetupMsg = stringResource(Res.string.cf_bpb_needs_setup)
     var current by rememberSaveable { mutableStateOf(TopDestination.Home) }
 
+    var showClassicServers by rememberSaveable { mutableStateOf(false) }
+
     var setupDone by rememberSaveable {
         mutableStateOf(settings.onboardingVersion >= com.amyrmo.damavand.ui.onboarding.ONBOARDING_VERSION)
     }
@@ -105,7 +107,9 @@ fun MainScaffold(
         activeId?.let { configRepository.profile(it) }
     }
     val autoSession by com.amyrmo.damavand.core.AutoSelect.session.collectAsStateWithLifecycle()
+    val connUi by connectionVm.ui.collectAsStateWithLifecycle()
     val bento = settings.appDesign == com.amyrmo.damavand.domain.model.AppDesign.Bento
+    val summit = settings.appDesign == com.amyrmo.damavand.domain.model.AppDesign.Summit
 
     val lockedNote = activeProfile?.takeIf { it.isLocked }?.note
 
@@ -130,7 +134,26 @@ fun MainScaffold(
 
     NudgeHost(settings = settings, onUpdateSettings = onUpdateSettings)
 
-    BackHandler(enabled = current != TopDestination.Home) { current = TopDestination.Home }
+    BackHandler(enabled = current != TopDestination.Home || showClassicServers) {
+        if (showClassicServers) showClassicServers = false else current = TopDestination.Home
+    }
+
+    // Summit has no BPB tab (Stats instead); other designs have no Stats tab.
+    androidx.compose.runtime.LaunchedEffect(settings.appDesign) {
+        if (settings.appDesign == com.amyrmo.damavand.domain.model.AppDesign.Summit &&
+            current == TopDestination.Bpb
+        ) {
+            current = TopDestination.Home
+        }
+        if (settings.appDesign != com.amyrmo.damavand.domain.model.AppDesign.Summit &&
+            current == TopDestination.Stats
+        ) {
+            current = TopDestination.Home
+        }
+    }
+    androidx.compose.runtime.LaunchedEffect(current) {
+        if (current != TopDestination.Servers) showClassicServers = false
+    }
 
     BackHandler(enabled = tourStep >= 0) {
         tourStep = -1
@@ -164,11 +187,19 @@ fun MainScaffold(
     Scaffold(
         bottomBar = {
             if (!bento) {
-                com.amyrmo.damavand.ui.navigation.ZedNavBar(
-                    style = settings.navBarStyle,
-                    current = current,
-                    onSelect = { current = it },
-                )
+                if (summit) {
+                    com.amyrmo.damavand.ui.navigation.SummitNavBar(
+                        current = current,
+                        onSelect = { current = it },
+                        connected = connUi.state == com.amyrmo.damavand.domain.model.ConnectionState.Connected,
+                    )
+                } else {
+                    com.amyrmo.damavand.ui.navigation.ZedNavBar(
+                        style = settings.navBarStyle,
+                        current = current,
+                        onSelect = { current = it },
+                    )
+                }
             }
         },
     ) { innerPadding ->
@@ -312,25 +343,62 @@ fun MainScaffold(
                     onBrowseConfigs = { current = TopDestination.Servers },
                     )
                 }
-                TopDestination.Servers -> ServersScreen(
-                    repository = configRepository,
-                    contentPadding = contentPadding,
-                    twoColumns = settings.doubleColumnDisplay,
-                    showAllGroup = settings.groupAllDisplay,
-                    confirmRemove = settings.confirmRemove,
-                    realPingConcurrency = settings.realPingConcurrency,
-                    delayTestUrl = settings.delayTestUrl,
-                    autoTestAfterUpdate = settings.autoTestAfterUpdate,
-                    autoRemoveInvalidAfterTest = settings.autoRemoveInvalidAfterTest,
-                    autoSortAfterTest = settings.autoSortAfterTest,
-                    personalization = settings.toPersonalization(),
-                    reduceMotion = settings.reduceMotion,
-                    onServerActivated = {
-                        if (settings.homeAfterSelect) current = TopDestination.Home
+                TopDestination.Servers -> if (summit && !showClassicServers) {
+                    com.amyrmo.damavand.ui.home.SummitServersScreen(
+                        profiles = profiles,
+                        activeId = activeId,
+                        contentPadding = contentPadding,
+                        title = stringResource(Res.string.nav_servers),
+                        testAllLabel = stringResource(Res.string.summit_test_all),
+                        testingLabel = stringResource(Res.string.summit_testing),
+                        fastestBadgeLabel = stringResource(Res.string.summit_fastest_badge),
+                        manageLabel = stringResource(Res.string.summit_manage_servers),
+                        testNoteLabel = stringResource(Res.string.summit_test_note),
+                        testProgress = com.amyrmo.damavand.data.net.PingCoordinator.progress,
+                        onTestAll = {
+                            com.amyrmo.damavand.data.net.PingCoordinator.start(
+                                profiles = profiles,
+                                useRealDelay = false,
+                                concurrency = settings.realPingConcurrency,
+                                delayUrl = settings.delayTestUrl,
+                                chainConfig = configRepository::chainProbeConfig,
+                                clearPings = { configRepository.clearPings(it, persist = false) },
+                                detectCountry = settings.detectServerLocation,
+                                onResult = { id, ms, cc -> configRepository.setPing(id, ms, cc, persist = false) },
+                                flush = { configRepository.flushProfiles() },
+                                onFinished = { if (settings.autoSortAfterTest) configRepository.sortByTestResults() },
+                            )
+                        },
+                        engineLabel = { p -> bentoEngineLabel(p) },
+                        countryCode = { p -> com.amyrmo.damavand.domain.config.ProfileCountry.of(p) },
+                        onActivate = { id ->
+                            configRepository.setActive(id)
+                            onActiveServerChanged()
+                            if (settings.homeAfterSelect) current = TopDestination.Home
+                        },
+                        onManageServers = { showClassicServers = true },
+                    )
+                } else {
+                    ServersScreen(
+                        repository = configRepository,
+                        contentPadding = contentPadding,
+                        twoColumns = settings.doubleColumnDisplay,
+                        showAllGroup = settings.groupAllDisplay,
+                        confirmRemove = settings.confirmRemove,
+                        realPingConcurrency = settings.realPingConcurrency,
+                        delayTestUrl = settings.delayTestUrl,
+                        autoTestAfterUpdate = settings.autoTestAfterUpdate,
+                        autoRemoveInvalidAfterTest = settings.autoRemoveInvalidAfterTest,
+                        autoSortAfterTest = settings.autoSortAfterTest,
+                        personalization = settings.toPersonalization(),
+                        reduceMotion = settings.reduceMotion,
+                        onServerActivated = {
+                            if (settings.homeAfterSelect) current = TopDestination.Home
 
-                        onActiveServerChanged()
-                    },
-                )
+                            onActiveServerChanged()
+                        },
+                    )
+                }
                 TopDestination.Bpb -> BpbScreen(
                     settings = settings,
                     contentPadding = contentPadding,
@@ -341,6 +409,19 @@ fun MainScaffold(
                             .onSuccess { platform.toast(warpAddedMsg) }
                             .onFailure { platform.toast(configInvalidMsg) }
                     },
+                )
+                TopDestination.Stats -> com.amyrmo.damavand.ui.home.SummitStatsScreen(
+                    connectionVm = connectionVm,
+                    homeVm = homeVm,
+                    contentPadding = contentPadding,
+                    title = stringResource(Res.string.nav_stats),
+                    sessionTotalLabel = stringResource(Res.string.stats_session_total),
+                    bestPingLabel = stringResource(Res.string.stats_best_ping),
+                    pingLabel = stringResource(Res.string.summit_ping),
+                    emptyNoteLabel = stringResource(Res.string.stats_empty_note),
+                    axis60Label = stringResource(Res.string.stats_axis_60),
+                    axis30Label = stringResource(Res.string.stats_axis_30),
+                    axisNowLabel = stringResource(Res.string.stats_axis_now),
                 )
                 TopDestination.Settings -> SettingsScreen(
                     settings = settings,
@@ -395,7 +476,7 @@ fun MainScaffold(
         val vpnStatus by com.amyrmo.damavand.core.VpnManager.status.collectAsStateWithLifecycle()
         val detailsOpen by homeVm.expanded.collectAsStateWithLifecycle()
         HomeFabCluster(
-            visible = !bento && current == TopDestination.Home &&
+            visible = !bento && !summit && current == TopDestination.Home &&
                 !(detailsOpen && settings.appDesign == com.amyrmo.damavand.domain.model.AppDesign.Pixel),
             showSpeedTest = vpnStatus.state == com.amyrmo.damavand.domain.model.ConnectionState.Connected &&
                 activeProfile?.isDnsBasedTunnel != true,
