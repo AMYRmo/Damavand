@@ -2,6 +2,7 @@ package com.amyrmo.damavand.lite.ui.screens
 
 import android.content.Intent
 import android.net.Uri
+import androidx.compose.foundation.ScrollState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -16,7 +17,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.selection.SelectionContainer
@@ -52,7 +52,7 @@ import com.amyrmo.damavand.lite.ui.theme.Vazirmatn
  * No save button, no reset row, no search.
  */
 @Composable
-fun SettingsScreen(vm: LiteViewModel) {
+fun SettingsScreen(vm: LiteViewModel, scrollState: ScrollState) {
     val killSwitch by vm.killSwitch.collectAsState(initial = false)
     val autoConnect by vm.autoConnect.collectAsState(initial = false)
     val batterySaver by vm.batterySaver.collectAsState(initial = true)
@@ -62,7 +62,7 @@ fun SettingsScreen(vm: LiteViewModel) {
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .verticalScroll(rememberScrollState())
+            .verticalScroll(scrollState)
             .padding(horizontal = 20.dp)
     ) {
         Spacer(Modifier.height(24.dp))
