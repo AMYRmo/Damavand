@@ -1701,6 +1701,9 @@
     <string name="bento_wave">موج روی نوار</string>
     <string name="bento_wave_sum">فقط هنگام اتصال حرکت می‌کند</string>
     <string name="home_design_bento">بنتو</string>
+    <string name="home_design_summit">سامیت</string>
+    <string name="summit_ping">پینگ</string>
+    <string name="summit_session">نشست</string>
     <string name="ipd_abuse_no">سوءاستفاده گزارش نشده</string>
     <string name="ipd_abuse_yes">سوءاستفاده گزارش شده</string>
     <string name="ipd_asn">ASN</string>
