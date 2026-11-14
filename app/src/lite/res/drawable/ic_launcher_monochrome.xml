@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <!-- Lite monochrome icon (themed icons, Android 13+): single peak,
+         filled black — the system tints it. -->
+    <path
+        android:fillColor="#000000"
+        android:pathData="M54,28 L88,80 L20,80 Z" />
+    <path
+        android:fillColor="#000000"
+        android:pathData="M14,86 L94,86 L94,90 L14,90 Z" />
+</vector>
