@@ -521,6 +521,7 @@ private fun BentoRoot(
             AppDesign.Bento -> Res.string.home_design_bento
             AppDesign.Pixel -> Res.string.home_design_pixel
             AppDesign.Portal -> Res.string.home_design_portal
+            AppDesign.Summit -> Res.string.home_design_summit
         },
     )
     val paletteName = stringResource(
