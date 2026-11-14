@@ -6,6 +6,7 @@ import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.ScrollState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -23,7 +24,6 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
@@ -80,7 +80,8 @@ fun SummitHomeScreen(
     selectedId: String?,
     onConnectRequest: () -> Unit,
     onGoToServers: () -> Unit,
-    onGoToSettingsGeo: () -> Unit
+    onGoToSettingsGeo: () -> Unit,
+    scrollState: ScrollState
 ) {
     val profile = profiles.firstOrNull { it.id == selectedId } ?: profiles.firstOrNull()
     val fastest = vm.fastestProfile
@@ -101,7 +102,7 @@ fun SummitHomeScreen(
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .verticalScroll(rememberScrollState())
+            .verticalScroll(scrollState)
             .padding(horizontal = 20.dp)
             .graphicsLayer {
                 alpha = enterAlpha
