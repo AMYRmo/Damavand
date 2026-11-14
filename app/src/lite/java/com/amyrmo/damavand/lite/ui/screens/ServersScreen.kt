@@ -16,6 +16,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -63,7 +64,8 @@ fun ServersScreen(
     vm: LiteViewModel,
     profiles: List<Profile>,
     selectedId: String?,
-    isConnected: Boolean
+    isConnected: Boolean,
+    listState: LazyListState
 ) {
     val isTesting by vm.isTesting.collectAsState()
     val testProgress by vm.testProgress.collectAsState()
@@ -94,6 +96,7 @@ fun ServersScreen(
         profiles.all { it.lastTestedAt > 0 && it.lastPingMs <= 0 }
 
     LazyColumn(
+        state = listState,
         modifier = Modifier
             .fillMaxSize()
             .padding(horizontal = 20.dp)
