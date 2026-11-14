@@ -24,9 +24,9 @@ android {
     }
 
     defaultConfig {
-        // TEST BUILD (Amir, 2026-11-07): side-by-side package so 1.5.1 installs next to 1.5.0.
-        // Revert to "com.amyrmo.damavand" before publishing.
-        applicationId = "com.amyrmo.damavand.test"
+        // DAMAVAND LITE: separate lightweight build (Summit UI only).
+        // Own package so it installs next to Damavand / Damavand Test.
+        applicationId = "com.amyrmo.damavand.lite"
         minSdk = 24
         targetSdk = 36
         versionCode = (project.property("damavand.versionCode") as String).toInt()
