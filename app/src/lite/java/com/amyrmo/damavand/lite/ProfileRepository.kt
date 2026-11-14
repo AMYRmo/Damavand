@@ -87,7 +87,7 @@ class ProfileRepository(private val context: Context) {
             val conn = URL(url).openConnection() as HttpURLConnection
             conn.connectTimeout = 15_000
             conn.readTimeout = 15_000
-            conn.setRequestProperty("User-Agent", "DamavandLite/1.1.0")
+            conn.setRequestProperty("User-Agent", "DamavandLite/2.0.0")
             conn.instanceFollowRedirects = true
             if (conn.responseCode !in 200..299) return emptyList()
             conn.inputStream.bufferedReader().readText().also { conn.disconnect() }
