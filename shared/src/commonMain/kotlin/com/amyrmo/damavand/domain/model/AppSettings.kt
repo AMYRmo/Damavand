@@ -8,7 +8,7 @@ enum class ColorStyle { Damavand, TonalSpot, Vibrant, Expressive, Rainbow, Fruit
 
 enum class ColorContrast(val level: Double) { Standard(0.0), Medium(0.5), High(1.0) }
 
-enum class AppDesign { Pixel, Portal, Bento }
+enum class AppDesign { Pixel, Portal, Bento, Summit }
 
 enum class ScreenTransition {
     Fade,
@@ -238,9 +238,9 @@ data class AppSettings(
     val customConfigCardColor: Long? = null,
     val customConfigCardTextColor: Long? = null,
 
-    // Default design is Bento since Damavand 1.5 (Amir's chosen defaults
-    // from his Interface screenshot, 2026-11-06; Portal remains selectable).
-    val appDesign: AppDesign = AppDesign.Bento,
+    // Default design is Summit since the new UI (Amir approved the
+    // Summit design, 2026-11-14; Bento/Pixel/Portal remain selectable).
+    val appDesign: AppDesign = AppDesign.Summit,
     val bento: BentoPrefs = BentoPrefs(),
     val detectServerLocation: Boolean = false,
 
