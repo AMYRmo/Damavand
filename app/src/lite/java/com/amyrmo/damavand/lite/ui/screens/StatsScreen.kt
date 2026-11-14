@@ -1,6 +1,7 @@
 package com.amyrmo.damavand.lite.ui.screens
 
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.ScrollState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
@@ -13,7 +14,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Text
@@ -49,7 +49,7 @@ import kotlin.math.max
  * No daily total — there is no real daily data.
  */
 @Composable
-fun StatsScreen(vm: LiteViewModel, connection: ConnectionUiState) {
+fun StatsScreen(vm: LiteViewModel, connection: ConnectionUiState, scrollState: ScrollState) {
     val chart by vm.chart.collectAsState()
     val bestPing by vm.bestSessionPing.collectAsState()
     val connected = connection.state == ConnState.CONNECTED
@@ -57,7 +57,7 @@ fun StatsScreen(vm: LiteViewModel, connection: ConnectionUiState) {
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .verticalScroll(rememberScrollState())
+            .verticalScroll(scrollState)
             .padding(horizontal = 20.dp)
     ) {
         Spacer(Modifier.height(24.dp))
