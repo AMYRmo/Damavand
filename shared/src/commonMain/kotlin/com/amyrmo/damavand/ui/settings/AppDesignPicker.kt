@@ -76,6 +76,12 @@ fun AppDesignPicker(selected: AppDesign, onSelect: (AppDesign) -> Unit) {
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
             ) {
                 DesignCard(
+                    name = stringResource(Res.string.home_design_summit),
+                    selected = selected == AppDesign.Summit,
+                    modifier = Modifier.weight(1f),
+                    onClick = { onSelect(AppDesign.Summit) },
+                ) { SummitPreview() }
+                DesignCard(
                     name = stringResource(Res.string.home_design_bento),
                     selected = selected == AppDesign.Bento,
                     modifier = Modifier.weight(1f),
@@ -95,6 +101,52 @@ fun AppDesignPicker(selected: AppDesign, onSelect: (AppDesign) -> Unit) {
                 ) { PortalPreview() }
             }
         }
+    }
+}
+
+@Composable
+private fun SummitPreview() {
+    val cs = MaterialTheme.colorScheme
+    Canvas(Modifier.fillMaxSize()) {
+        val c = Offset(size.width / 2f, size.height * 0.38f)
+        val r = size.width * 0.24f
+        drawCircle(cs.primary.copy(alpha = 0.18f), r, c, style = Stroke(5.dp.toPx()))
+        drawArc(
+            color = cs.primary,
+            startAngle = -90f,
+            sweepAngle = 250f,
+            useCenter = false,
+            topLeft = Offset(c.x - r, c.y - r),
+            size = Size(r * 2f, r * 2f),
+            style = Stroke(5.dp.toPx(), cap = androidx.compose.ui.graphics.StrokeCap.Round),
+        )
+        drawCircle(
+            cs.onSurface.copy(alpha = 0.25f),
+            r * 0.68f,
+            c,
+            style = Stroke(
+                width = 1.dp.toPx(),
+                pathEffect = androidx.compose.ui.graphics.PathEffect.dashPathEffect(
+                    floatArrayOf(3.dp.toPx(), 5.dp.toPx()),
+                    0f,
+                ),
+            ),
+        )
+        val pad = 10.dp.toPx()
+        val meterTop = size.height * 0.74f
+        val half = (size.width - pad * 2 - 3.dp.toPx()) / 2f
+        drawRoundRect(
+            cs.surfaceContainerHigh,
+            Offset(pad, meterTop),
+            Size(half, 14.dp.toPx()),
+            CornerRadius(7.dp.toPx()),
+        )
+        drawRoundRect(
+            cs.surfaceContainerHigh,
+            Offset(pad + half + 3.dp.toPx(), meterTop),
+            Size(half, 14.dp.toPx()),
+            CornerRadius(7.dp.toPx()),
+        )
     }
 }
 
