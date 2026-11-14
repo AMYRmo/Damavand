@@ -24,7 +24,7 @@ object PingTester {
             Socket().use { socket ->
                 socket.connect(InetSocketAddress(parsed.addr, parsed.port), TIMEOUT_MS)
                 if (parsed.tls == "tls") {
-                    val factory = SSLSocketFactory.getDefault()
+                    val factory = SSLSocketFactory.getDefault() as SSLSocketFactory
                     val ssl = factory.createSocket(socket, parsed.addr, parsed.port, true) as javax.net.ssl.SSLSocket
                     try {
                         val sni = parsed.sni.ifEmpty { parsed.addr }
