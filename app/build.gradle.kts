@@ -1,5 +1,3 @@
-import org.jetbrains.kotlin.gradle.dsl.JvmTarget
-
 plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.plugin.compose")
@@ -8,12 +6,12 @@ plugins {
 
 android {
     namespace = "com.amyrmo.damavand.lite"
-    compileSdk = 37
+    compileSdk = 34
 
     defaultConfig {
         applicationId = "com.amyrmo.damavand.lite"
         minSdk = 26
-        targetSdk = 36
+        targetSdk = 34
         versionCode = (project.property("damavand.versionCode") as String).toInt()
         versionName = project.property("damavand.versionName") as String
         vectorDrawables { useSupportLibrary = true }
@@ -25,26 +23,28 @@ android {
     // fetch location (app/src/main/jniLibs).
     sourceSets {
         getByName("main") {
-            java.directories.clear()
-            java.directories.add("src/lite/java")
-            res.directories.clear()
-            res.directories.add("src/lite/res")
+            java.srcDirs("src/lite/java")
+            res.srcDirs("src/lite/res")
             manifest.srcFile("src/lite/AndroidManifest.xml")
-            assets.directories.clear()
-            assets.directories.add("src/lite/assets")
-            jniLibs.directories.clear()
-            jniLibs.directories.add("src/main/jniLibs")
+            assets.srcDirs("src/lite/assets")
+            jniLibs.srcDirs("src/main/jniLibs")
         }
+    }
+
+    buildFeatures {
+        // SettingsScreen reads BuildConfig.VERSION_NAME / VERSION_CODE.
+        buildConfig = true
     }
 
     buildTypes {
         release {
-            isMinifyEnabled = true
-            isShrinkResources = true
-            proguardFiles(
-                getDefaultProguardFile("proguard-android-optimize.txt"),
-                "proguard-rules.pro"
-            )
+            // 2.0.0: R8/minify deliberately OFF. The 1.1.x builds (AGP 9 +
+            // R8 full mode) died on launch twice with no proven cause, so
+            // every unproven build variable is removed until the app is
+            // proven to open on-device. The APK is native-lib dominated
+            // anyway; minify saves ~1 MB of dex at most.
+            isMinifyEnabled = false
+            isShrinkResources = false
         }
     }
 
@@ -52,20 +52,18 @@ android {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
     }
-    kotlin {
-        compilerOptions {
-            jvmTarget = JvmTarget.JVM_17
-        }
+    kotlinOptions {
+        jvmTarget = "17"
     }
 
     // Keep the unused core .so files (fetched by tools/get-cores.sh so the
     // CI verify step passes) OUT of the APK: Lite ships only the Xray core
     // (libgojni, from zedcore.aar) and the hev tun bridge.
+    // useLegacyPackaging = true stores native libs uncompressed AND the
+    // manifest sets android:extractNativeLibs="true" (the Khazar-proven
+    // combination) so the JNI loader can always find them.
     packaging {
         jniLibs {
-            // AGP 9.x forbids android:extractNativeLibs in the manifest;
-            // this is the sanctioned equivalent (native libs stored
-            // uncompressed so the JNI loader can extract them).
             useLegacyPackaging = true
             excludes += setOf(
                 "lib/arm64-v8a/libtor.so",
@@ -110,21 +108,21 @@ android {
 }
 
 dependencies {
-    implementation(platform("androidx.compose:compose-bom:2026.09.00"))
+    implementation(platform("androidx.compose:compose-bom:2024.09.00"))
     implementation("androidx.compose.ui:ui")
     implementation("androidx.compose.ui:ui-graphics")
     implementation("androidx.compose.ui:ui-tooling-preview")
     implementation("androidx.compose.material3:material3")
     implementation("androidx.compose.animation:animation")
-    implementation("androidx.core:core-ktx:1.16.0")
-    implementation("androidx.activity:activity-compose:1.11.0")
-    implementation("androidx.lifecycle:lifecycle-runtime-compose:2.11.0")
-    implementation("androidx.lifecycle:lifecycle-viewmodel-compose:2.11.0")
-    implementation("androidx.datastore:datastore-preferences:1.2.1")
-    implementation("androidx.work:work-runtime-ktx:2.10.0")
-    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.11.0")
-    implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.11.0")
-    implementation("io.coil-kt.coil3:coil-compose:3.6.0")
-    implementation("io.coil-kt.coil3:coil-svg:3.6.0")
+    implementation("androidx.core:core-ktx:1.13.1")
+    implementation("androidx.activity:activity-compose:1.9.2")
+    implementation("androidx.lifecycle:lifecycle-runtime-compose:2.8.7")
+    implementation("androidx.lifecycle:lifecycle-viewmodel-compose:2.8.7")
+    implementation("androidx.datastore:datastore-preferences:1.1.1")
+    implementation("androidx.work:work-runtime-ktx:2.9.0")
+    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.8.1")
+    implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.7.3")
+    implementation("io.coil-kt.coil3:coil-compose:3.0.4")
+    implementation("io.coil-kt.coil3:coil-svg:3.0.4")
     implementation(files("libs/zedcore.aar"))
 }
