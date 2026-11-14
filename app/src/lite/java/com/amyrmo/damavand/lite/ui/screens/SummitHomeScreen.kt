@@ -18,6 +18,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -340,7 +341,7 @@ private fun SummitRing(
                 }
                 ConnState.CONNECTED -> {
                     val ping = connection.pingMs
-                    val location = connection.location.ifNotBlank()
+                    val location = connection.location.takeIf { it.isNotBlank() }
                         ?: profileLocation(profile)
                     Column(
                         horizontalAlignment = Alignment.CenterHorizontally,
