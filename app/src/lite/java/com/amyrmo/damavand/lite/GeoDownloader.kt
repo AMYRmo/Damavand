@@ -155,7 +155,7 @@ class GeoDownloader(private val context: Context) {
         val conn = URL(url).openConnection() as HttpURLConnection
         conn.connectTimeout = 20_000
         conn.readTimeout = 60_000
-        conn.setRequestProperty("User-Agent", "DamavandLite/1.1.0")
+        conn.setRequestProperty("User-Agent", "DamavandLite/2.0.0")
         conn.instanceFollowRedirects = true
         if (conn.responseCode !in 200..299) throw java.io.IOException("HTTP ${conn.responseCode}")
         val total = conn.contentLengthLong
