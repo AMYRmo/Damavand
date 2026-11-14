@@ -143,21 +143,32 @@ class LiteViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     init {
-        val filter = IntentFilter(LiteVpnService.ACTION_STATUS)
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            context.registerReceiver(statusReceiver, filter, Context.RECEIVER_NOT_EXPORTED)
-        } else {
-            @Suppress("DEPRECATION")
-            context.registerReceiver(statusReceiver, filter)
+        // 1.1.1: every step is guarded — a failure in any one of them
+        // (receiver, DataStore, WorkManager, broadcast) must never kill
+        // the launch. Each is best-effort; the UI works without it.
+        runCatching {
+            val filter = IntentFilter(LiteVpnService.ACTION_STATUS)
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                context.registerReceiver(statusReceiver, filter, Context.RECEIVER_NOT_EXPORTED)
+            } else {
+                @Suppress("DEPRECATION")
+                context.registerReceiver(statusReceiver, filter)
+            }
         }
-        viewModelScope.launch { _selectedId.value = settings.selectedProfileIdNow() }
-        refreshProfiles()
-        geo.refreshState()
         viewModelScope.launch {
-            if (settings.subAutoUpdateNow()) scheduleSubRefresh()
+            runCatching { _selectedId.value = settings.selectedProfileIdNow() }
+        }
+        runCatching { refreshProfiles() }
+        runCatching { geo.refreshState() }
+        viewModelScope.launch {
+            runCatching {
+                if (settings.subAutoUpdateNow()) scheduleSubRefresh()
+            }
         }
         // Ask the service for its current state (in case it is already running).
-        context.sendBroadcast(Intent(LiteVpnService.ACTION_QUERY).setPackage(context.packageName))
+        runCatching {
+            context.sendBroadcast(Intent(LiteVpnService.ACTION_QUERY).setPackage(context.packageName))
+        }
     }
 
     override fun onCleared() {
@@ -298,20 +309,26 @@ class LiteViewModel(app: Application) : AndroidViewModel(app) {
     fun setPreferredCore(v: String) = viewModelScope.launch { settings.setPreferredCore(v) }
 
     private fun scheduleSubRefresh() {
-        val request = PeriodicWorkRequestBuilder<SubRefreshWorker>(12, TimeUnit.HOURS)
-            .setConstraints(
-                Constraints.Builder()
-                    .setRequiredNetworkType(NetworkType.UNMETERED)
-                    .build()
+        // WorkManager.getInstance() throws if the startup initializer did
+        // not run; never let that kill the launch.
+        runCatching {
+            val request = PeriodicWorkRequestBuilder<SubRefreshWorker>(12, TimeUnit.HOURS)
+                .setConstraints(
+                    Constraints.Builder()
+                        .setRequiredNetworkType(NetworkType.UNMETERED)
+                        .build()
+                )
+                .build()
+            WorkManager.getInstance(context).enqueueUniquePeriodicWork(
+                "lite-sub-refresh", ExistingPeriodicWorkPolicy.KEEP, request
             )
-            .build()
-        WorkManager.getInstance(context).enqueueUniquePeriodicWork(
-            "lite-sub-refresh", ExistingPeriodicWorkPolicy.KEEP, request
-        )
+        }
     }
 
     private fun cancelSubRefresh() {
-        WorkManager.getInstance(context).cancelUniqueWork("lite-sub-refresh")
+        runCatching {
+            WorkManager.getInstance(context).cancelUniqueWork("lite-sub-refresh")
+        }
     }
 
     // ---- geo ----
