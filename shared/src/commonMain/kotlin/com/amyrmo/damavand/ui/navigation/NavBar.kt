@@ -11,6 +11,7 @@ import androidx.compose.animation.scaleIn
 import androidx.compose.animation.scaleOut
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -43,6 +44,7 @@ import com.amyrmo.damavand.ui.onboarding.tourTarget
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import com.amyrmo.damavand.domain.model.NavBarStyle
 import org.jetbrains.compose.resources.painterResource
 import org.jetbrains.compose.resources.stringResource
@@ -52,14 +54,15 @@ fun ZedNavBar(
     style: NavBarStyle,
     current: TopDestination,
     onSelect: (TopDestination) -> Unit,
+    tabs: List<TopDestination> = TopDestination.entries.filter { it != TopDestination.Stats },
 ) {
     when (style) {
-        NavBarStyle.FloatingPill, NavBarStyle.Dock -> FloatingPillBar(current, onSelect, compact = false)
-        NavBarStyle.CompactDock -> FloatingPillBar(current, onSelect, compact = true)
-        NavBarStyle.ExpressivePill -> ExpressivePillBar(current, onSelect)
-        NavBarStyle.FullBar -> MaterialBar(current, onSelect, underline = false)
-        NavBarStyle.Underline -> MaterialBar(current, onSelect, underline = true)
-        NavBarStyle.Minimal -> MinimalBar(current, onSelect)
+        NavBarStyle.FloatingPill, NavBarStyle.Dock -> FloatingPillBar(current, onSelect, tabs, compact = false)
+        NavBarStyle.CompactDock -> FloatingPillBar(current, onSelect, tabs, compact = true)
+        NavBarStyle.ExpressivePill -> ExpressivePillBar(current, onSelect, tabs)
+        NavBarStyle.FullBar -> MaterialBar(current, onSelect, tabs, underline = false)
+        NavBarStyle.Underline -> MaterialBar(current, onSelect, tabs, underline = true)
+        NavBarStyle.Minimal -> MinimalBar(current, onSelect, tabs)
     }
 }
 
@@ -67,6 +70,7 @@ fun ZedNavBar(
 private fun FloatingPillBar(
     current: TopDestination,
     onSelect: (TopDestination) -> Unit,
+    tabs: List<TopDestination>,
     compact: Boolean,
 ) {
     Box(
@@ -80,7 +84,7 @@ private fun FloatingPillBar(
             expanded = true,
             colors = FloatingToolbarDefaults.standardFloatingToolbarColors(),
         ) {
-            TopDestination.entries.forEach { dest ->
+            tabs.forEach { dest ->
                 NavPill(
                     destination = dest,
                     selected = current == dest,
@@ -94,7 +98,11 @@ private fun FloatingPillBar(
 }
 
 @Composable
-private fun ExpressivePillBar(current: TopDestination, onSelect: (TopDestination) -> Unit) {
+private fun ExpressivePillBar(
+    current: TopDestination,
+    onSelect: (TopDestination) -> Unit,
+    tabs: List<TopDestination>,
+) {
     Box(
         modifier = Modifier
             .fillMaxWidth()
@@ -112,7 +120,7 @@ private fun ExpressivePillBar(current: TopDestination, onSelect: (TopDestination
                 horizontalArrangement = Arrangement.spacedBy(4.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                TopDestination.entries.forEach { dest ->
+                tabs.forEach { dest ->
                     val selected = current == dest
                     val bg by animateColorAsState(
                         if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceContainer,
@@ -167,10 +175,11 @@ private fun ExpressivePillBar(current: TopDestination, onSelect: (TopDestination
 private fun MaterialBar(
     current: TopDestination,
     onSelect: (TopDestination) -> Unit,
+    tabs: List<TopDestination>,
     underline: Boolean,
 ) {
     NavigationBar {
-        TopDestination.entries.forEach { dest ->
+        tabs.forEach { dest ->
             val selected = current == dest
             NavigationBarItem(
                 modifier = Modifier.tourTarget(TourTargets.nav(dest.name)),
@@ -210,7 +219,11 @@ private fun MaterialBar(
 }
 
 @Composable
-private fun MinimalBar(current: TopDestination, onSelect: (TopDestination) -> Unit) {
+private fun MinimalBar(
+    current: TopDestination,
+    onSelect: (TopDestination) -> Unit,
+    tabs: List<TopDestination>,
+) {
     Row(
         Modifier
             .fillMaxWidth()
@@ -219,7 +232,7 @@ private fun MinimalBar(current: TopDestination, onSelect: (TopDestination) -> Un
         horizontalArrangement = Arrangement.SpaceEvenly,
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        TopDestination.entries.forEach { dest ->
+        tabs.forEach { dest ->
             val selected = current == dest
             val tint by animateColorAsState(
                 if (selected) MaterialTheme.colorScheme.primary
@@ -291,6 +304,86 @@ private fun NavPill(
             FilledIconButton(onClick = onClick, modifier = sizeMod) { icon() }
         } else {
             IconButton(onClick = onClick, modifier = sizeMod) { icon() }
+        }
+    }
+}
+
+/**
+ * The Summit bottom bar, matching the approved prototype: a plain dark bar
+ * (bg at 92% + 1dp top hairline), 22dp icons, 11sp semibold labels, active
+ * item in text color, and a 5dp red live dot on Servers while connected.
+ */
+@Composable
+fun SummitNavBar(
+    current: TopDestination,
+    onSelect: (TopDestination) -> Unit,
+    connected: Boolean,
+) {
+    val tabs = listOf(
+        TopDestination.Home,
+        TopDestination.Servers,
+        TopDestination.Stats,
+        TopDestination.Settings,
+    )
+    Column(
+        Modifier
+            .fillMaxWidth()
+            .background(com.amyrmo.damavand.ui.home.SummitBg.copy(alpha = 0.92f))
+            .navigationBarsPadding(),
+    ) {
+        Box(
+            Modifier
+                .fillMaxWidth()
+                .height(1.dp)
+                .background(com.amyrmo.damavand.ui.home.SummitHairline),
+        )
+        Row(
+            Modifier
+                .fillMaxWidth()
+                .height(52.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            tabs.forEach { dest ->
+                val selected = current == dest
+                val tint = if (selected) {
+                    com.amyrmo.damavand.ui.home.SummitText
+                } else {
+                    com.amyrmo.damavand.ui.home.SummitTextMuted
+                }
+                Column(
+                    modifier = Modifier
+                        .weight(1f)
+                        .clickable { onSelect(dest) },
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                ) {
+                    Box(contentAlignment = Alignment.TopEnd) {
+                        Icon(
+                            painterResource(dest.icon),
+                            contentDescription = stringResource(dest.labelRes),
+                            tint = tint,
+                            modifier = Modifier.size(22.dp),
+                        )
+                        if (connected && dest == TopDestination.Servers) {
+                            Box(
+                                Modifier
+                                    .size(5.dp)
+                                    .clip(CircleShape)
+                                    .background(com.amyrmo.damavand.ui.home.SummitRed),
+                            )
+                        }
+                    }
+                    Spacer(Modifier.height(3.dp))
+                    Text(
+                        stringResource(dest.labelRes),
+                        style = MaterialTheme.typography.labelSmall.copy(
+                            fontSize = 11.sp,
+                            fontWeight = androidx.compose.ui.text.font.FontWeight.SemiBold,
+                        ),
+                        color = tint,
+                        maxLines = 1,
+                    )
+                }
+            }
         }
     }
 }
