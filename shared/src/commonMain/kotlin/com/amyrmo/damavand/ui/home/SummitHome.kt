@@ -54,7 +54,6 @@ import androidx.compose.ui.unit.dp
 import com.amyrmo.damavand.core.ConnectionFault
 import com.amyrmo.damavand.data.net.NetworkInfo
 import com.amyrmo.damavand.domain.model.ConnectionState
-import com.amyrmo.damavand.shared.resources.Res
 import com.amyrmo.damavand.ui.connection.ConnectionUiState
 import com.amyrmo.damavand.ui.format.formatBytes
 import com.amyrmo.damavand.ui.format.formatElapsed
@@ -83,6 +82,10 @@ internal fun SummitHome(
     showConnectionInfo: Boolean,
     reduceMotion: Boolean,
     contentPadding: PaddingValues,
+    pingLabel: String,
+    downloadLabel: String,
+    uploadLabel: String,
+    sessionLabel: String,
     onToggleConnection: () -> Unit,
     onBrowseConfigs: () -> Unit,
     onShowLogs: () -> Unit,
@@ -135,7 +138,7 @@ internal fun SummitHome(
                     style = MaterialTheme.typography.labelLarge,
                     color = cs.onSurface,
                     modifier = Modifier.clickable(
-                        onClickLabel = stringResource(Res.string.state_connected),
+                        onClickLabel = stringResource(ui.state.labelRes()),
                         onClick = onStatusTap,
                     ),
                 )
@@ -169,7 +172,6 @@ internal fun SummitHome(
             // Server under the ring: name + place. Tapping opens servers.
             Column(
                 Modifier.clickable(
-                    onClickLabel = stringResource(Res.string.nav_servers),
                     role = Role.Button,
                     onClick = onBrowseConfigs,
                 ),
@@ -219,6 +221,10 @@ internal fun SummitHome(
                         downloadBps = ui.downloadBps,
                         uploadBps = ui.uploadBps,
                         sessionBytes = ui.totalDownload + ui.totalUpload,
+                        pingLabel = pingLabel,
+                        downloadLabel = downloadLabel,
+                        uploadLabel = uploadLabel,
+                        sessionLabel = sessionLabel,
                     )
                 }
             }
@@ -434,6 +440,10 @@ private fun SummitStats(
     downloadBps: Long,
     uploadBps: Long,
     sessionBytes: Long,
+    pingLabel: String,
+    downloadLabel: String,
+    uploadLabel: String,
+    sessionLabel: String,
 ) {
     val cs = MaterialTheme.colorScheme
     val down = formatRate(downloadBps)
@@ -444,22 +454,22 @@ private fun SummitStats(
     ) {
         SummitStat(
             value = pingMs?.let { "$it ms" } ?: "–",
-            label = stringResource(Res.string.summit_ping),
+            label = pingLabel,
             modifier = Modifier.weight(1f),
         )
         SummitStat(
             value = "${down.first} ${down.second}",
-            label = stringResource(Res.string.home_download),
+            label = downloadLabel,
             modifier = Modifier.weight(1f),
         )
         SummitStat(
             value = "${up.first} ${up.second}",
-            label = stringResource(Res.string.home_upload),
+            label = uploadLabel,
             modifier = Modifier.weight(1f),
         )
         SummitStat(
             value = formatBytes(sessionBytes),
-            label = stringResource(Res.string.summit_session),
+            label = sessionLabel,
             modifier = Modifier.weight(1f),
         )
     }
