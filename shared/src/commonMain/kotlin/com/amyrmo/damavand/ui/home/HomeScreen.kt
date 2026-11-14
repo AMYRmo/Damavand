@@ -133,7 +133,33 @@ fun HomeScreen(
     val haptics = LocalHapticFeedback.current
 
     Box(modifier.fillMaxSize()) {
-        if (design == AppDesign.Bento) {
+        if (design == AppDesign.Summit) {
+            SummitHome(
+                ui = ui,
+                info = info,
+                activeConfigName = activeConfigName,
+                activeConfigDetail = activeConfigDetail,
+                activeLocked = activeLocked,
+                lockedNote = lockedNote,
+                localProxyAddress = localProxyAddress,
+                showConnectionInfo = showConnectionInfo,
+                reduceMotion = reduceMotion,
+                contentPadding = contentPadding,
+                onToggleConnection = onToggleConnection,
+                onBrowseConfigs = onBrowseConfigs,
+                onShowLogs = { showLogs = true },
+                onStatusTap = {
+                    val now = System.currentTimeMillis()
+                    statusTaps = if (now - statusLastTap < TAP_WINDOW_MS) statusTaps + 1 else 1
+                    statusLastTap = now
+                    if (statusTaps >= 3) {
+                        statusTaps = 0
+                        haptics.performHapticFeedback(HapticFeedbackType.LongPress)
+                        laser++
+                    }
+                },
+            )
+        } else if (design == AppDesign.Bento) {
             val budget = com.amyrmo.damavand.ui.theme.LocalMotionBudget.current
             com.amyrmo.damavand.ui.bento.BentoHome(
                 ui = ui,
