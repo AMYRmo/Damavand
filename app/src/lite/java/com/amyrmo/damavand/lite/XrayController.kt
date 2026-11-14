@@ -43,11 +43,13 @@ object XrayController {
         initialized = true
     }
 
-    fun warmUp(context: Context) {
+    /**
+     * Stores the application context for the lazy init below. This touches
+     * NO native code: loading libgojni happens only on the first connect
+     * or test, so a broken native lib can never kill the app launch.
+     */
+    fun setAppContext(context: Context) {
         appContext = context.applicationContext
-        if (initialized) return
-        val app = context.applicationContext
-        Thread({ runCatching { init(app) } }, "zed-core-init").apply { isDaemon = true }.start()
     }
 
     private fun ready(): CoreController? {
