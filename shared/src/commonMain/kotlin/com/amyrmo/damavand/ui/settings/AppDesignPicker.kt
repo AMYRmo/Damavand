@@ -81,24 +81,6 @@ fun AppDesignPicker(selected: AppDesign, onSelect: (AppDesign) -> Unit) {
                     modifier = Modifier.weight(1f),
                     onClick = { onSelect(AppDesign.Summit) },
                 ) { SummitPreview() }
-                DesignCard(
-                    name = stringResource(Res.string.home_design_bento),
-                    selected = selected == AppDesign.Bento,
-                    modifier = Modifier.weight(1f),
-                    onClick = { onSelect(AppDesign.Bento) },
-                ) { BentoPreviewCard() }
-                DesignCard(
-                    name = stringResource(Res.string.home_design_pixel),
-                    selected = selected == AppDesign.Pixel,
-                    modifier = Modifier.weight(1f),
-                    onClick = { onSelect(AppDesign.Pixel) },
-                ) { PixelPreview() }
-                DesignCard(
-                    name = stringResource(Res.string.home_design_portal),
-                    selected = selected == AppDesign.Portal,
-                    modifier = Modifier.weight(1f),
-                    onClick = { onSelect(AppDesign.Portal) },
-                ) { PortalPreview() }
             }
         }
     }
