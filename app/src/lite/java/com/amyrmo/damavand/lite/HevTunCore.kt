@@ -26,6 +26,9 @@ object HevTunCore {
         pipeline: Boolean = true,
         logLevel: String = DEFAULT_LOG_LEVEL,
         rwTimeout: String = DEFAULT_RW_TIMEOUT,
+        // The core's SOCKS inbound requires auth when a user is set.
+        socksUser: String = "",
+        socksPass: String = "",
     ): Boolean {
         if (running) return false
         stopping?.let { previous ->
@@ -45,6 +48,8 @@ object HevTunCore {
                 logLevel = logLevel,
                 tcpTimeoutSeconds = tcpTimeout,
                 udpTimeoutSeconds = udpTimeout,
+                socksUser = socksUser,
+                socksPass = socksPass,
             )
             val file = File(context.filesDir, "hev-tunnel.yaml").apply { writeText(yaml) }
             TProxyService.TProxyStartService(file.absolutePath, fd)
@@ -83,6 +88,8 @@ object HevTunCore {
         logLevel: String = DEFAULT_LOG_LEVEL,
         tcpTimeoutSeconds: Int = 300,
         udpTimeoutSeconds: Int = 60,
+        socksUser: String = "",
+        socksPass: String = "",
     ): String = buildString {
         appendLine("tunnel:")
         appendLine("  mtu: $mtu")
@@ -93,6 +100,12 @@ object HevTunCore {
         appendLine("  address: 127.0.0.1")
         appendLine("  udp: 'udp'")
         if (pipeline) appendLine("  pipeline: true")
+        // Same rule as the Xray SOCKS inbound (XrayConfig.assemble): auth
+        // is required whenever the user is non-empty.
+        if (socksUser.isNotEmpty()) {
+            appendLine("  username: ${yamlQuote(socksUser)}")
+            appendLine("  password: ${yamlQuote(socksPass)}")
+        }
         appendLine("misc:")
         appendLine("  tcp-buffer-size: 131072")
         appendLine("  udp-recv-buffer-size: 262144")
@@ -100,6 +113,9 @@ object HevTunCore {
         appendLine("  udp-read-write-timeout: ${udpTimeoutSeconds * 1000}")
         appendLine("  log-level: ${logLevel.takeIf { it in LOG_LEVELS } ?: DEFAULT_LOG_LEVEL}")
     }
+
+    /** YAML single-quoted scalar (a quote inside is doubled). */
+    private fun yamlQuote(value: String): String = "'${value.replace("'", "''")}'"
 
     const val DEFAULT_LOG_LEVEL = "warn"
     const val DEFAULT_RW_TIMEOUT = "300,60"
