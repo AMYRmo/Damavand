@@ -266,18 +266,30 @@ class MainActivity : ComponentActivity() {
         }
         // One auto-connect attempt on launch (spec §7.1) — unless a
         // shortcut/widget action already decided what to do (3.2.0).
-        when (intent?.getStringExtra("lite_action")) {
-            "connect" -> requestConnect()
-            "disconnect" -> vm.disconnect()
-            else -> runCatching { vm.autoConnectOnce() }
+        // Only on a fresh start: a recreation (language change, dark
+        // mode, font scale, multi-window, process death) must not
+        // reconnect a VPN the user turned off, nor replay the intent.
+        if (savedInstanceState == null) {
+            when (consumeLiteAction(intent)) {
+                "connect" -> requestConnect()
+                "disconnect" -> vm.disconnect()
+                else -> runCatching { vm.autoConnectOnce() }
+            }
         }
+    }
+
+    /** The shortcut/widget action, removed from the intent so it runs once. */
+    private fun consumeLiteAction(intent: Intent?): String? {
+        val action = intent?.getStringExtra("lite_action")
+        intent?.removeExtra("lite_action")
+        return action
     }
 
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
         setIntent(intent)
         // 3.2.0: shortcut / widget action while the app is already open.
-        when (intent.getStringExtra("lite_action")) {
+        when (consumeLiteAction(intent)) {
             "connect" -> requestConnect()
             "disconnect" -> vm.disconnect()
         }

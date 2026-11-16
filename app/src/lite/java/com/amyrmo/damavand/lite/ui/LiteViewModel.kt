@@ -791,8 +791,14 @@ class LiteViewModel(app: Application) : AndroidViewModel(app) {
     /** True when the system VPN permission is already granted. */
     fun vpnPrepared(): Boolean = VpnService.prepare(context) == null
 
+    // autoConnectOnce() ran already for this ViewModel (it outlives
+    // activity recreation).
+    private var autoConnectTried = false
+
     /** One auto-connect attempt on launch (spec §7.1): once, then stop on failure. */
     fun autoConnectOnce() {
+        if (autoConnectTried) return
+        autoConnectTried = true
         viewModelScope.launch {
             if (!settings.autoConnectNow()) return@launch
             if (_profiles.value.isEmpty()) return@launch
