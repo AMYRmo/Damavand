@@ -15,13 +15,14 @@ import java.security.MessageDigest
 /**
  * Geo data (geoip.dat + geosite.dat).
  *
- * 3.0.0: the official v2fly files ARE bundled in the APK (app/src/lite/
- * assets) — the app copies them into the Xray asset directory
- * (filesDir/assets/) on first use, so geo works with no download at
- * all. The download below stays as the UPDATE path (a newer release
- * overwrites the bundled files, checksum-verified). Connecting is never
- * blocked on geo: when geo is Missing the core runs the minimal config
- * (no geo rules); when Ready, the config gains the geo-based rule.
+ * 3.2.20: the official v2fly files are NOT bundled in the APK any
+ * more — they were 26 MB inside it, and the app copied them into the
+ * Xray asset directory on first use, so they sat on the phone twice.
+ * They download on demand instead (Settings → Geo, or the update
+ * path below), from jsDelivr first and GitHub second, checksum-
+ * verified. Connecting is never blocked on geo: when geo is Missing
+ * the core runs the minimal config (no geo rules); when Ready, the
+ * config gains the geo-based rule.
  *
  * Download sources (v2fly):
  * - geoip.dat: https://github.com/v2fly/geoip/releases/latest/download/geoip.dat
@@ -126,7 +127,6 @@ class GeoDownloader(private val context: Context) {
     }
 
     fun refreshState() {
-        ensureBundled()
         _state.value = currentState()
     }
 
@@ -164,40 +164,12 @@ class GeoDownloader(private val context: Context) {
     }
 
     /**
-     * Copy the geo files bundled in the APK (3.0.0) into the core asset
-     * dir when the dir does not have them yet. The bundled files are the
-     * official v2fly release, already checksum-verified at build time,
-     * so no network and no verification is needed here. A later
-     * download() overwrites them with a newer release. Returns true
-     * when the files are present afterwards.
+     * True when the geo files are already in the core asset dir (3.2.20:
+     * nothing is bundled any more, so this only answers whether a
+     * download — or an import — put them there). The download in
+     * Settings is what fills the dir now.
      */
-    fun ensureBundled(): Boolean {
-        if (filesPresent()) return true
-        return try {
-            geoDir.mkdirs()
-            if (!geoipFile.exists()) {
-                context.assets.open("geoip.dat").use { input ->
-                    FileOutputStream(geoipFile).use { input.copyTo(it) }
-                }
-            }
-            if (!geositeFile.exists()) {
-                context.assets.open("geosite.dat").use { input ->
-                    FileOutputStream(geositeFile).use { input.copyTo(it) }
-                }
-            }
-            if (filesPresent()) {
-                if (readMeta() == null) {
-                    writeMeta(Meta(version = "bundled", downloadedAt = System.currentTimeMillis()))
-                }
-                _state.value = State.Ready("bundled")
-                true
-            } else {
-                false
-            }
-        } catch (_: Exception) {
-            false
-        }
-    }
+    private fun ensurePresent(): Boolean = filesPresent()
 
     private fun filesPresent(): Boolean = geoipFile.exists() && geositeFile.exists()
 
@@ -231,10 +203,10 @@ class GeoDownloader(private val context: Context) {
         // it unpacked before the first Psiphon connect, and isReady()
         // is asked on every connect.
         ensurePsiphonList()
-        if (filesPresent()) return true
-        // First run after install: the APK bundles the files, so copy
-        // them over before answering (the service asks this at connect).
-        return ensureBundled()
+        // 3.2.20: no bundled files any more — a fresh install answers
+        // false until the user downloads geo from Settings, and the
+        // core runs its minimal config until then.
+        return ensurePresent()
     }
 
     /**
