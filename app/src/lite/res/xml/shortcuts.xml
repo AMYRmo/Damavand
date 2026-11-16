@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="utf-8"?>
+<shortcuts xmlns:android="http://schemas.android.com/apk/res/android">
+    <shortcut
+        android:shortcutId="connect"
+        android:enabled="true"
+        android:icon="@drawable/ic_lite"
+        android:shortcutShortLabel="@string/shortcut_connect"
+        android:shortcutLongLabel="@string/shortcut_connect">
+        <intent
+            android:action="android.intent.action.VIEW"
+            android:targetPackage="com.amyrmo.damavand.lite"
+            android:targetClass="com.amyrmo.damavand.lite.MainActivity">
+            <extra android:name="lite_action" android:value="connect" />
+        </intent>
+    </shortcut>
+    <shortcut
+        android:shortcutId="disconnect"
+        android:enabled="true"
+        android:icon="@drawable/ic_lite"
+        android:shortcutShortLabel="@string/shortcut_disconnect"
+        android:shortcutLongLabel="@string/shortcut_disconnect">
+        <intent
+            android:action="android.intent.action.VIEW"
+            android:targetPackage="com.amyrmo.damavand.lite"
+            android:targetClass="com.amyrmo.damavand.lite.MainActivity">
+            <extra android:name="lite_action" android:value="disconnect" />
+        </intent>
+    </shortcut>
+</shortcuts>
