@@ -779,6 +779,112 @@ object XrayConfig {
         return config to core.through(secondaryPort)
     }
 
+    /**
+     * A chain with exactly one Aether hop (3.2.13) — a port of PattNG's
+     * AetherDependency.of / routeThroughXray for chains:
+     *
+     * - the Aether hop's outbound is a SOCKS outbound dialling the core
+     *   on 127.0.0.1:[aetherPort]; it dials the core through the next
+     *   hop toward the entry (sockopt.dialerProxy, the same chaining
+     *   rule as [buildChain]), or directly when the Aether hop IS the
+     *   entry hop;
+     * - the hops on its exit side dial through its outbound, as they
+     *   dial through any hop;
+     * - the core dials out through Xray's secondary-socks inbound on
+     *   aetherPort+3 (via `--upstream`), which the prepended rule sends
+     *   to the "exit-node" outbound — [exitOutbound] when the Aether
+     *   hop is the entry hop and names an exit-node profile, else a
+     *   plain freedom outbound (PattNG's routeThroughXray);
+     * - the core's exit is the digest of the links on its entry side
+     *   (AetherExit.through) when there is an entry side, else its own
+     *   exit (with [exitNodeContent] when it names one) — as PattNG
+     *   replaces the exit only for a chained hop with an entry side.
+     *
+     * Returns the config JSON plus the core routed through Xray, or
+     * null when the members hold no (or more than one) Aether profile,
+     * a member link does not parse, or the core fails the same guards
+     * as [buildAether]. The caller starts Xray first, then the core.
+     */
+    fun buildChainWithAether(
+        members: List<Profile>,
+        aetherPort: Int = AetherArgs.SOCKS_PORT,
+        socksPort: Int,
+        geoAvailable: Boolean = false,
+        xraySettings: XraySettings = XraySettings(),
+        exitOutbound: JsonObject? = null,
+        exitNodeContent: String? = null,
+    ): Pair<String, AetherCore>? {
+        val aetherIdx = members.indexOfFirst { it.isAether }
+        if (aetherIdx < 0 || members.count { it.isAether } != 1) return null
+        val aetherProfile = members[aetherIdx]
+        val aetherSettings = AetherSettings.fromJson(aetherProfile.aetherJson)
+        val entrySide = members.subList(0, aetherIdx)
+        val base = AetherCore.of(aetherSettings, aetherPort)
+        val core = when {
+            entrySide.isNotEmpty() ->
+                base.copy(exit = AetherExit.through(entrySide.map { it.link }))
+            exitNodeContent != null ->
+                base.copy(exit = base.exit.copy(nodeContent = exitNodeContent))
+            else -> base
+        }
+        if (core.invalidListener != null || core.unreachableListener != null) return null
+        if (AetherArgs.invalidPort(core) != null) return null
+        val secondaryPort = aetherPort + AetherArgs.SECONDARY_SOCKS_OFFSET
+        if (secondaryPort == socksPort || secondaryPort == socksPort + 1) return null
+        // Resolved exit-first, tags like buildChain: the exit hop is
+        // "proxy", the rest "proxy-chain-<i>"; hop i dials through
+        // hop i+1, toward the entry, and the entry hop dials directly.
+        val resolved = members.reversed()
+        val outbounds = resolved.mapIndexed { i, profile ->
+            val tag = if (i == 0) "proxy" else "proxy-chain-$i"
+            val dialerProxy = if (i < resolved.size - 1) "proxy-chain-${i + 1}" else null
+            if (profile.isAether) {
+                buildJsonObject {
+                    put("tag", tag)
+                    put("protocol", "socks")
+                    putJsonObject("settings") {
+                        putJsonArray("servers") {
+                            add(buildJsonObject {
+                                put("address", AetherArgs.LOOPBACK)
+                                put("port", aetherPort)
+                            })
+                        }
+                    }
+                    if (dialerProxy != null) {
+                        putJsonObject("sockopt") { put("dialerProxy", dialerProxy) }
+                    }
+                }
+            } else {
+                val parsed = parse(profile.link) ?: return null
+                outbound(parsed, tag, dialerProxy, xraySettings) ?: return null
+            }
+        }
+        val exit = exitOutbound ?: buildJsonObject {
+            put("tag", AetherArgs.TAG_EXIT_NODE)
+            put("protocol", "freedom")
+        }
+        val secondarySocks = buildJsonObject {
+            put("tag", AetherArgs.TAG_SECONDARY_SOCKS)
+            put("port", secondaryPort)
+            put("listen", AetherArgs.LOOPBACK)
+            put("protocol", "mixed")
+            putJsonObject("settings") { put("udp", true) }
+        }
+        val exitRule = buildJsonObject {
+            putJsonArray("inboundTag") { add(JsonPrimitive(AetherArgs.TAG_SECONDARY_SOCKS)) }
+            put("outboundTag", AetherArgs.TAG_EXIT_NODE)
+        }
+        val config = assemble(
+            outbounds + exit,
+            socksPort,
+            geoAvailable,
+            xraySettings,
+            extraInbounds = listOf(secondarySocks),
+            extraRulesFirst = listOf(exitRule),
+        ) ?: return null
+        return config to core.through(secondaryPort)
+    }
+
     /** One custom rule → its Xray routing rule object. */
     private fun customRuleJson(rule: RoutingRule): JsonObject {
         val pattern = rule.pattern.trim()
