@@ -27,6 +27,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListState
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
@@ -48,6 +49,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -98,7 +100,7 @@ import com.amyrmo.damavand.lite.ui.theme.LiteFormat
 import com.amyrmo.damavand.lite.ui.theme.Vazirmatn
 import kotlinx.coroutines.launch
 
-private enum class SortMode { FASTEST, NAME, NEWEST }
+internal enum class SortMode { FASTEST, NAME, NEWEST }
 
 private data class ServerGroup(
     val key: String, // subscription URL, or "" for manual profiles
@@ -122,6 +124,9 @@ fun ServersScreen(
     selectedId: String?,
     isConnected: Boolean,
     listState: LazyListState,
+    // Connect through MainActivity.requestConnect(): VPN consent and
+    // root mode are handled there. vm.connect() connects the selection.
+    onConnectRequest: () -> Unit,
     onOpenQrScan: () -> Unit = {},
     onImportFile: () -> Unit = {},
     onOpenSubscriptions: () -> Unit = {}
@@ -147,14 +152,16 @@ fun ServersScreen(
 
     var showAddSheet by remember { mutableStateOf(false) }
     var addInitialUrl by remember { mutableStateOf("") }
-    var showAddDialog by remember { mutableStateOf(false) }
+    var showAddDialog by rememberSaveable { mutableStateOf(false) }
     // 3.2.0 (PattNG): manual per-protocol editor dialog.
-    var showManualDialog by remember { mutableStateOf(false) }
+    var showManualDialog by rememberSaveable { mutableStateOf(false) }
     // 3.2.10 (Aether): the Aether profile editor dialog.
-    var showAetherDialog by remember { mutableStateOf(false) }
-    var searchOpen by remember { mutableStateOf(false) }
-    var searchQuery by remember { mutableStateOf("") }
-    var sortMode by remember { mutableStateOf(SortMode.FASTEST) }
+    var showAetherDialog by rememberSaveable { mutableStateOf(false) }
+    // Search + sort live in the ViewModel: only the visible tab is
+    // composed, so local state was reset on every tab switch.
+    var searchQuery by vm.serversSearchQuery
+    var sortMode by vm.serversSortMode
+    var searchOpen by rememberSaveable { mutableStateOf(searchQuery.isNotEmpty()) }
     var sortMenuOpen by remember { mutableStateOf(false) }
     var moreMenuOpen by remember { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
@@ -172,6 +179,18 @@ fun ServersScreen(
     var chainToDelete by remember { mutableStateOf<Chain?>(null) }
     val pickMode = chainPick.isNotEmpty()
     val multiMode = selectedIds.isNotEmpty()
+    // Back leaves multi-select, chain pick or search first, instead of
+    // jumping to the Home tab with the mode still active.
+    BackHandler(enabled = multiMode || pickMode || searchOpen) {
+        when {
+            multiMode -> selectedIds = emptySet()
+            pickMode -> vm.cancelChainPick()
+            else -> {
+                searchOpen = false
+                searchQuery = ""
+            }
+        }
+    }
 
     // Freeze the display order while a test runs (spec §5.2).
     var frozenIds by remember { mutableStateOf<List<String>?>(null) }
@@ -346,13 +365,15 @@ fun ServersScreen(
                             searchOpen = !searchOpen
                             if (!searchOpen) searchQuery = ""
                         },
+                        contentDescription = stringResource(R.string.cd_search),
                         icon = SearchVector
                     )
                     Spacer(Modifier.width(8.dp))
                     Box {
                         HeaderIconButton(
                             onClick = { sortMenuOpen = true },
-                            icon = SortVector
+                            icon = SortVector,
+                            contentDescription = stringResource(R.string.cd_sort)
                         )
                         DropdownMenu(
                             expanded = sortMenuOpen,
@@ -382,7 +403,8 @@ fun ServersScreen(
                     Box {
                         HeaderIconButton(
                             onClick = { moreMenuOpen = true },
-                            icon = DotsVerticalVector
+                            icon = DotsVerticalVector,
+                            contentDescription = stringResource(R.string.cd_more_options)
                         )
                         DropdownMenu(
                             expanded = moreMenuOpen,
@@ -441,7 +463,8 @@ fun ServersScreen(
                         filled = true,
                         onClick = { showAddSheet = true },
                         glyphColor = Color.White,
-                        icon = PlusVector
+                        icon = PlusVector,
+                        contentDescription = stringResource(R.string.cd_add)
                     )
                 }
                 Spacer(Modifier.height(16.dp))
@@ -741,7 +764,10 @@ fun ServersScreen(
                             live = autoLive,
                             memberName = { id -> profiles.firstOrNull { it.id == id }?.name },
                             onSelect = { vm.selectAuto(autoId) },
-                            onConnect = { vm.connectToAuto(autoId) },
+                            onConnect = {
+                                vm.selectAuto(autoId)
+                                onConnectRequest()
+                            },
                             onDetails = { showAutoSheet = true }
                         )
                         Spacer(Modifier.height(12.dp))
@@ -1017,7 +1043,11 @@ fun ServersScreen(
                 Column {
                     AddSheetRow(
                         labelRes = R.string.server_menu_connect,
-                        onClick = { vm.connectToChain(chainMenuTarget); menuChain = null }
+                        onClick = {
+                            vm.selectChain(chainMenuTarget.id)
+                            menuChain = null
+                            onConnectRequest()
+                        }
                     )
                     AddSheetRow(
                         labelRes = R.string.server_menu_delete,
@@ -1183,14 +1213,15 @@ private fun sortProfiles(list: List<Profile>, mode: SortMode): List<Profile> {
 // ---- Header icon button (3.1.2: vector icon via CircleIconButton) ----
 
 @Composable
-private fun HeaderIconButton(onClick: () -> Unit, icon: ImageVector) {
+private fun HeaderIconButton(onClick: () -> Unit, icon: ImageVector, contentDescription: String) {
     CircleIconButton(
         buttonSize = 40.dp,
         glyphSize = 18.dp,
         filled = false,
         onClick = onClick,
         glyphColor = LiteColors.text,
-        icon = icon
+        icon = icon,
+        contentDescription = contentDescription
     )
 }
 
@@ -1652,7 +1683,8 @@ private fun ChainRow(
             filled = false,
             onClick = onMenu,
             glyphColor = LiteColors.text,
-            icon = DotsVerticalVector
+            icon = DotsVerticalVector,
+            contentDescription = stringResource(R.string.cd_more_options)
         )
     }
 }
@@ -1808,7 +1840,8 @@ private fun ServerRow(
             filled = false,
             onClick = onMenu,
             glyphColor = LiteColors.text,
-            icon = DotsVerticalVector
+            icon = DotsVerticalVector,
+            contentDescription = stringResource(R.string.cd_more_options)
         )
     }
 }
@@ -2288,7 +2321,7 @@ fun AddSubscriptionDialog(
     initialUrl: String = "",
     onDismiss: () -> Unit
 ) {
-    var url by remember { mutableStateOf(initialUrl) }
+    var url by rememberSaveable { mutableStateOf(initialUrl) }
     val subImport by vm.subImport.collectAsState()
     val adding = subImport == LiteViewModel.SubImportState.Adding
 
