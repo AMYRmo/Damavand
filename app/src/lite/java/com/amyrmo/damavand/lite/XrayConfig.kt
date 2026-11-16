@@ -107,6 +107,9 @@ object XrayConfig {
         val wgReserved: String = "",
         val hyInsecure: String = "",
         val customJson: String = "",
+        // TCP header obfuscation ("http" or "none"), from the link's
+        // headerType (vmess JSON: "type").
+        val headerType: String = "",
     )
 
     fun parse(link: String): Parsed? {
@@ -153,7 +156,13 @@ object XrayConfig {
                     path = j.optString("path"),
                     host = j.optString("host"),
                     flow = "",
-                    serviceName = "",
+                    // v2rayN carries the gRPC service name in "path".
+                    serviceName = if (j.optString("net") == "grpc") {
+                        j.optString("serviceName").ifEmpty { j.optString("path") }
+                    } else {
+                        ""
+                    },
+                    headerType = if (j.optString("net", "tcp") == "tcp") j.optString("type") else "",
                     alpn = j.optString("alpn"),
                     fp = j.optString("fp"),
                     echConfigList = j.optString("ech"),
@@ -223,6 +232,7 @@ object XrayConfig {
                 wgMtu = q["mtu"] ?: "",
                 wgReserved = q["reserved"] ?: "",
                 hyInsecure = q["insecure"] ?: "",
+                headerType = q["headerType"] ?: "",
             )
         } catch (_: Exception) {
             null
@@ -357,7 +367,9 @@ object XrayConfig {
                         put("Host", p.host.ifEmpty { p.sni.ifEmpty { p.addr } })
                     }
                 }
-                "xhttp" -> putJsonObject("xhttpSettings") {
+                // splithttp is xhttp's old name; the core reads
+                // xhttpSettings for both.
+                "xhttp", "splithttp" -> putJsonObject("xhttpSettings") {
                     put("path", p.path.ifEmpty { "/" })
                     put("host", p.host.ifEmpty { p.sni.ifEmpty { p.addr } })
                     put("mode", "auto")
@@ -365,6 +377,33 @@ object XrayConfig {
                 "grpc" -> putJsonObject("grpcSettings") {
                     put("serviceName", p.serviceName)
                     put("multiMode", true)
+                }
+                "httpupgrade" -> putJsonObject("httpupgradeSettings") {
+                    put("path", p.path.ifEmpty { "/" })
+                    put("host", p.host.ifEmpty { p.sni.ifEmpty { p.addr } })
+                }
+                // TCP with HTTP header obfuscation (headerType=http).
+                "tcp", "raw" -> if (p.headerType == "http") {
+                    putJsonObject("tcpSettings") {
+                        putJsonObject("header") {
+                            put("type", "http")
+                            putJsonObject("request") {
+                                putJsonArray("path") {
+                                    p.path.ifEmpty { "/" }.split(",")
+                                        .map { it.trim() }.filter { it.isNotEmpty() }
+                                        .forEach { add(JsonPrimitive(it)) }
+                                }
+                                if (p.host.isNotEmpty()) {
+                                    putJsonObject("headers") {
+                                        putJsonArray("Host") {
+                                            p.host.split(",").map { it.trim() }.filter { it.isNotEmpty() }
+                                                .forEach { add(JsonPrimitive(it)) }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
                 }
             }
         }
