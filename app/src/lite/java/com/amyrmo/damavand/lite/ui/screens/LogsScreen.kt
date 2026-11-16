@@ -27,6 +27,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -72,8 +73,19 @@ fun LogsScreen(vm: LiteViewModel, onBack: () -> Unit) {
         val q = filter.trim()
         if (q.isEmpty()) sourceLines else sourceLines.filter { it.contains(q, ignoreCase = true) }
     }
-    LaunchedEffect(shown.size) {
-        if (shown.isNotEmpty()) listState.scrollToItem(shown.size - 1)
+    // Follow the tail only while the user is at the bottom, so reading
+    // older lines isn't interrupted.
+    val atBottom by remember {
+        derivedStateOf {
+            val info = listState.layoutInfo
+            val lastVisible = info.visibleItemsInfo.lastOrNull()?.index ?: -1
+            lastVisible >= info.totalItemsCount - 3
+        }
+    }
+    // Keyed on the newest line, not the size: once the 300-line buffer
+    // is full the size stops changing and the list stopped following.
+    LaunchedEffect(shown.size, shown.lastOrNull()) {
+        if (shown.isNotEmpty() && atBottom) listState.scrollToItem(shown.size - 1)
     }
 
     Column(
