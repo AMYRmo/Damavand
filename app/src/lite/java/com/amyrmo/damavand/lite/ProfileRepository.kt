@@ -2,6 +2,8 @@ package com.amyrmo.damavand.lite
 
 import android.content.Context
 import android.util.Base64
+import com.amyrmo.damavand.lite.aether.AetherFmt
+import com.amyrmo.damavand.lite.aether.AetherSettings
 import kotlinx.serialization.decodeFromString
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
@@ -527,6 +529,28 @@ class ProfileRepository(private val context: Context) {
             val line = raw.trim()
             if (line.isEmpty() || !line.contains("://")) continue
             if (!seen.add(line)) continue
+            // 3.2.13 (PattNG AngConfigManager dispatch): an aether://
+            // share link parses into an Aether profile — the same parser
+            // serves the subscription body, the manual add, the Add
+            // subscription dialog and the URL scheme alike, so a pasted
+            // aether:// link is accepted everywhere a config link is.
+            if (line.substringBefore("://").lowercase() == "aether") {
+                val (settings, name) = AetherFmt.parse(line) ?: continue
+                out.add(
+                    Profile(
+                        id = Profile.idFor(line),
+                        link = line,
+                        name = name,
+                        proto = "aether",
+                        address = "",
+                        port = 0,
+                        core = "Aether",
+                        aetherJson = AetherSettings.toJson(settings),
+                        subscriptionUrl = subscriptionUrl,
+                    )
+                )
+                continue
+            }
             val parsed = XrayConfig.parse(line)
             if (parsed == null) {
                 // Count only links whose scheme Lite does not speak at
@@ -534,7 +558,8 @@ class ProfileRepository(private val context: Context) {
                 val scheme = line.substringBefore("://").lowercase()
                 if (scheme !in setOf(
                         "vless", "vmess", "trojan", "ss",
-                        "socks", "http", "hysteria2", "wg", "custom"
+                        "socks", "http", "hysteria2", "wg", "custom",
+                        "aether"
                     )
                 ) skippedUnsupported++
                 continue
