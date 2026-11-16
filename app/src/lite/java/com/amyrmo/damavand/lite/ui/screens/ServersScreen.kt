@@ -411,9 +411,12 @@ fun ServersScreen(
                             onDismissRequest = { moreMenuOpen = false }
                         ) {
                             MenuActionItem(
-                                labelRes = R.string.servers_menu_real_ping_all,
-                                enabled = !isTesting && !isConnected,
-                                onClick = { moreMenuOpen = false; vm.testAllRealPing() }
+                                labelRes = if (isTesting) R.string.cancel_test else R.string.servers_menu_real_ping_all,
+                                enabled = isTesting || !isConnected,
+                                onClick = {
+                                    moreMenuOpen = false
+                                    if (isTesting) vm.cancelTestAll() else vm.testAllRealPing()
+                                }
                             )
                             MenuActionItem(
                                 labelRes = R.string.servers_menu_restart,
@@ -505,12 +508,15 @@ fun ServersScreen(
                     modifier = Modifier
                         .fillMaxWidth()
                         .height(48.dp)
-                        .alpha(if (isTesting || profiles.isEmpty()) 0.5f else 1f)
+                        .alpha(if (profiles.isEmpty()) 0.5f else 1f)
                         .background(Color.Transparent, CircleShape)
                         .border(1.5.dp, LiteColors.hairlineStrong, CircleShape)
                         .clickable(
-                            enabled = !isTesting && profiles.isNotEmpty(),
-                            onClick = { vm.testAll() }
+                            // 3.2.18 (#62): while a test runs the pill
+                            // becomes "Cancel test" instead of going
+                            // dead — the sweep can be stopped mid-run.
+                            enabled = profiles.isNotEmpty(),
+                            onClick = { if (isTesting) vm.cancelTestAll() else vm.testAll() }
                         ),
                     contentAlignment = Alignment.Center
                 ) {
@@ -524,7 +530,7 @@ fun ServersScreen(
                         }
                         Text(
                             text = stringResource(
-                                if (isTesting) R.string.btn_testing else R.string.btn_test_all
+                                if (isTesting) R.string.cancel_test else R.string.btn_test_all
                             ),
                             fontSize = 14.sp,
                             fontWeight = FontWeight.Bold,
