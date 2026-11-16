@@ -573,6 +573,13 @@ class LiteViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     /** Start the service with one link, a chain, fastest candidates, or an Auto group. */
+    // 3.2.23: when the last connect request went out — a ring tap
+    // while CONNECTING must not fire another one (each new attempt's
+    // Aether start SIGTERMs the previous core mid-startup). The
+    // window is the core's 30 s listen budget: after that a stuck
+    // CONNECTING state may be retried.
+    private var lastConnectAt = 0L
+
     private fun startService(
         links: List<String>,
         candidates: List<String> = emptyList(),
@@ -582,6 +589,13 @@ class LiteViewModel(app: Application) : AndroidViewModel(app) {
         // 3.2.10 (Aether): the single link is an Aether profile.
         aether: Boolean = false,
     ) {
+        if (_connection.value.state == ConnState.CONNECTING &&
+            System.currentTimeMillis() - lastConnectAt < 30_000
+        ) return
+        lastConnectAt = System.currentTimeMillis()
+        // Optimistic CONNECTING now (not inside the launch below), so
+        // a second tap in the same frame already sees it.
+        _connection.update { it.copy(state = ConnState.CONNECTING, detail = "") }
         viewModelScope.launch {
             val kill = settings.killSwitchNow()
             val testUrl = settings.testUrlNow()
@@ -608,7 +622,6 @@ class LiteViewModel(app: Application) : AndroidViewModel(app) {
                 displayName?.let { putExtra(LiteVpnService.EXTRA_NAME, it) }
             }
             context.startService(intent)
-            _connection.update { it.copy(state = ConnState.CONNECTING, detail = "") }
         }
     }
 
