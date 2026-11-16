@@ -140,6 +140,9 @@ fun SettingsScreen(
     val dynamicColor by vm.dynamicColor.collectAsState(initial = false)
     val localProxy by vm.localProxy.collectAsState(initial = true)
     val useHev by vm.useHev.collectAsState(initial = true)
+    // 3.2.10 (PattNG root mode).
+    val rootMode by vm.rootMode.collectAsState(initial = false)
+    val rootLanShare by vm.rootLanShare.collectAsState(initial = false)
     var editField by remember { mutableStateOf<String?>(null) } // see the dialog below
 
     Column(
@@ -309,6 +312,33 @@ fun SettingsScreen(
                 checked = useHev,
                 onCheckedChange = { vm.setUseHev(it) }
             )
+            GroupDivider()
+            // 3.2.10 (PattNG root mode): system-wide routing via
+            // iptables + a root-run hev, no VpnService. Turning it on
+            // probes for su; without root the row stays off.
+            SwitchRow(
+                titleRes = R.string.root_mode_title,
+                descRes = R.string.root_mode_desc,
+                checked = rootMode,
+                onCheckedChange = { v ->
+                    vm.setRootMode(v) {
+                        Toast.makeText(
+                            context,
+                            context.getString(R.string.toast_root_required),
+                            Toast.LENGTH_SHORT
+                        ).show()
+                    }
+                }
+            )
+            if (rootMode) {
+                GroupDivider()
+                SwitchRow(
+                    titleRes = R.string.root_lan_share_title,
+                    descRes = R.string.root_lan_share_desc,
+                    checked = rootLanShare,
+                    onCheckedChange = { vm.setRootLanShare(it) }
+                )
+            }
             GroupDivider()
             TextEditRow(
                 titleRes = R.string.mtu_title,
