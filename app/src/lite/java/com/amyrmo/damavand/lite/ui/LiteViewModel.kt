@@ -22,7 +22,10 @@ import com.amyrmo.damavand.lite.AutoSelect
 import com.amyrmo.damavand.lite.AutoSelectIds
 import com.amyrmo.damavand.lite.aether.AetherArgs
 import com.amyrmo.damavand.lite.aether.AetherDelayTester
+import com.amyrmo.damavand.lite.aether.AetherEngine
+import com.amyrmo.damavand.lite.aether.AetherIdentity
 import com.amyrmo.damavand.lite.aether.AetherIdentityManager
+import com.amyrmo.damavand.lite.aether.AetherKey
 import com.amyrmo.damavand.lite.aether.AetherKey
 import com.amyrmo.damavand.lite.aether.AetherKeys
 import com.amyrmo.damavand.lite.aether.AetherKeysSettings
@@ -232,15 +235,17 @@ class LiteViewModel(app: Application) : AndroidViewModel(app) {
     // the renewal run, and whether one is running.
     private val _aetherKeysSettings = MutableStateFlow(AetherKeysSettings())
     val aetherKeysSettings = _aetherKeysSettings.asStateFlow()
-    private val _aetherKeys = MutableStateFlow<List<AetherKey>>(emptyList())
-    val aetherKeys = _aetherKeys.asStateFlow()
     private val _aetherKeysLog = MutableStateFlow<List<String>>(emptyList())
     val aetherKeysLog = _aetherKeysLog.asStateFlow()
     private val _aetherKeysRenewing = MutableStateFlow(false)
     val aetherKeysRenewing = _aetherKeysRenewing.asStateFlow()
     private val _aetherKeysNotice = MutableStateFlow<String?>(null)
     val aetherKeysNotice = _aetherKeysNotice.asStateFlow()
+    private val _aetherKeysCoreAvailable = MutableStateFlow(true)
+    val aetherKeysCoreAvailable = _aetherKeysCoreAvailable.asStateFlow()
     private var aetherKeysRenewJob: Job? = null
+    /** The identity of each key file as the log last showed it. */
+    private val aetherKeysShown = mutableMapOf<String, AetherIdentity?>()
     val showSpeedNotif = settings.showSpeedNotif
     val confirmDelete = settings.confirmDelete
     val showAllGroups = settings.showAllGroups
@@ -1308,19 +1313,80 @@ class LiteViewModel(app: Application) : AndroidViewModel(app) {
     /** The SOCKS port of the Xray the keys renewal dials out through, when it names an exit-node profile. */
     private val renewExitPort = 10825
 
-    /** Loads the keys page's settings and the keys in use (call when the keys dialog opens). */
+    /** Loads the keys page's settings and the keys in use (call when the keys dialog opens). The log starts fresh,
+     * like PattNG's page, and the keys in use are its first lines. */
     fun loadAetherKeys() {
         viewModelScope.launch(Dispatchers.IO) {
             _aetherKeysSettings.value = settings.aetherKeysSettingsNow()
-            _aetherKeys.value = AetherIdentityManager.keys(context)
+            _aetherKeysCoreAvailable.value = AetherEngine.isSupported(context)
+            _aetherKeysLog.value = emptyList()
+            aetherKeysShown.clear()
+            showAetherKeys(AetherIdentityManager.keys(context), onlyChanges = false)
         }
     }
 
-    /** Saves one change of the keys page's settings (the dialog calls this on every edit). */
+    /** Saves one change of the keys page's settings (the dialog calls this on every edit). While a run is going,
+     * what it was started with stays on show. */
     fun setAetherKeysSettings(next: AetherKeysSettings) {
+        if (_aetherKeysRenewing.value) return
         if (next == _aetherKeysSettings.value) return
         _aetherKeysSettings.value = next
         viewModelScope.launch { settings.setAetherKeysSettings(next.toJson()) }
+    }
+
+    /** Takes [command] as written by hand; written back to the one the settings give, it follows the settings again. */
+    fun setAetherKeysCommand(command: String) {
+        val current = _aetherKeysSettings.value
+        setAetherKeysSettings(current.copy(command = if (command.trim() == AetherKeys.builtCommand(current)) "" else command))
+    }
+
+    /** Drops the command written by hand, so that the settings make the command again. */
+    fun useAetherKeysSettings() {
+        setAetherKeysSettings(_aetherKeysSettings.value.copy(command = ""))
+    }
+
+    /** Shows each of [keys], or with [onlyChanges] only those whose identity is not the one the log showed last. */
+    private fun showAetherKeys(keys: List<AetherKey>, onlyChanges: Boolean) {
+        for (key in keys) {
+            if (onlyChanges && key.file in aetherKeysShown && aetherKeysShown[key.file] == key.identity) continue
+            aetherKeysShown[key.file] = key.identity
+            aetherKeysAppendLog(aetherKeyLine(key))
+        }
+    }
+
+    /** The log line of [key], named after its file: its device and addresses, or that there is none yet. */
+    private fun aetherKeyLine(key: AetherKey): String {
+        val readyRes: Int
+        val missingRes: Int
+        when (key.file) {
+            AetherIdentityManager.WIREGUARD_FILE -> {
+                readyRes = R.string.aether_log_wireguard_key_ready
+                missingRes = R.string.aether_log_wireguard_key_missing
+            }
+            AetherIdentityManager.WIREGUARD_INNER_FILE -> {
+                readyRes = R.string.aether_log_wireguard_inner_key_ready
+                missingRes = R.string.aether_log_wireguard_inner_key_missing
+            }
+            AetherIdentityManager.MASQUE_FILE -> {
+                readyRes = R.string.aether_log_masque_key_ready
+                missingRes = R.string.aether_log_masque_key_missing
+            }
+            AetherIdentityManager.MASQUE_INNER_FILE -> {
+                readyRes = R.string.aether_log_masque_inner_key_ready
+                missingRes = R.string.aether_log_masque_inner_key_missing
+            }
+            else -> {
+                readyRes = R.string.aether_log_gool_key_ready
+                missingRes = R.string.aether_log_gool_key_missing
+            }
+        }
+        val identity = key.identity
+        return if (identity == null) {
+            strings.getString(missingRes)
+        } else {
+            val device = identity.deviceId.let { if (it.length > 8) it.take(8) + "…" else it }
+            strings.getString(readyRes, device, identity.ipv4, identity.ipv6)
+        }
     }
 
     /** Clears the keys page's notice (the dialog calls this once shown). */
@@ -1408,13 +1474,13 @@ class LiteViewModel(app: Application) : AndroidViewModel(app) {
                 } else {
                     // By now the core and the exit it dialled out through have ended, and the new keys are in place.
                     aetherKeysAppendLog(strings.getString(R.string.aether_keys_renewed))
-                    _aetherKeys.value = AetherIdentityManager.keys(context)
+                    showAetherKeys(keys, onlyChanges = false)
                     _aetherKeysNotice.value = strings.getString(R.string.aether_keys_renewed)
                 }
             } catch (e: CancellationException) {
                 // By now the core and what it started have ended. A run cancelled once every new key was ready has put
                 // them in place all the same, so the keys in use are shown where they changed.
-                withContext(NonCancellable) { _aetherKeys.value = AetherIdentityManager.keys(context) }
+                withContext(NonCancellable) { showAetherKeys(AetherIdentityManager.keys(context), onlyChanges = true) }
                 throw e
             } finally {
                 if (exitStarted) XrayController.stop()
