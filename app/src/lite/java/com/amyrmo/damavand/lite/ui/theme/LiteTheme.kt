@@ -22,15 +22,46 @@ object LiteColors {
     // (both would be setDark(Z)V), so the function is applyDark.
     fun applyDark(isDark: Boolean) { dark = isDark }
 
-    val bg: Color get() = if (dark) Color(0xFF0E0F11) else Color(0xFFF2F3F5)
-    val surface: Color get() = if (dark) Color(0xFF1A1C1F) else Color(0xFFFFFFFF)
-    val surface2: Color get() = if (dark) Color(0xFF212327) else Color(0xFFE9EAED)
+    // 3.2.9 (PattNG dynamicColor, opt-in): when on (Android 12+), the
+    // system wallpaper palette replaces the fixed tokens below. The
+    // dynamic values are state too, so the UI recomposes on change;
+    // null means "use the fixed tokens" (dynamic off or unavailable).
+    var dynamic by mutableStateOf(false)
+        private set
+    fun applyDynamic(on: Boolean) { dynamic = on }
+
+    private var dynamicAccent: Color? by mutableStateOf(null)
+    private var dynamicBg: Color? by mutableStateOf(null)
+    private var dynamicSurface: Color? by mutableStateOf(null)
+    private var dynamicSurface2: Color? by mutableStateOf(null)
+    private var dynamicText: Color? by mutableStateOf(null)
+    private var dynamicTextSecondary: Color? by mutableStateOf(null)
+
+    fun applyDynamicScheme(
+        accent: Color?, bg: Color?, surface: Color?,
+        surface2: Color?, text: Color?, textSecondary: Color?,
+    ) {
+        dynamicAccent = accent; dynamicBg = bg; dynamicSurface = surface
+        dynamicSurface2 = surface2; dynamicText = text
+        dynamicTextSecondary = textSecondary
+    }
+
+    val bg: Color get() = if (dynamic && dynamicBg != null) dynamicBg!!
+        else if (dark) Color(0xFF0E0F11) else Color(0xFFF2F3F5)
+    val surface: Color get() = if (dynamic && dynamicSurface != null) dynamicSurface!!
+        else if (dark) Color(0xFF1A1C1F) else Color(0xFFFFFFFF)
+    val surface2: Color get() = if (dynamic && dynamicSurface2 != null) dynamicSurface2!!
+        else if (dark) Color(0xFF212327) else Color(0xFFE9EAED)
     val hairline: Color get() = if (dark) Color.White.copy(alpha = 0.08f) else Color.Black.copy(alpha = 0.08f)
     val hairlineStrong: Color get() = if (dark) Color.White.copy(alpha = 0.14f) else Color.Black.copy(alpha = 0.14f)
-    val text: Color get() = if (dark) Color(0xFFF2F3F5) else Color(0xFF141518)
-    val textSecondary: Color get() = if (dark) Color(0xFF9AA0A6) else Color(0xFF5F6368)
+    val text: Color get() = if (dynamic && dynamicText != null) dynamicText!!
+        else if (dark) Color(0xFFF2F3F5) else Color(0xFF141518)
+    val textSecondary: Color get() = if (dynamic && dynamicTextSecondary != null) dynamicTextSecondary!!
+        else if (dark) Color(0xFF9AA0A6) else Color(0xFF5F6368)
     val textMuted: Color get() = if (dark) Color(0xFF6B7280) else Color(0xFF8A8F98)
-    val accent: Color = Color(0xFFE5322D) // Damavand Red — the ONLY accent.
+    // Damavand Red — the ONLY accent (unless dynamic color is on).
+    val accent: Color get() = if (dynamic && dynamicAccent != null) dynamicAccent!!
+        else Color(0xFFE5322D)
     val green: Color get() = if (dark) Color(0xFF34C77B) else Color(0xFF1E8E4F)
     val error: Color get() = if (dark) Color(0xFFE5484D) else Color(0xFFD92D20)
     val amber: Color get() = if (dark) Color(0xFFD8A13A) else Color(0xFFB7791F)
