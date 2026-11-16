@@ -140,8 +140,9 @@ object XrayConfig {
                 )
             }
             if (proto == "vmess") {
-                val padded = rest + "=".repeat((4 - rest.length % 4) % 4)
-                val j = JSONObject(String(Base64.decode(padded, Base64.URL_SAFE)))
+                // v2rayN emits standard Base64 ('+', '/'); some clients
+                // emit URL-safe. b64decode accepts both.
+                val j = JSONObject(b64decode(rest) ?: return null)
                 return Parsed(
                     proto = "vmess",
                     addr = j.optString("add"),
@@ -230,17 +231,22 @@ object XrayConfig {
     }
 
     /** Base64 (URL-safe first, then standard) with padding repaired. */
-    private fun b64decode(text: String): String? {
-        val clean = text.trim()
+    internal fun b64decode(text: String): String? {
+        // android.util.Base64 silently SKIPS characters outside the
+        // active alphabet instead of failing, so URL_SAFE drops every
+        // '+'/'/' of a standard string (and DEFAULT every '-'/'_' of a
+        // URL-safe one) and "succeeds" with garbage. A string never
+        // mixes the two alphabets, so map URL-safe to standard and
+        // decode once with DEFAULT.
+        val clean = text.trim().trimEnd('=').replace('-', '+').replace('_', '/')
         if (clean.isEmpty()) return null
-        val padded = clean + "=".repeat((4 - clean.length % 4) % 4)
-        for (flags in listOf(Base64.URL_SAFE, Base64.DEFAULT)) {
-            try {
-                return String(Base64.decode(padded, flags), Charsets.UTF_8)
-            } catch (_: Exception) {
-            }
+        // No re-padding: the decoder accepts unpadded input, and a
+        // line-wrapped body would get a wrong pad count.
+        return try {
+            String(Base64.decode(clean, Base64.DEFAULT), Charsets.UTF_8)
+        } catch (_: Exception) {
+            null
         }
-        return null
     }
 
     /**

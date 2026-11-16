@@ -1576,16 +1576,8 @@ class LiteViewModel(app: Application) : AndroidViewModel(app) {
                     }
                     trimmed.contains("://") -> trimmed
                     else -> {
-                        // A base64 subscription body (standard, then URL-safe).
-                        var decoded = trimmed
-                        for (flags in listOf(android.util.Base64.DEFAULT, android.util.Base64.URL_SAFE)) {
-                            try {
-                                val d = String(android.util.Base64.decode(trimmed, flags), Charsets.UTF_8)
-                                if (d.contains("://")) { decoded = d; break }
-                            } catch (_: Exception) {
-                            }
-                        }
-                        decoded
+                        // A base64 subscription body (standard or URL-safe).
+                        XrayConfig.b64decode(trimmed)?.takeIf { it.contains("://") } ?: trimmed
                     }
                 }
                 if (links.isEmpty()) -1 else when (val r = repo.addSingleLinks(links)) {
