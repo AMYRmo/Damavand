@@ -4,8 +4,11 @@ import android.app.Notification
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.PendingIntent
+import android.content.BroadcastReceiver
 import android.content.ComponentName
+import android.content.Context
 import android.content.Intent
+import android.content.IntentFilter
 import android.content.res.Resources
 import android.net.VpnService
 import android.os.Build
@@ -181,11 +184,31 @@ class LiteVpnService : VpnService() {
     override fun onCreate() {
         super.onCreate()
         createChannel()
+        // 3.2.16 (#51): the ViewModel asks for the current state with
+        // an ACTION_QUERY broadcast — but the service only handled it
+        // in onStartCommand, so the query went nowhere and the app
+        // never learned a running service existed. Answer it here.
+        try {
+            val filter = IntentFilter(ACTION_QUERY)
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                registerReceiver(queryReceiver, filter, RECEIVER_NOT_EXPORTED)
+            } else {
+                @Suppress("UnspecifiedRegisterReceiverFlag")
+                registerReceiver(queryReceiver, filter)
+            }
+        } catch (_: Exception) {
+        }
         XrayController.onCoreShutdown = {
             if (connected) {
                 broadcastLog("core stopped unexpectedly")
                 onTunnelDropped()
             }
+        }
+    }
+
+    private val queryReceiver = object : BroadcastReceiver() {
+        override fun onReceive(context: Context?, intent: Intent?) {
+            if (intent?.action == ACTION_QUERY) broadcastStatus()
         }
     }
 
@@ -1366,6 +1389,11 @@ class LiteVpnService : VpnService() {
             }
         }
         if (!running && tun == null) {
+            // 3.2.16 (#51): a stale tile tap (or a Tasker stop) lands
+            // here with no tunnel up — still reset the persisted tile
+            // state and broadcast, or the tile stays "connected"
+            // forever and can never connect again.
+            broadcastStatus()
             stopSelf()
             return
         }
@@ -1417,6 +1445,7 @@ class LiteVpnService : VpnService() {
     }
 
     override fun onDestroy() {
+        try { unregisterReceiver(queryReceiver) } catch (_: Exception) {}
         stopAutoSelectSession()
         // 3.2.10 (Aether): the core dies with the service, even when
         // it is killed without a clean stopTunnel.
