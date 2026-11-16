@@ -95,6 +95,8 @@ object BackupManager {
             settings.put("dynamic_color", store.dynamicColor.first())
             settings.put("local_proxy", store.localProxy.first())
             settings.put("use_hev_tun", store.useHev.first())
+            settings.put("root_mode", store.rootMode.first())
+            settings.put("root_lan_share", store.rootLanShare.first())
         }
         return JSONObject()
             .put("version", VERSION)
@@ -195,6 +197,8 @@ object BackupManager {
                     if (settings.has("dynamic_color")) store.setDynamicColor(settings.getBoolean("dynamic_color"))
                     if (settings.has("local_proxy")) store.setLocalProxy(settings.getBoolean("local_proxy"))
                     if (settings.has("use_hev_tun")) store.setUseHev(settings.getBoolean("use_hev_tun"))
+                    if (settings.has("root_mode")) store.setRootMode(settings.getBoolean("root_mode"))
+                    if (settings.has("root_lan_share")) store.setRootLanShare(settings.getBoolean("root_lan_share"))
                 }
             }
             true
