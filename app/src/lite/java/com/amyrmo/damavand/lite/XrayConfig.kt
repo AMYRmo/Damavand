@@ -82,6 +82,8 @@ object XrayConfig {
         val flow: String,
         val serviceName: String,
         val alpn: String,
+        // 3.2.16 (#52): TCP header type (e.g. "http") from the link.
+        val headerType: String = "",
         // 3.2.7 (PattNG parity): TLS/Reality extras, read from the link
         // exactly like PattNG's FmtBase (fp, insecure/allowInsecure,
         // cs, pbk, sid, spx) and honoured in streamSettings below.
@@ -141,20 +143,30 @@ object XrayConfig {
                 )
             }
             if (proto == "vmess") {
-                val padded = rest + "=".repeat((4 - rest.length % 4) % 4)
-                val j = JSONObject(String(Base64.decode(padded, Base64.URL_SAFE)))
+                // 3.2.16 (#48): v2rayN emits STANDARD base64; the old
+                // URL_SAFE-only decode silently dropped every '+' and
+                // '/' (android.util.Base64 skips out-of-alphabet chars
+                // instead of throwing), so links with a flag emoji in
+                // `ps` — and ~3% of ASCII-named ones — never imported.
+                // b64decode() normalises both alphabets first.
+                val decoded = b64decode(rest) ?: return null
+                val j = JSONObject(decoded)
+                val vmessNet = j.optString("net", "tcp")
                 return Parsed(
                     proto = "vmess",
                     addr = j.optString("add"),
                     port = j.optInt("port"),
                     id = j.optString("id"),
-                    net = j.optString("net", "tcp"),
+                    net = vmessNet,
                     tls = j.optString("tls"),
                     sni = j.optString("sni").ifEmpty { j.optString("host") },
                     path = j.optString("path"),
                     host = j.optString("host"),
                     flow = "",
-                    serviceName = "",
+                    // 3.2.16 (#52): v2rayN carries the gRPC service
+                    // name in the JSON `path` (PattNG VmessFmt) — the
+                    // old code always sent "" and grpc never connected.
+                    serviceName = if (vmessNet == "grpc") j.optString("path") else "",
                     alpn = j.optString("alpn"),
                     fp = j.optString("fp"),
                     echConfigList = j.optString("ech"),
@@ -198,6 +210,9 @@ object XrayConfig {
                 flow = q["flow"] ?: "",
                 serviceName = q["serviceName"] ?: "",
                 alpn = q["alpn"] ?: "",
+                // 3.2.16 (#52): TCP+HTTP-header obfuscation
+                // (headerType=http) — parsed like PattNG's FmtBase.
+                headerType = q["headerType"] ?: "",
                 // 3.2.7 (PattNG FmtBase): fingerprint, allow-insecure
                 // (insecure / allowInsecure / allow_insecure), cipher
                 // suites (cs), Reality public key (pbk) + short id
@@ -286,16 +301,21 @@ object XrayConfig {
 
     /** Base64 (URL-safe first, then standard) with padding repaired. */
     private fun b64decode(text: String): String? {
-        val clean = text.trim()
+        val clean = text.trim().replace(Regex("\\s"), "")
         if (clean.isEmpty()) return null
-        val padded = clean + "=".repeat((4 - clean.length % 4) % 4)
-        for (flags in listOf(Base64.URL_SAFE, Base64.DEFAULT)) {
-            try {
-                return String(Base64.decode(padded, flags), Charsets.UTF_8)
-            } catch (_: Exception) {
-            }
+        // 3.2.16 (#48): both alphabets in ONE pass. A standard-base64
+        // string never contains '-' or '_', so translate the URL-safe
+        // pair and decode DEFAULT. The old code tried URL_SAFE first
+        // and never reached DEFAULT: android.util.Base64 SKIPS
+        // out-of-alphabet chars instead of throwing, so it "succeeded"
+        // with garbage and the fallback never ran.
+        val normalized = clean.replace('-', '+').replace('_', '/')
+        val padded = normalized + "=".repeat((4 - normalized.length % 4) % 4)
+        return try {
+            String(Base64.decode(padded, Base64.DEFAULT), Charsets.UTF_8)
+        } catch (_: Exception) {
+            null
         }
-        return null
     }
 
     /**
@@ -399,15 +419,56 @@ object XrayConfig {
                     if (p.mldsa65Verify.isNotEmpty()) put("mldsa65Verify", p.mldsa65Verify)
                 }
             }
-            // Fragment (3.1.0): split the TLS hello so DPI sees noise.
+            // 3.2.16 (#49): Fragment (3.1.0) split the TLS hello so DPI
+            // sees noise — but the pinned core has NO streamSettings
+            // .fragment key (its StreamConfig carries `finalmask`,
+            // not `fragment`), so the old object was silently ignored
+            // and Fragment did nothing. Fragmentation here is a TCP
+            // finalmask: packets "tlshello", length/delay ranges
+            // (infra/conf/transport_finalmask.go, FragmentMask).
             if (settings.fragmentEnabled) {
-                putJsonObject("fragment") {
-                    put("packets", "tlshello")
-                    put("length", "100-200")
-                    put("interval", "10-20")
+                putJsonObject("finalmask") {
+                    putJsonArray("tcp") {
+                        add(buildJsonObject {
+                            put("type", "fragment")
+                            putJsonObject("settings") {
+                                put("packets", "tlshello")
+                                put("length", "100-200")
+                                put("delay", "10-20")
+                            }
+                        })
+                    }
                 }
             }
             when (net) {
+                // 3.2.16 (#52): TCP+HTTP-header obfuscation — the
+                // headerType was never parsed, so the header was lost.
+                // Shape mirrors PattNG's createTcpHttpRequest.
+                "tcp" -> if (p.headerType == "http") {
+                    putJsonObject("tcpSettings") {
+                        putJsonObject("header") {
+                            put("type", "http")
+                            putJsonObject("request") {
+                                put("version", "1.1")
+                                put("method", "GET")
+                                putJsonArray("path") {
+                                    val paths = p.path.split(",").map { it.trim() }.filter { it.isNotEmpty() }
+                                    if (paths.isEmpty()) add(JsonPrimitive("/")) else paths.forEach { add(JsonPrimitive(it)) }
+                                }
+                                putJsonObject("headers") {
+                                    val hosts = p.host.split(",").map { it.trim() }.filter { it.isNotEmpty() }
+                                    if (hosts.isNotEmpty()) {
+                                        putJsonArray("Host") { hosts.forEach { add(JsonPrimitive(it)) } }
+                                    }
+                                    putJsonArray("User-Agent") { add(JsonPrimitive("Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.6478.122 Mobile Safari/537.36")) }
+                                    putJsonArray("Accept-Encoding") { add(JsonPrimitive("gzip, deflate")) }
+                                    putJsonArray("Connection") { add(JsonPrimitive("keep-alive")) }
+                                    put("Pragma", "no-cache")
+                                }
+                            }
+                        }
+                    }
+                }
                 "ws" -> putJsonObject("wsSettings") {
                     put("path", p.path.ifEmpty { "/" })
                     putJsonObject("headers") {
@@ -415,6 +476,19 @@ object XrayConfig {
                     }
                 }
                 "xhttp" -> putJsonObject("xhttpSettings") {
+                    put("path", p.path.ifEmpty { "/" })
+                    put("host", p.host.ifEmpty { p.sni.ifEmpty { p.addr } })
+                    put("mode", "auto")
+                }
+                // 3.2.16 (#52): httpupgrade + splithttp links imported
+                // but lost path/host (the core fell back to "/" and the
+                // address). Both settings keys exist in the pinned core
+                // (StreamConfig.httpupgradeSettings / splithttpSettings).
+                "httpupgrade" -> putJsonObject("httpupgradeSettings") {
+                    put("path", p.path.ifEmpty { "/" })
+                    put("host", p.host.ifEmpty { p.sni.ifEmpty { p.addr } })
+                }
+                "splithttp" -> putJsonObject("splithttpSettings") {
                     put("path", p.path.ifEmpty { "/" })
                     put("host", p.host.ifEmpty { p.sni.ifEmpty { p.addr } })
                     put("mode", "auto")
