@@ -173,6 +173,11 @@
     <string name="fake_dns_desc">Xray به هر دامنه یک IP جعلی می‌دهد و با دامنه مسیریابی می‌کند</string>
     <string name="http_proxy_title">پروکسی HTTP</string>
     <string name="http_proxy_desc">یک پروکسی HTTP روی پورت SOCKS + 1 باز می‌شود</string>
+    <!-- 3.2.9 — local proxy + HEV tun (PattNG) -->
+    <string name="local_proxy_title">پروکسی محلی</string>
+    <string name="local_proxy_desc">ورودی SOCKS و HTTP برای برنامه‌های دیگر</string>
+    <string name="use_hev_title">تونل HEV</string>
+    <string name="use_hev_desc">روشن: پل HEV؛ خاموش: تونل داخلی Xray</string>
     <string name="mtu_title">MTU</string>
     <string name="mtu_desc">اندازه بسته تونل؛ پیش‌فرض 1500</string>
     <string name="iface_addr_title">آدرس اینترفیس</string>
@@ -514,7 +519,18 @@
     <string name="manual_reality_pbk">کلید عمومی Reality</string>
     <string name="manual_reality_sid">Short ID (Reality)</string>
 
+    <!-- 3.2.9 — ECH + pinning + ML-DSA (PattNG, the rest) -->
+    <string name="manual_ech">لیست پیکربندی ECH</string>
+    <string name="manual_ech_outbound">خروجی ECH (JSON)</string>
+    <string name="manual_vcn">تأیید گواهی با نام</string>
+    <string name="manual_pcs">پین گواهی (SHA-256)</string>
+    <string name="manual_spx">SpiderX (Reality)</string>
+    <string name="manual_pqv">کلید تأیید ML-DSA-65</string>
+
     <!-- 3.2.7 — two-column server list (PattNG) -->
     <string name="settings_double_column_title">نمایش دو ستونه</string>
     <string name="settings_double_column_desc">سرورها دو تا دو تا کنار هم</string>
+    <!-- 3.2.9 — dynamic color (PattNG) -->
+    <string name="dynamic_color_title">رنگ پویا</string>
+    <string name="dynamic_color_desc">رنگ‌ها از تصویر پس‌زمینه (اندروید ۱۲ به بالا)</string>
 </resources>
