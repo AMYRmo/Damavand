@@ -749,7 +749,9 @@ private fun enc(s: String): String =
 /** Build a share link from the editor fields; null when required fields are missing. */
 private fun buildManualLink(proto: String, f: Map<String, String>): String? {
     val name = f["name"].orEmpty().trim()
-    val addr = f["addr"].orEmpty().trim()
+    // A share link carries an IPv6 literal in brackets ("[2001:db8::1]:443").
+    val rawAddr = f["addr"].orEmpty().trim().removePrefix("[").removeSuffix("]")
+    val addr = if (':' in rawAddr) "[$rawAddr]" else rawAddr
     val port = f["port"].orEmpty().trim()
     val frag = if (name.isEmpty()) "" else "#" + enc(name)
     fun query(vararg pairs: Pair<String, String>): String {
@@ -792,7 +794,7 @@ private fun buildManualLink(proto: String, f: Map<String, String>): String? {
             val j = JSONObject().apply {
                 put("v", "2")
                 put("ps", name.ifEmpty { "$addr:$port" })
-                put("add", addr)
+                put("add", rawAddr) // VMess JSON: the bare address
                 put("port", port)
                 put("id", uuid)
                 put("aid", "0")
@@ -822,7 +824,8 @@ private fun buildManualLink(proto: String, f: Map<String, String>): String? {
         "trojan" -> {
             val pass = f["password"].orEmpty().trim()
             if (pass.isEmpty() || addr.isEmpty() || port.isEmpty()) return null
-            "trojan://$pass@$addr:$port" + query(
+            // Userinfo is percent-encoded (the parser decodes it).
+            "trojan://${enc(pass)}@$addr:$port" + query(
                 "security" to f["security"].orEmpty().ifEmpty { "tls" },
                 "sni" to f["sni"].orEmpty(),
                 // 3.2.7 (PattNG share link). 3.2.9 (the rest).
@@ -860,7 +863,7 @@ private fun buildManualLink(proto: String, f: Map<String, String>): String? {
         "hysteria2" -> {
             val pass = f["password"].orEmpty().trim()
             if (pass.isEmpty() || addr.isEmpty() || port.isEmpty()) return null
-            "hysteria2://$pass@$addr:$port" + query(
+            "hysteria2://${enc(pass)}@$addr:$port" + query(
                 "sni" to f["sni"].orEmpty(),
                 "insecure" to f["insecure"].orEmpty(),
                 // 3.2.9 (PattNG): ECH + pinning ride on Hysteria2 too.
@@ -874,7 +877,7 @@ private fun buildManualLink(proto: String, f: Map<String, String>): String? {
             val priv = f["privateKey"].orEmpty().trim()
             val pub = f["publicKey"].orEmpty().trim()
             if (priv.isEmpty() || pub.isEmpty() || addr.isEmpty() || port.isEmpty()) return null
-            "wg://$priv@$addr:$port" + query(
+            "wg://${enc(priv)}@$addr:$port" + query(
                 "publicKey" to pub,
                 "allowedIPs" to f["allowedIps"].orEmpty().ifEmpty { "0.0.0.0/0,::/0" },
                 "address" to f["localAddress"].orEmpty(),
