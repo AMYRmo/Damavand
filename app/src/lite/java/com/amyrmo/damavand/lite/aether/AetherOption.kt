@@ -461,3 +461,36 @@ enum class AetherFingerprint(
         fun fromString(type: String?) = entries.find { it.type == type } ?: CHROME
     }
 }
+
+/**
+ * Which WARP keys a registration gets: every key, or the keys of one protocol, both hops' keys for a two-hop one.
+ * [type] is the protocol's own value, which the WARP keys page stores; [register] is the word the core's --register
+ * takes for those keys. (PattNG AetherOption.AetherKeyKind, 3.2.11.)
+ */
+enum class AetherKeyKind(val type: String, val register: String) {
+    ALL("all", "all"),
+    WIREGUARD("wg", "wg"),
+    MASQUE("masque", "masque"),
+
+    /** WARP-in-WARP, the older gool: both WireGuard hops' keys, which the core registers as gool-classic. */
+    GOOL("gool", "gool-classic"),
+    MIM("mim", "mim"),
+
+    /** WireGuard over MASQUE, the gool of the core's --gool: the MASQUE key and the WireGuard key it carries inside. */
+    WG_OVER_MASQUE("wg-over-masque", "gool");
+
+    companion object {
+        fun fromString(type: String?) = entries.find { it.type == type } ?: ALL
+
+        /** The kind the core reads [word] after --register as, under any of the names it accepts; null for none. */
+        fun ofRegister(word: String?): AetherKeyKind? = when (word?.trim()?.lowercase(java.util.Locale.ROOT)) {
+            "all" -> ALL
+            "wg", "wireguard", "warp" -> WIREGUARD
+            "masque" -> MASQUE
+            "gool-classic", "wiw", "warp-in-warp" -> GOOL
+            "mim", "masque-in-masque" -> MIM
+            "gool", "wg-over-masque" -> WG_OVER_MASQUE
+            else -> null
+        }
+    }
+}
