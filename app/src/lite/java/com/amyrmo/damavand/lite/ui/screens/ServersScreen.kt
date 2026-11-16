@@ -1260,7 +1260,6 @@ private fun AddSheetRow(labelRes: Int, onClick: () -> Unit) {
  * expiry when the panel reports them. Tap collapses the group;
  * the refresh / balancer actions live on the card itself.
  */
-@Composable
 // 3.2.12 (Damavand ServersScreen GroupTab): one entry of the group
 // pill row — a group, or the Subscriptions action chip.
 private sealed interface GroupChipEntry {
@@ -1268,6 +1267,7 @@ private sealed interface GroupChipEntry {
     data object Subscriptions : GroupChipEntry
 }
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 private fun GroupChip(
     label: String,
