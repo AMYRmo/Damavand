@@ -2,6 +2,7 @@ package com.amyrmo.damavand.lite
 
 import android.content.Context
 import androidx.datastore.core.DataStore
+import com.amyrmo.damavand.lite.aether.AetherKeysSettings
 import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
@@ -91,6 +92,20 @@ class SettingsStore(private val context: Context) {
         // 3.2.10 (PattNG root mode): system-wide routing via iptables + hev tun.
         val KEY_ROOT_MODE = booleanPreferencesKey("root_mode")
         val KEY_ROOT_LAN_SHARE = booleanPreferencesKey("root_lan_share")
+        // 3.2.11 (PattNG full parity): IPv6 (PattNG PREF_IPV6_ENABLED,
+        // default true) + prefer-IPv6 (default false) + the Aether
+        // listen port (PattNG title_pref_aether_listen_port, 10819).
+        val KEY_IPV6_ENABLED = booleanPreferencesKey("ipv6_enabled")
+        val KEY_PREFER_IPV6 = booleanPreferencesKey("prefer_ipv6")
+        val KEY_AETHER_LISTEN_PORT = stringPreferencesKey("aether_listen_port")
+        // 3.2.11 (PattNG full parity): the WARP keys page's settings,
+        // one JSON string (PattNG keeps them in MMKV; Lite has none).
+        val KEY_AETHER_KEYS_SETTINGS = stringPreferencesKey("aether_keys_settings")
+        // 3.2.11 (PattNG full parity): the URL each asset file downloads
+        // from (PattNG UserAssetUrlActivity); blank means the built-in one.
+        val KEY_ASSET_GEOIP_URL = stringPreferencesKey("asset_geoip_url")
+        val KEY_ASSET_GEOSITE_URL = stringPreferencesKey("asset_geosite_url")
+        val KEY_ASSET_PSIPHON_URL = stringPreferencesKey("asset_psiphon_url")
     }
 
     val killSwitch: Flow<Boolean> = context.liteDataStore.data.map { it[KEY_KILL_SWITCH] ?: false }
@@ -183,6 +198,22 @@ class SettingsStore(private val context: Context) {
     // 3.2.10 (PattNG root mode): off by default — needs a rooted phone.
     val rootMode: Flow<Boolean> =
         context.liteDataStore.data.map { it[KEY_ROOT_MODE] ?: false }
+    // 3.2.11 (PattNG full parity): IPv6 on by default (PattNG's
+    // DEFAULT_IPV6_ENABLED), prefer-IPv6 off, Aether listen port 10819.
+    val ipv6Enabled: Flow<Boolean> =
+        context.liteDataStore.data.map { it[KEY_IPV6_ENABLED] ?: true }
+    val preferIpv6: Flow<Boolean> =
+        context.liteDataStore.data.map { it[KEY_PREFER_IPV6] ?: false }
+    val aetherListenPort: Flow<String> =
+        context.liteDataStore.data.map { it[KEY_AETHER_LISTEN_PORT] ?: "10819" }
+    val aetherKeysSettings: Flow<String> =
+        context.liteDataStore.data.map { it[KEY_AETHER_KEYS_SETTINGS] ?: "" }
+    val assetGeoipUrl: Flow<String> =
+        context.liteDataStore.data.map { it[KEY_ASSET_GEOIP_URL] ?: "" }
+    val assetGeositeUrl: Flow<String> =
+        context.liteDataStore.data.map { it[KEY_ASSET_GEOSITE_URL] ?: "" }
+    val assetPsiphonUrl: Flow<String> =
+        context.liteDataStore.data.map { it[KEY_ASSET_PSIPHON_URL] ?: "" }
     val rootLanShare: Flow<Boolean> =
         context.liteDataStore.data.map { it[KEY_ROOT_LAN_SHARE] ?: false }
 
@@ -273,6 +304,14 @@ class SettingsStore(private val context: Context) {
     // 3.2.10 (PattNG root mode).
     suspend fun setRootMode(v: Boolean) = context.liteDataStore.edit { it[KEY_ROOT_MODE] = v }
     suspend fun setRootLanShare(v: Boolean) = context.liteDataStore.edit { it[KEY_ROOT_LAN_SHARE] = v }
+    // 3.2.11 (PattNG full parity).
+    suspend fun setIpv6Enabled(v: Boolean) = context.liteDataStore.edit { it[KEY_IPV6_ENABLED] = v }
+    suspend fun setPreferIpv6(v: Boolean) = context.liteDataStore.edit { it[KEY_PREFER_IPV6] = v }
+    suspend fun setAetherListenPort(v: String) = context.liteDataStore.edit { it[KEY_AETHER_LISTEN_PORT] = v }
+    suspend fun setAetherKeysSettings(v: String) = context.liteDataStore.edit { it[KEY_AETHER_KEYS_SETTINGS] = v }
+    suspend fun setAssetGeoipUrl(v: String) = context.liteDataStore.edit { it[KEY_ASSET_GEOIP_URL] = v }
+    suspend fun setAssetGeositeUrl(v: String) = context.liteDataStore.edit { it[KEY_ASSET_GEOSITE_URL] = v }
+    suspend fun setAssetPsiphonUrl(v: String) = context.liteDataStore.edit { it[KEY_ASSET_PSIPHON_URL] = v }
     suspend fun rootModeNow(): Boolean = rootMode.first()
     suspend fun rootLanShareNow(): Boolean = rootLanShare.first()
     suspend fun socksUserNow(): String = socksUser.first()
@@ -323,6 +362,13 @@ class SettingsStore(private val context: Context) {
     suspend fun dynamicColorNow(): Boolean = dynamicColor.first()
     suspend fun localProxyNow(): Boolean = localProxy.first()
     suspend fun useHevNow(): Boolean = useHev.first()
+    // 3.2.11 (PattNG full parity).
+    suspend fun ipv6EnabledNow(): Boolean = ipv6Enabled.first()
+    suspend fun preferIpv6Now(): Boolean = preferIpv6.first()
+    suspend fun aetherListenPortNow(): Int =
+        aetherListenPort.first().toIntOrNull()?.coerceIn(1024, 65535) ?: 10819
+    suspend fun aetherKeysSettingsNow(): AetherKeysSettings =
+        AetherKeysSettings.fromJson(aetherKeysSettings.first()) ?: AetherKeysSettings()
     suspend fun showSpeedNotifNow(): Boolean = showSpeedNotif.first()
     suspend fun confirmDeleteNow(): Boolean = confirmDelete.first()
     suspend fun showAllGroupsNow(): Boolean = showAllGroups.first()
@@ -383,6 +429,9 @@ class SettingsStore(private val context: Context) {
             dnsHosts = hosts,
             mtu = mtuNow(),
             ifaceAddr = ifaceAddrNow(),
+            // 3.2.11 (PattNG full parity): IPv6 gates the WG IPv6
+            // addresses + the tun's IPv6 side (CoreOutboundBuilder).
+            ipv6Enabled = ipv6EnabledNow(),
         )
     }
 }
