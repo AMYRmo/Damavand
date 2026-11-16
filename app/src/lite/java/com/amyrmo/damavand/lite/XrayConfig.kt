@@ -585,26 +585,52 @@ object XrayConfig {
     }
 
     /**
-     * Balancer config (3.2.0, PattNG policy group): one outbound per
-     * profile (tags proxy-0..N) + a leastPing balancer + an observatory
-     * that probes them every minute. The catch-all route sends traffic
-     * to the balancer; the busiest hop's counters feed the stats
-     * (see XrayController.readTrafficDelta's fallback).
+     * Auto-select config (3.2.8, Damavand/ZedSecure-faithful) — a port
+     * of Damavand's XrayJsonBuilder.buildAutoSelect/autoSelectGroup:
+     * one outbound per member link (tags proxy@0..N) + one group
+     * outbound, tag "proxy", protocol "autoselect", with the tuning
+     * (probe URL + fallback, probe timeout, active/sweep intervals,
+     * switch ratio, retry, initial member tag). The group is FIRST in
+     * the outbounds list, so unmatched traffic defaults to it — the
+     * same trick Damavand uses (its GroupBuild is listOf(group) +
+     * memberOutbounds). Routing rules keep pointing at "proxy" and
+     * never learn a group exists. Returns null when fewer than two
+     * members (the caller falls back to a direct connect) or when a
+     * member link does not parse.
      */
-    fun buildBalancer(
+    fun buildAutoSelect(
         links: List<String>,
+        tuning: AutoSelectTuning,
+        initialTag: String? = null,
         socksPort: Int,
         geoAvailable: Boolean = false,
         settings: XraySettings = XraySettings(),
     ): String? {
-        if (links.size < 2) return links.firstOrNull()
-            ?.let { build(it, socksPort, geoAvailable, settings) }
+        if (links.size < 2) return null
         val parsed = links.map { parse(it) ?: return null }
-        val tags = parsed.indices.map { "proxy-$it" }
-        val outbounds = parsed.mapIndexed { i, p ->
+        val tags = parsed.indices.map { "proxy@$it" }
+        val memberOutbounds = parsed.mapIndexed { i, p ->
             outbound(p, tags[i], null, settings) ?: return null
         }
-        return assemble(outbounds, socksPort, geoAvailable, settings, balancerTags = tags)
+        val group = buildJsonObject {
+            put("tag", "proxy")
+            put("protocol", "autoselect")
+            putJsonObject("settings") {
+                putJsonArray("outbounds") { tags.forEach { add(JsonPrimitive(it)) } }
+                val probe = tuning.probeUrl.ifBlank { "https://www.gstatic.com/generate_204" }
+                put("probeURL", probe)
+                if (probe != "https://cp.cloudflare.com/generate_204") {
+                    put("fallbackProbeURL", "https://cp.cloudflare.com/generate_204")
+                }
+                put("probeTimeout", "${tuning.probeTimeoutSec.coerceIn(2, 20)}s")
+                put("activeInterval", "${tuning.activeIntervalSec.coerceIn(10, 600)}s")
+                put("sweepInterval", "${tuning.sweepIntervalMin.coerceIn(1, 120)}m")
+                put("switchRatio", tuning.switchMarginPercent.coerceIn(5, 90) / 100.0)
+                put("retry", tuning.retry)
+                if (initialTag != null) put("initial", initialTag)
+            }
+        }
+        return assemble(listOf(group) + memberOutbounds, socksPort, geoAvailable, settings)
     }
 
     /** One custom rule → its Xray routing rule object. */
@@ -634,8 +660,6 @@ object XrayConfig {
         socksPort: Int,
         geoAvailable: Boolean,
         settings: XraySettings = XraySettings(),
-        // 3.2.0 (PattNG): when set, a leastPing balancer over these tags.
-        balancerTags: List<String>? = null,
     ): String {
         val json = buildJsonObject {
             val logLevel = settings.coreLogLevel.takeIf {
@@ -761,40 +785,9 @@ object XrayConfig {
                             put("type", "field")
                             put("outboundTag", "direct")
                         })
-                    } else if (balancerTags != null) {
-                        // 3.2.0 (PattNG): the balancer is the default
-                        // route — everything not matched above goes to
-                        // the least-ping hop.
-                        add(buildJsonObject {
-                            put("type", "field")
-                            put("outboundTag", "balancer")
-                        })
                     }
-                }
-                // 3.2.0 (PattNG): the leastPing balancer itself.
-                if (balancerTags != null) {
-                    putJsonArray("balancers") {
-                        add(buildJsonObject {
-                            put("tag", "balancer")
-                            putJsonArray("selector") {
-                                balancerTags.forEach { add(JsonPrimitive(it)) }
-                            }
-                            putJsonObject("strategy") {
-                                put("type", "leastPing")
-                            }
-                        })
-                    }
-                }
-            }
-            // 3.2.0 (PattNG): the observatory probes the balancer's
-            // outbounds so leastPing has live data.
-            if (balancerTags != null) {
-                putJsonObject("observatory") {
-                    putJsonArray("subjectSelector") {
-                        balancerTags.forEach { add(JsonPrimitive(it)) }
-                    }
-                    put("probeUrl", "https://www.google.com/generate_204")
-                    put("probeInterval", "1m")
+                    // Anything else falls through to the first outbound
+                    // ("proxy") — for Auto that is the autoselect group.
                 }
             }
         }
