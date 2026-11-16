@@ -6,6 +6,7 @@ import android.net.VpnService
 import com.amyrmo.damavand.lite.LiteVpnService
 import com.amyrmo.damavand.lite.MainActivity
 import com.amyrmo.damavand.lite.ProfileRepository
+import com.amyrmo.damavand.lite.SelectedEntry
 import com.amyrmo.damavand.lite.SettingsStore
 import kotlinx.coroutines.runBlocking
 
@@ -61,7 +62,12 @@ object TaskerLauncher {
             } else {
                 val selectedId = runBlocking { store.selectedProfileIdNow() }
                 val selected = profiles.firstOrNull { it.id == selectedId }
-                if (selected != null) {
+                if (SelectedEntry.isGroup(selectedId)) {
+                    // A selected chain or Auto entry starts as in the app.
+                    val extras = SelectedEntry.startExtras(context, selectedId)
+                        ?: run { openApp(context); return false }
+                    putExtras(extras)
+                } else if (selected != null) {
                     putExtra(LiteVpnService.EXTRA_LINK, selected.link)
                     if (selected.isAether) putExtra(LiteVpnService.EXTRA_AETHER, true)
                 } else {

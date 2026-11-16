@@ -17,6 +17,20 @@ class BootReceiver : BroadcastReceiver() {
         runBlocking {
             val store = SettingsStore(context)
             if (!store.autoStartBootNow()) return@runBlocking
+            // A selected Auto entry starts its group (the lookups below
+            // only know chains and profiles, so boot did nothing).
+            val selectedEntry = store.selectedProfileIdNow()
+            if (AutoSelectIds.isAuto(selectedEntry)) {
+                val extras = SelectedEntry.startExtras(context, selectedEntry) ?: return@runBlocking
+                context.startForegroundService(
+                    Intent(context, LiteVpnService::class.java)
+                        .setAction(LiteVpnService.ACTION_START)
+                        .putExtras(extras)
+                        .putExtra(LiteVpnService.EXTRA_TEST_URL, store.testUrlNow())
+                        .putExtra(LiteVpnService.EXTRA_KILL_SWITCH, store.killSwitchNow())
+                )
+                return@runBlocking
+            }
             val repo = ProfileRepository(context)
             val selected = store.selectedProfileIdNow() ?: return@runBlocking
             var aether = false
