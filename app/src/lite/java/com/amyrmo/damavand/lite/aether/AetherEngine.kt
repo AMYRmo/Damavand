@@ -273,9 +273,6 @@ object AetherEngine {
             return
         }
         target.process = process
-        // 3.2.22: the pid, so a start and its exit line can be matched
-        // when two sessions run back to back in the same second.
-        AppLog.i(TAG, "AetherCore: started pid ${process.pid()}")
         thread(name = "aether-core-output", isDaemon = true) { watch(target, process) }
     }
 
