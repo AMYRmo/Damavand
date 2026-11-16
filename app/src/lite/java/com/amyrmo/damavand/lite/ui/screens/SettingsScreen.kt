@@ -123,9 +123,12 @@ fun SettingsScreen(
     val doubleColumn by vm.doubleColumn.collectAsState(initial = false)
     // 3.2.8 (Auto): tuning for the autoselect core.
     val autoProbeUrl by vm.autoProbeUrl.collectAsState(initial = "https://www.gstatic.com/generate_204")
-    val autoCheckSeconds by vm.autoCheckSeconds.collectAsState(initial = 30)
-    val autoSweepMinutes by vm.autoSweepMinutes.collectAsState(initial = 10)
-    val autoSwitchMargin by vm.autoSwitchMargin.collectAsState(initial = 30)
+    // The tuning flows are Flow<String> — the initials must be
+    // strings too (Int initials broke overload resolution and the
+    // CycleRow "current" then mismatched String).
+    val autoCheckSeconds by vm.autoCheckSeconds.collectAsState(initial = "30")
+    val autoSweepMinutes by vm.autoSweepMinutes.collectAsState(initial = "10")
+    val autoSwitchMargin by vm.autoSwitchMargin.collectAsState(initial = "30")
     val autoRetry by vm.autoRetry.collectAsState(initial = true)
     val autoStartBoot by vm.autoStartBoot.collectAsState(initial = false)
     val subAutoTest by vm.subAutoTest.collectAsState(initial = true)
@@ -133,6 +136,10 @@ fun SettingsScreen(
     val subAutoRemoveInvalid by vm.subAutoRemoveInvalid.collectAsState(initial = false)
     val hevLogLevel by vm.hevLogLevel.collectAsState(initial = "warning")
     val hevRwTimeout by vm.hevRwTimeout.collectAsState(initial = "0")
+    // 3.2.9 (PattNG, the rest): dynamic color, local proxy, HEV tun.
+    val dynamicColor by vm.dynamicColor.collectAsState(initial = false)
+    val localProxy by vm.localProxy.collectAsState(initial = true)
+    val useHev by vm.useHev.collectAsState(initial = true)
     var editField by remember { mutableStateOf<String?>(null) } // see the dialog below
 
     Column(
@@ -280,6 +287,27 @@ fun SettingsScreen(
                 descRes = R.string.http_proxy_desc,
                 checked = httpProxy,
                 onCheckedChange = { vm.setHttpProxy(it) }
+            )
+            GroupDivider()
+            // 3.2.9 (PattNG): the local proxy switch — the SOCKS (and
+            // HTTP) inbound other apps use. Forced on in VPN+HEV mode
+            // and in proxy-only mode; this switch bites in Xray-tun
+            // mode and proxy-only mode.
+            SwitchRow(
+                titleRes = R.string.local_proxy_title,
+                descRes = R.string.local_proxy_desc,
+                checked = localProxy,
+                onCheckedChange = { vm.setLocalProxy(it) }
+            )
+            GroupDivider()
+            // 3.2.9 (PattNG useHevTun): on = Lite's HEV bridge (the
+            // proven path); off = Xray's own tun inbound reading the
+            // VPN fd straight from the core.
+            SwitchRow(
+                titleRes = R.string.use_hev_title,
+                descRes = R.string.use_hev_desc,
+                checked = useHev,
+                onCheckedChange = { vm.setUseHev(it) }
             )
             GroupDivider()
             TextEditRow(
@@ -578,6 +606,17 @@ fun SettingsScreen(
                 descRes = R.string.settings_double_column_desc,
                 checked = doubleColumn,
                 onCheckedChange = { vm.setDoubleColumn(it) }
+            )
+            GroupDivider()
+            // 3.2.9 (PattNG dynamicColor): wallpaper-palette colors,
+            // Android 12+ only — below 12 the switch is disabled and
+            // Damavand Red stays the accent.
+            SwitchRow(
+                titleRes = R.string.dynamic_color_title,
+                descRes = R.string.dynamic_color_desc,
+                checked = dynamicColor,
+                onCheckedChange = { vm.setDynamicColor(it) },
+                enabled = Build.VERSION.SDK_INT >= Build.VERSION_CODES.S
             )
             GroupDivider()
             // 3.2.6: add the quick settings tile (control-center
@@ -1230,7 +1269,8 @@ private fun SwitchRow(
     titleRes: Int,
     descRes: Int,
     checked: Boolean,
-    onCheckedChange: (Boolean) -> Unit
+    onCheckedChange: (Boolean) -> Unit,
+    enabled: Boolean = true
 ) {
     Row(
         modifier = Modifier
@@ -1244,14 +1284,14 @@ private fun SwitchRow(
                 text = stringResource(titleRes),
                 fontSize = 14.sp,
                 fontWeight = FontWeight.SemiBold,
-                color = LiteColors.text,
+                color = if (enabled) LiteColors.text else LiteColors.textMuted,
                 fontFamily = Vazirmatn
             )
             Spacer(Modifier.height(2.dp))
             Text(
                 text = stringResource(descRes),
                 fontSize = 12.sp,
-                color = LiteColors.textSecondary,
+                color = if (enabled) LiteColors.textSecondary else LiteColors.textMuted,
                 fontFamily = Vazirmatn,
                 maxLines = 2
             )
@@ -1259,7 +1299,8 @@ private fun SwitchRow(
         Spacer(Modifier.width(12.dp))
         Switch(
             checked = checked,
-            onCheckedChange = onCheckedChange,
+            onCheckedChange = if (enabled) onCheckedChange else null,
+            enabled = enabled,
             colors = SwitchDefaults.colors(
                 checkedThumbColor = Color.White,
                 checkedTrackColor = LiteColors.accent,
