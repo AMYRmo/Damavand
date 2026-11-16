@@ -119,4 +119,17 @@ object XrayController {
 
     fun measureDelay(url: String): Long =
         runCatching { ready()?.measureDelay(url) ?: -1L }.getOrDefault(-1L)
+
+    // ---- Auto-select (3.2.8, Damavand Auto) ----
+    // Package-level funcs of the Go core (gomobile exposes them as
+    // Libv2ray.* statics). "[]" when no autoselect group is running.
+    fun autoSelectStatus(): String =
+        runCatching { Libv2ray.autoSelectStatus() }.getOrDefault("[]")
+
+    fun autoSelectPin(group: String, member: String): Boolean =
+        runCatching { Libv2ray.autoSelectPin(group, member) }.getOrDefault(false)
+
+    fun autoSelectNetworkChanged() {
+        runCatching { Libv2ray.autoSelectNetworkChanged() }
+    }
 }
