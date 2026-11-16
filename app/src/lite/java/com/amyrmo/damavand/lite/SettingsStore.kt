@@ -84,6 +84,10 @@ class SettingsStore(private val context: Context) {
         val KEY_AUTO_SWITCH_MARGIN = stringPreferencesKey("auto_switch_margin")
         val KEY_AUTO_RETRY = booleanPreferencesKey("auto_retry")
         val KEY_AUTO_LAST_PICK = stringPreferencesKey("auto_last_pick")
+        // 3.2.9 (PattNG, the rest): dynamic color, local proxy, HEV tun.
+        val KEY_DYNAMIC_COLOR = booleanPreferencesKey("dynamic_color")
+        val KEY_LOCAL_PROXY = booleanPreferencesKey("local_proxy")
+        val KEY_USE_HEV = booleanPreferencesKey("use_hev_tun")
     }
 
     val killSwitch: Flow<Boolean> = context.liteDataStore.data.map { it[KEY_KILL_SWITCH] ?: false }
@@ -162,6 +166,17 @@ class SettingsStore(private val context: Context) {
         context.liteDataStore.data.map { it[KEY_AUTO_SWITCH_MARGIN] ?: "30" }
     val autoRetry: Flow<Boolean> =
         context.liteDataStore.data.map { it[KEY_AUTO_RETRY] ?: true }
+
+    // 3.2.9 (PattNG): dynamic color (off — Damavand Red stays the
+    // default), local proxy (on — the SOCKS inbound other apps use),
+    // HEV tunnel (on — Lite's current tun path; off is Xray's own
+    // tun inbound reading the VPN fd).
+    val dynamicColor: Flow<Boolean> =
+        context.liteDataStore.data.map { it[KEY_DYNAMIC_COLOR] ?: false }
+    val localProxy: Flow<Boolean> =
+        context.liteDataStore.data.map { it[KEY_LOCAL_PROXY] ?: true }
+    val useHev: Flow<Boolean> =
+        context.liteDataStore.data.map { it[KEY_USE_HEV] ?: true }
 
     suspend fun setKillSwitch(v: Boolean) = context.liteDataStore.edit { it[KEY_KILL_SWITCH] = v }
     suspend fun setAutoConnect(v: Boolean) = context.liteDataStore.edit { it[KEY_AUTO_CONNECT] = v }
@@ -243,6 +258,10 @@ class SettingsStore(private val context: Context) {
     suspend fun setAutoSweepMinutes(v: String) = context.liteDataStore.edit { it[KEY_AUTO_SWEEP_MINUTES] = v }
     suspend fun setAutoSwitchMargin(v: String) = context.liteDataStore.edit { it[KEY_AUTO_SWITCH_MARGIN] = v }
     suspend fun setAutoRetry(v: Boolean) = context.liteDataStore.edit { it[KEY_AUTO_RETRY] = v }
+    // 3.2.9 (PattNG, the rest).
+    suspend fun setDynamicColor(v: Boolean) = context.liteDataStore.edit { it[KEY_DYNAMIC_COLOR] = v }
+    suspend fun setLocalProxy(v: Boolean) = context.liteDataStore.edit { it[KEY_LOCAL_PROXY] = v }
+    suspend fun setUseHev(v: Boolean) = context.liteDataStore.edit { it[KEY_USE_HEV] = v }
 
     /** Remember the Auto pick for one auto id (the "initial" member). */
     suspend fun setAutoLastPick(autoId: String, profileId: String) {
@@ -285,6 +304,10 @@ class SettingsStore(private val context: Context) {
     suspend fun autoStartBootNow(): Boolean = autoStartBoot.first()
     suspend fun hevLogLevelNow(): String = hevLogLevel.first()
     suspend fun hevRwTimeoutNow(): String = hevRwTimeout.first()
+    // 3.2.9 (PattNG, the rest).
+    suspend fun dynamicColorNow(): Boolean = dynamicColor.first()
+    suspend fun localProxyNow(): Boolean = localProxy.first()
+    suspend fun useHevNow(): Boolean = useHev.first()
     suspend fun showSpeedNotifNow(): Boolean = showSpeedNotif.first()
     suspend fun confirmDeleteNow(): Boolean = confirmDelete.first()
     suspend fun showAllGroupsNow(): Boolean = showAllGroups.first()
