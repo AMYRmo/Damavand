@@ -33,6 +33,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.toArgb
@@ -99,19 +100,38 @@ class MainActivity : ComponentActivity() {
 
     private val vm: LiteViewModel by viewModels()
 
+    // The connect action waiting on the system VPN consent dialog. Saved
+    // in onSaveInstanceState, so it survives the process being killed
+    // while the dialog is up.
     private var pendingConnect = false
     private var pendingFastest = false
 
     private val vpnPrepareLauncher = registerForActivityResult(
         ActivityResultContracts.StartActivityForResult()
-    ) {
-        if (pendingConnect) {
-            pendingConnect = false
+    ) { result ->
+        val connect = pendingConnect
+        val fastest = pendingFastest
+        pendingConnect = false
+        pendingFastest = false
+        // Cancel on the "Connection request" dialog: don't start a
+        // connection that can only fail with "VPN interface failed".
+        if (result.resultCode != RESULT_OK) {
+            if (connect || fastest) {
+                Toast.makeText(this, getString(R.string.vpn_permission_denied), Toast.LENGTH_SHORT).show()
+            }
+            return@registerForActivityResult
+        }
+        if (connect) {
             vm.connect()
-        } else if (pendingFastest) {
-            pendingFastest = false
+        } else if (fastest) {
             vm.connectFastest()
         }
+    }
+
+    override fun onSaveInstanceState(outState: Bundle) {
+        super.onSaveInstanceState(outState)
+        outState.putBoolean(STATE_PENDING_CONNECT, pendingConnect)
+        outState.putBoolean(STATE_PENDING_FASTEST, pendingFastest)
     }
 
     // 3.2.0 (PattNG): custom geo import file picker.
@@ -175,6 +195,10 @@ class MainActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        if (savedInstanceState != null) {
+            pendingConnect = savedInstanceState.getBoolean(STATE_PENDING_CONNECT)
+            pendingFastest = savedInstanceState.getBoolean(STATE_PENDING_FASTEST)
+        }
         // 2.0.0: if the first Compose frame throws, show a plain error
         // view instead of dying — and the crash handler in LiteApp has
         // already written the full stack trace to crash-<time>.txt.
@@ -266,18 +290,30 @@ class MainActivity : ComponentActivity() {
         }
         // One auto-connect attempt on launch (spec §7.1) — unless a
         // shortcut/widget action already decided what to do (3.2.0).
-        when (intent?.getStringExtra("lite_action")) {
-            "connect" -> requestConnect()
-            "disconnect" -> vm.disconnect()
-            else -> runCatching { vm.autoConnectOnce() }
+        // Only on a fresh start: a recreation (language change, dark
+        // mode, font scale, multi-window, process death) must not
+        // reconnect a VPN the user turned off, nor replay the intent.
+        if (savedInstanceState == null) {
+            when (consumeLiteAction(intent)) {
+                "connect" -> requestConnect()
+                "disconnect" -> vm.disconnect()
+                else -> runCatching { vm.autoConnectOnce() }
+            }
         }
+    }
+
+    /** The shortcut/widget action, removed from the intent so it runs once. */
+    private fun consumeLiteAction(intent: Intent?): String? {
+        val action = intent?.getStringExtra("lite_action")
+        intent?.removeExtra("lite_action")
+        return action
     }
 
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
         setIntent(intent)
         // 3.2.0: shortcut / widget action while the app is already open.
-        when (intent.getStringExtra("lite_action")) {
+        when (consumeLiteAction(intent)) {
             "connect" -> requestConnect()
             "disconnect" -> vm.disconnect()
         }
@@ -296,6 +332,7 @@ class MainActivity : ComponentActivity() {
             vm.connect()
         } else {
             pendingConnect = true
+            pendingFastest = false
             vpnPrepareLauncher.launch(prepare)
         }
     }
@@ -311,8 +348,14 @@ class MainActivity : ComponentActivity() {
             vm.connectFastest()
         } else {
             pendingFastest = true
+            pendingConnect = false
             vpnPrepareLauncher.launch(prepare)
         }
+    }
+
+    private companion object {
+        const val STATE_PENDING_CONNECT = "pending_connect"
+        const val STATE_PENDING_FASTEST = "pending_fastest"
     }
 }
 
@@ -326,9 +369,11 @@ private fun LiteRoot(
     onImportFile: () -> Unit,
     onImportGeo: (String) -> Unit
 ) {
-    var tab by remember { mutableIntStateOf(0) } // 0 Home, 1 Servers, 2 Stats, 3 Settings
+    // Saveable: a recreation (language change, theme, process death)
+    // keeps the user on the same tab / sub-screen.
+    var tab by rememberSaveable { mutableIntStateOf(0) } // 0 Home, 1 Servers, 2 Stats, 3 Settings
     // 3.1.0 (PattNG): a sub-screen opened from Settings hides the tabs.
-    var subScreen by remember { mutableStateOf<SubScreen?>(null) }
+    var subScreen by rememberSaveable { mutableStateOf<SubScreen?>(null) }
     val connection by vm.connection.collectAsState()
     val profiles by vm.profiles.collectAsState()
     val selectedId by vm.selectedId.collectAsState()
@@ -343,6 +388,26 @@ private fun LiteRoot(
     // The chart only samples while the Stats tab is visible and connected.
     // (LaunchedEffect, not a call during composition.)
     LaunchedEffect(tab) { vm.setStatsVisible(tab == 2) }
+
+    // Android 13+: POST_NOTIFICATIONS is a runtime permission. Without
+    // it the connection notification (live speed, Disconnect) never
+    // shows. Ask once per screen session, when a connection starts.
+    val notifContext = androidx.compose.ui.platform.LocalContext.current
+    val notifPermissionLauncher = androidx.activity.compose.rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestPermission()
+    ) { }
+    var notifAsked by androidx.compose.runtime.saveable.rememberSaveable { mutableStateOf(false) }
+    LaunchedEffect(connection.state) {
+        if (connection.state == ConnState.CONNECTING && !notifAsked &&
+            Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
+            androidx.core.content.ContextCompat.checkSelfPermission(
+                notifContext, android.Manifest.permission.POST_NOTIFICATIONS
+            ) != android.content.pm.PackageManager.PERMISSION_GRANTED
+        ) {
+            notifAsked = true
+            notifPermissionLauncher.launch(android.Manifest.permission.POST_NOTIFICATIONS)
+        }
+    }
 
     // Android back from any tab goes to Home; back from Home exits the app.
     // A sub-screen closes first.
@@ -458,6 +523,7 @@ private fun TabContent(
             selectedId = selectedId,
             isConnected = connection.state == ConnState.CONNECTED,
             listState = serversList,
+            onConnectRequest = onConnectRequest,
             onOpenQrScan = onOpenQrScan,
             onImportFile = onImportFile,
             onOpenSubscriptions = { onNavigate(SubScreen.SUBSCRIPTIONS) },
