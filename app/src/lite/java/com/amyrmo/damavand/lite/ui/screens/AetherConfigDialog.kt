@@ -300,9 +300,14 @@ private fun AetherConfigEditor(
         },
         confirmButton = {
             TextButton(onClick = {
+                // 3.2.13: save over the settings this editor opened, so
+                // what it does not show — the two-hop endpoints, the
+                // fragment/ECH/Psiphon/Tor details, the final mask and
+                // dial mode an imported aether:// link carried — survives
+                // an edit instead of being silently dropped.
                 onSave(
                     name.trim().ifEmpty { "Aether" },
-                    AetherSettings(
+                    initial.copy(
                         protocol = protocol.ifEmpty { null },
                         transport = transport.ifEmpty { null },
                         masqueSni = masqueSni.ifEmpty { null },
