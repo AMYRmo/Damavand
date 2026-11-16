@@ -25,4 +25,4 @@ replace github.com/wlynxg/anet => ./third_party/anet
 // commit zedcore-r6 builds (2026-11-02). main/distro/all already
 // blank-imports proxy/autoselect, so no code change is needed to
 // register the protocol.
-replace github.com/xtls/xray-core => github.com/CluvexStudio/Xray-core v0.0.0-20261102141629-7b4c3ceb15346
+replace github.com/xtls/xray-core => github.com/CluvexStudio/Xray-core v0.0.0-20261102141629-7b4c3ceb1534
