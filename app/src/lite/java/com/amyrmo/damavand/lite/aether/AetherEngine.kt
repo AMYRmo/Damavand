@@ -118,14 +118,39 @@ object AetherEngine {
     fun workDir(context: Context): File = File(context.filesDir, "aether")
 
     /**
-     * Starts [core]'s process. Any running session is stopped first; the
-     * work runs on the core's executor, so a start that follows queues
-     * behind the stop and comes up only once the old core is gone.
-     * [onExit] runs when the process ends on its own (not when [stop]
-     * ends it — the caller already knows then).
+     * Starts [core]'s process. Any running session is stopped first —
+     * on the core's executor, and waited for — so a start that follows
+     * comes up only once the old core is gone (3.2.23: the old code
+     * only QUEUED the stop behind open(new), so with two overlapping
+     * starts the queued end ran after open(old) had already started
+     * the old core and SIGTERMed it microseconds after it started —
+     * exit 143, zero output). [onExit] runs when the process ends on
+     * its own (not when [stop] ends it — the caller already knows
+     * then).
      */
+    @Synchronized
     fun start(context: Context, core: AetherCore, onExit: () -> Unit) {
-        stop()
+        // 3.2.23: end the old core on the lifecycle executor and WAIT
+        // for it, before the new session is assigned. The executor is
+        // single-threaded, so the end task runs after any already
+        // queued open(old) — which returns early now that the session
+        // moved — and before open(next) below: the old core is always
+        // gone before the new one starts, and a new connect never
+        // kills the previous core microseconds after its own start.
+        // start() runs on the service worker, open()/end() on the
+        // executor, so the wait cannot deadlock; end() waits on the
+        // process itself, never on the watch thread.
+        val old = session
+        session = null
+        if (old != null) {
+            val done = lifecycle.submit { old.process?.let { end(it, old.context) } }
+            try {
+                done.get()
+            } catch (_: InterruptedException) {
+                Thread.currentThread().interrupt()
+            } catch (_: Exception) {
+            }
+        }
         val appContext = context.applicationContext
         var logLevel = coreLogLevel()
         // The ready word is an info line; a quieter setting must not leave a Psiphon session waiting for it.
