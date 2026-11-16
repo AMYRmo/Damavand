@@ -254,6 +254,37 @@ class LiteVpnService : VpnService() {
         }
     }
 
+    // 3.2.11 (his order): when Material You (dynamic color) is on, the
+    // live notification takes the dynamic primary — dark system_accent1_200,
+    // light system_accent1_600, the same primary LiteTheme's dynamic scheme
+    // uses — so the notification and the app are one colour; otherwise
+    // Damavand Red. notification() is rebuilt on every poller tick, so
+    // the colour follows a theme change live.
+    private fun notifColor(): Int {
+        val dynamic = try {
+            kotlinx.coroutines.runBlocking { SettingsStore(applicationContext).dynamicColorNow() }
+        } catch (_: Exception) {
+            false
+        }
+        if (!dynamic || Build.VERSION.SDK_INT < Build.VERSION_CODES.S) return 0xFFE5322D.toInt()
+        val themeMode = try {
+            kotlinx.coroutines.runBlocking { SettingsStore(applicationContext).themeModeNow() }
+        } catch (_: Exception) {
+            "system"
+        }
+        val dark = when (themeMode) {
+            "dark" -> true
+            "light" -> false
+            else -> (resources.configuration.uiMode and android.content.res.Configuration.UI_MODE_NIGHT_MASK) ==
+                android.content.res.Configuration.UI_MODE_NIGHT_YES
+        }
+        return try {
+            getColor(if (dark) android.R.color.system_accent1_200 else android.R.color.system_accent1_600)
+        } catch (_: Exception) {
+            0xFFE5322D.toInt()
+        }
+    }
+
     private fun notification(): Notification {
         val stopIntent = Intent(this, LiteVpnService::class.java).setAction(ACTION_STOP)
         val stopPending = PendingIntent.getService(
@@ -262,7 +293,7 @@ class LiteVpnService : VpnService() {
         )
         val b = NotificationCompat.Builder(this, CHANNEL_ID)
             .setSmallIcon(R.drawable.ic_lite)
-            .setColor(0xFFE5322D.toInt())
+            .setColor(notifColor())
             .setOngoing(true)
             .setSilent(true)
             .setOnlyAlertOnce(true)
@@ -607,6 +638,12 @@ class LiteVpnService : VpnService() {
         }
         return XrayConfig.buildAether(
             aetherSettings,
+            // 3.2.11 (PattNG): the listen port is a setting, not a constant.
+            aetherPort = try {
+                kotlinx.coroutines.runBlocking { SettingsStore(applicationContext).aetherListenPortNow() }
+            } catch (_: Exception) {
+                AetherArgs.SOCKS_PORT
+            },
             socksPort = activeSocksPort,
             geoAvailable = geoReady,
             xraySettings = settings,
@@ -621,9 +658,8 @@ class LiteVpnService : VpnService() {
      * Runs on the connect worker thread (awaitListening blocks up to 30 s).
      */
     private fun startAether(core: AetherCore): Boolean {
-        // Psiphon modes need the bundled Psiphon client, which Lite
-        // excludes from packaging (+35 MB installed) — refuse with a
-        // plain message instead of a core that can never carry traffic.
+        // 3.2.11: the Psiphon client is packaged again — this refusal
+        // only fires when the binary is missing on the device's ABI.
         if (AetherArgs.psiphonModeOf(core.arguments) != AetherPsiphon.OFF && !AetherEngine.isPsiphonSupported(this)) {
             lastDetail = getString(R.string.conn_aether_no_psiphon)
             return false
@@ -740,16 +776,28 @@ class LiteVpnService : VpnService() {
         // like RakhshApp. The tun + hev bridge are skipped entirely.
         // Root mode (3.2.10): no tun either — iptables + a root-run hev
         // steer system traffic into the core's SOCKS inbound instead.
-        val descriptor = if (proxyOnlyMode || rootMode) {
-            null
-        } else try {
+        // 3.2.11 (PattNG PREF_IPV6_ENABLED, default true): with IPv6 on,
+        // the tun also takes a ULA IPv6 address (PattNG OPTION_1's
+        // fc00::10:10:14:1) + the ::/0 route, and IPv6 DNS servers are
+        // added; establish falls back to IPv4-only when the IPv6
+        // establish fails (PattNG establishFallingBackToIpv4).
+        val ipv6Enabled = try {
+            kotlinx.coroutines.runBlocking { SettingsStore(applicationContext).ipv6EnabledNow() }
+        } catch (_: Exception) {
+            true
+        }
+        fun establishTun(withIpv6: Boolean): ParcelFileDescriptor? = try {
             Builder().apply {
                 setSession(getString(R.string.app_name))
                 setMtu(settings.mtu)
                 addAddress(settings.ifaceAddr, 30)
                 addRoute("0.0.0.0", 0)
+                if (withIpv6) {
+                    addAddress("fc00::10:10:14:1", 126)
+                    addRoute("::", 0)
+                }
                 // Local DNS off: the tun uses the system DNS.
-                if (localDns) dnsServers.forEach { addDnsServer(it) }
+                if (localDns) dnsServers.filter { withIpv6 || !it.contains(":") }.forEach { addDnsServer(it) }
                 // The app itself (Xray core) must bypass the tunnel.
                 runCatching { addDisallowedApplication(packageName) }
                 // Per-app proxy (3.1.0, PattNG): bypass mode excludes
@@ -771,6 +819,11 @@ class LiteVpnService : VpnService() {
         } catch (e: Exception) {
             AppLog.e("LiteVpnService", "establish failed", e)
             null
+        }
+        val descriptor = if (proxyOnlyMode || rootMode) {
+            null
+        } else {
+            establishTun(ipv6Enabled) ?: if (ipv6Enabled) establishTun(false) else null
         }
         if (descriptor == null && !proxyOnlyMode && !rootMode) {
             lastDetail = getString(R.string.conn_vpn_iface_failed)
