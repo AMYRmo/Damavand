@@ -33,6 +33,7 @@ import (
 	xrayNet "github.com/xtls/xray-core/common/net"
 	"github.com/xtls/xray-core/core"
 	featureStats "github.com/xtls/xray-core/features/stats"
+	"github.com/xtls/xray-core/proxy/autoselect"
 	_ "github.com/xtls/xray-core/main/distro/all"
 )
 
@@ -162,6 +163,41 @@ func (c *CoreController) MeasureDelay(url string) int64 {
 	_, _ = io.Copy(io.Discard, resp.Body)
 	_ = resp.Body.Close()
 	return time.Since(start).Milliseconds()
+}
+
+// AutoSelectStatus returns every running autoselect outbound as JSON:
+// the member new connections go to, why the selection last changed,
+// and what is known about each member (state, delay, failures, open
+// connections). "[]" when none is running. (3.2.8, Damavand Auto —
+// the fork's proxy/autoselect package exposes this; the stock core
+// has no equivalent.)
+func AutoSelectStatus() (status string) {
+	defer func() {
+		if recover() != nil {
+			status = "[]"
+		}
+	}()
+	return autoselect.StatusJSON()
+}
+
+// AutoSelectNetworkChanged makes every group re-measure all of its
+// members now. Call it when the device moves to another network:
+// every number measured on the previous one is stale.
+func AutoSelectNetworkChanged() {
+	defer func() { _ = recover() }()
+	autoselect.KickAll()
+}
+
+// AutoSelectPin forces the new connections of group onto member; an
+// empty member returns the group to automatic selection. It reports
+// whether the group and the member exist.
+func AutoSelectPin(group string, member string) (ok bool) {
+	defer func() {
+		if recover() != nil {
+			ok = false
+		}
+	}()
+	return autoselect.PinMember(group, member)
 }
 
 // QueryAllOutboundTrafficStats returns "tag,dir,bytes;" entries for
