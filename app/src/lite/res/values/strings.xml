@@ -1,0 +1,473 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">دماوند لایت</string>
+
+    <!-- Header -->
+
+    <!-- Status pill -->
+    <string name="status_disconnected">قطع</string>
+    <string name="status_connecting">در حال اتصال…</string>
+    <string name="status_connected">متصل</string>
+    <string name="status_error">خطا در اتصال</string>
+
+    <!-- Tabs -->
+    <string name="tab_home">خانه</string>
+    <string name="tab_servers">سرورها</string>
+    <string name="tab_stats">آمار</string>
+    <string name="tab_settings">تنظیمات</string>
+
+    <!-- Ring -->
+    <string name="ring_tap_to_connect">برای اتصال بزنید</string>
+    <string name="ring_auto_fastest">سریع‌ترین سرور به‌صورت خودکار انتخاب می‌شود</string>
+    <string name="ring_step_keys">مذاکره کلیدها</string>
+    <string name="ring_step_route">بررسی مسیر</string>
+    <string name="ring_step_finish">تکمیل اتصال</string>
+
+    <!-- Under-ring caption -->
+    <string name="caption_idle_title">متصل نیستید</string>
+    <string name="caption_idle_body">ترافیک شما در حال حاضر بدون تونل عبور می‌کند</string>
+    <string name="caption_connecting_title">در حال اتصال…</string>
+    <string name="caption_connecting_body">لطفاً صبر کنید</string>
+    <string name="caption_connected_title">به قله رسیدید</string>
+    <string name="caption_connected_body">برای قطع اتصال، دوباره روی حلقه بزنید</string>
+    <string name="caption_error_title">اتصال برقرار نشد</string>
+
+    <!-- Stats row -->
+    <string name="stat_ping">پینگ</string>
+    <string name="stat_download">دانلود</string>
+    <string name="stat_upload">آپلود</string>
+    <string name="stat_session">حجم جلسه</string>
+
+    <!-- Fastest button -->
+    <string name="btn_fastest">اتصال به سریع‌ترین سرور</string>
+    <string name="fastest_sweep">در حال تست سرورها… %1$d از %2$d</string>
+    <string name="fastest_none">هیچ سروری پاسخ نداد — اتصال اینترنت را بررسی کنید</string>
+    <string name="fastest_testing">تست سرور %1$d از %2$d…</string>
+    <string name="fastest_retry">تلاش دوباره برای سریع‌ترین سرور…</string>
+    <string name="btn_disconnect">قطع اتصال</string>
+    <string name="btn_connecting">در حال اتصال…</string>
+
+    <!-- Connect errors -->
+    <string name="err_no_profiles">سروری برای اتصال نیست — اول یک سرور انتخاب کنید</string>
+    <string name="err_no_network">به شبکه دسترسی نیست — اتصال اینترنت را بررسی کنید</string>
+    <string name="err_server_timeout">سرور پاسخ نداد — سرور دیگری را امتحان کنید</string>
+    <string name="err_generic">اتصال برقرار نشد — دوباره تلاش کنید</string>
+
+    <!-- Servers -->
+    <string name="btn_test_all">تست همه سرورها</string>
+    <string name="btn_testing">در حال تست…</string>
+    <string name="test_note">تست فقط هنگام باز بودن این صفحه اجرا می‌شود</string>
+    <string name="servers_chain_hint">برای ساخت زنجیره، روی یک سرور نگه دارید و سرورها را به‌ترتیب انتخاب کنید</string>
+    <string name="server_delete_title">حذف سرور</string>
+    <string name="server_delete_body">«%1$s» حذف شود؟</string>
+    <string name="server_delete_confirm">حذف</string>
+    <string name="server_ping">پینگ</string>
+    <string name="chain_pick_title">زنجیره‌سازی — %1$s سرور انتخاب شده</string>
+    <string name="chain_pick_body">سرورها به‌ترتیب اتصال انتخاب می‌شوند — اولی ورودی و آخری خروجی است</string>
+    <string name="chain_create">ساخت زنجیره</string>
+    <string name="chain_cancel">لغو</string>
+    <string name="chain_name_format">زنجیرهٔ %1$d</string>
+    <string name="chain_members">%1$s سرور</string>
+    <string name="badge_fastest">سریع‌ترین</string>
+    <string name="ping_untested">تست نشده</string>
+    <string name="ping_failed">ناموفق</string>
+    <string name="servers_empty_title">سروری نیست</string>
+    <string name="servers_empty_body">هنوز سابسکریپشن یا سروری اضافه نشده است — بعد از اضافه کردن، سرورها اینجا نمایش داده می‌شوند</string>
+    <string name="servers_test_all_failed">تست هیچ سروری موفق نبود — اتصال اینترنت را بررسی کنید و دوباره تلاش کنید</string>
+    <string name="servers_add_subscription">افزودن سابسکریپشن</string>
+    <string name="servers_unavailable">این سرور در دسترس نیست</string>
+    <string name="home_empty_title">هنوز سروری انتخاب نشده است</string>
+    <string name="home_empty_body">از تب سرورها یک سرور انتخاب کنید یا سابسکریپشن را وارد کنید</string>
+
+    <!-- Stats -->
+    <string name="stats_live_label">سرعت دانلود — زنده</string>
+    <string name="stats_axis_60">۶۰ ثانیه پیش</string>
+    <string name="stats_axis_30">۳۰ ثانیه پیش</string>
+    <string name="stats_axis_now">اکنون</string>
+    <string name="stats_empty">برای دیدن نمودار زنده، از صفحه خانه متصل شوید</string>
+    <string name="stats_best_ping">بهترین پینگ جلسه</string>
+    <string name="stats_best_ping_sub">کمترین پینگ ثبت‌شده در این اتصال</string>
+    <string name="stats_session_volume">حجم جلسه</string>
+    <string name="stats_session_volume_sub">مجموع دانلود و آپلود این اتصال</string>
+
+    <!-- Settings groups -->
+    <string name="settings_group_connection">اتصال</string>
+    <string name="settings_group_battery">باتری و حجم</string>
+    <string name="settings_group_core">هسته اتصال</string>
+    <string name="settings_group_about">درباره</string>
+
+    <!-- Kill switch / auto-connect -->
+    <string name="kill_switch">کیل‌سوئیچ</string>
+    <string name="kill_switch_desc">اگر اتصال VPN قطع شود، اینترنت دستگاه هم قطع می‌شود تا ترافیک بدون تونل عبور نکند</string>
+    <string name="auto_connect">اتصال خودکار</string>
+    <string name="auto_connect_desc">با باز شدن برنامه، به سریع‌ترین سرور وصل شو</string>
+
+    <!-- Battery / volume -->
+    <string name="battery_saver">حالت کم‌مصرف</string>
+    <string name="battery_saver_desc">با خاموش شدن صفحه، به‌روزرسانی آمار متوقف می‌شود؛ حلقه سرعت فقط وقتی شنونده دارد می‌چرخد</string>
+    <string name="battery_saver_off_note">مصرف باتری بیشتر می‌شود</string>
+    <string name="sub_auto_update">به‌روزرسانی خودکار سابسکریپشن</string>
+    <string name="sub_auto_update_desc">سابسکریپشن‌ها به‌صورت دوره‌ای در پس‌زمینه به‌روز می‌شوند</string>
+
+    <!-- Geo download -->
+    <string name="geo_title">داده موقعیت</string>
+    <string name="geo_desc">برای تشخیص کشور و شهر سرورها لازم است — همراه برنامه نصب شده و به‌روزرسانی آن دانلود می‌شود</string>
+    <string name="geo_download">دانلود</string>
+    <string name="geo_cancel">لغو</string>
+    <string name="geo_ready">آماده</string>
+    <string name="geo_update">به‌روزرسانی</string>
+    <string name="geo_retry">تلاش دوباره</string>
+    <string name="geo_update_available">نسخه جدید داده موقعیت در دسترس است</string>
+    <string name="geo_err_network">دانلود ناموفق بود — اتصال اینترنت را بررسی کنید</string>
+    <string name="geo_err_corrupt">فایل دانلودشده خراب است — دوباره تلاش کنید</string>
+
+    <!-- About -->
+    <string name="about_version">نسخه</string>
+    <string name="about_version_code">کد نسخه %1$s</string>
+    <string name="geo_version">نسخه: %1$s</string>
+    <string name="about_package">بسته برنامه</string>
+    <string name="about_core">هسته</string>
+    <string name="about_repo">مخزن</string>
+    <string name="about_repo_value">AMYRmo/Damavand — شاخه lite</string>
+    <string name="about_copy">دماوند لایت — نسخه سبک دماوند. برای اتصال سریع و کم‌مصرف ساخته شده است.</string>
+
+    <!-- Subscription import -->
+    <string name="sub_import_title">افزودن سابسکریپشن</string>
+    <string name="sub_import_hint">پیوند سابسکریپشن یا کانفیگ تکی را وارد کنید</string>
+    <string name="sub_import_fetching">در حال دریافت…</string>
+    <string name="sub_import_add">افزودن</string>
+    <string name="sub_import_cancel">لغو</string>
+    <string name="sub_import_failed_network">دریافت سابسکریپشن ناموفق بود — اینترنت را بررسی کنید، یا وقتی به اینترنت آزاد وصل هستید دوباره تلاش کنید</string>
+    <string name="sub_import_failed_empty">در این سابسکریپشن هیچ کانفیگ قابل‌استفاده‌ای پیدا نشد</string>
+    <string name="sub_import_failed_unsupported">%1$d کانفیگ با پروتکل پشتیبانی‌نشده رد شد — لایت فعلاً VLESS، VMess، Trojan و Shadowsocks را پشتیبانی می‌کند</string>
+    <string name="sub_import_failed_single">این لینک کانفیگ معتبر نیست — باید VLESS، VMess، Trojan یا Shadowsocks باشد</string>
+
+    <!-- Misc -->
+    <string name="vpn_permission_title">برای اتصال، اجازه VPN لازم است</string>
+    <string name="notif_disconnect">قطع</string>
+
+    <!-- 3.1.0 — PattNG: servers -->
+    <string name="servers_search_hint">جست‌وجوی سرور…</string>
+    <string name="servers_sort_fastest">سریع‌ترین اول</string>
+    <string name="servers_sort_name">نام (الفبا)</string>
+    <string name="servers_sort_newest">جدیدترین اول</string>
+    <string name="server_menu_share_full">اشتراک‌گذاری کامل</string>
+    <string name="servers_menu_real_ping_all">تست واقعی همه</string>
+    <string name="servers_menu_restart">راه‌اندازی دوباره سرویس</string>
+    <string name="servers_menu_locate">پیدا کردن سرور متصل</string>
+    <string name="servers_menu_update_subs">به‌روزرسانی همه اشتراک‌ها</string>
+    <string name="servers_menu_export_all">خروجی گرفتن از همه</string>
+    <string name="servers_menu_delete_dupes">حذف تکراری‌ها</string>
+    <string name="servers_menu_delete_invalid">حذف خراب‌ها</string>
+    <string name="servers_menu_delete_all">حذف همه</string>
+    <string name="settings_group_vpn">VPN</string>
+    <string name="settings_group_socks">SOCKS</string>
+    <string name="settings_group_misc">متفرقه</string>
+    <string name="proxy_only_title">فقط پروکسی</string>
+    <string name="proxy_only_desc">بدون تونل سیستمی؛ فقط Xray و SOCKS اجرا می‌شود</string>
+    <string name="route_only_title">فقط مسیرهای مشخص</string>
+    <string name="route_only_desc">ترافیکی که هیچ قانونی ندارد مستقیم می‌رود، نه از پروکسی</string>
+    <string name="local_dns_title">DNS محلی</string>
+    <string name="local_dns_desc">تونل از DNS تنظیم‌شده استفاده کند</string>
+    <string name="fake_dns_title">DNS جعلی</string>
+    <string name="fake_dns_desc">Xray به هر دامنه یک IP جعلی می‌دهد و با دامنه مسیریابی می‌کند</string>
+    <string name="http_proxy_title">پروکسی HTTP</string>
+    <string name="http_proxy_desc">یک پروکسی HTTP روی پورت SOCKS + 1 باز می‌شود</string>
+    <string name="mtu_title">MTU</string>
+    <string name="mtu_desc">اندازه بسته تونل؛ پیش‌فرض 1500</string>
+    <string name="iface_addr_title">آدرس اینترفیس</string>
+    <string name="iface_addr_desc">آدرس IP تونل؛ پیش‌فرض 10.8.0.2</string>
+    <string name="auto_start_boot_title">شروع با بوت</string>
+    <string name="auto_start_boot_desc">بعد از روشن شدن گوشی، آخرین سرور وصل شود</string>
+    <string name="socks_port_title">پورت SOCKS</string>
+    <string name="socks_port_desc">پورتی که Xray روی آن SOCKS می‌دهد؛ پیش‌فرض 1080</string>
+    <string name="socks_user_title">نام کاربری SOCKS</string>
+    <string name="socks_user_desc">خالی یعنی بدون احراز هویت</string>
+    <string name="socks_pass_title">رمز SOCKS</string>
+    <string name="socks_pass_desc">رمز عبور پروکسی SOCKS</string>
+    <string name="socks_udp_title">UDP در SOCKS</string>
+    <string name="socks_udp_desc">ترافیک UDP هم از پروکسی SOCKS بگذرد</string>
+    <string name="socks_share_lan_title">اشتراک در شبکه محلی</string>
+    <string name="socks_share_lan_desc">پروکسی SOCKS روی همه اینترفیس‌ها گوش دهد (LAN)</string>
+    <string name="socks_dynamic_port_title">پورت تصادفی</string>
+    <string name="socks_dynamic_port_desc">در هر اتصال یک پورت SOCKS تصادفی انتخاب شود</string>
+    <string name="sub_auto_test_title">تست خودکار بعد از به‌روزرسانی</string>
+    <string name="sub_auto_test_desc">بعد از به‌روزرسانی اشتراک، همه سرورها تست شوند</string>
+    <string name="sub_auto_sort_title">مرتب‌سازی خودکار بعد از تست</string>
+    <string name="sub_auto_sort_desc">بعد از تست، سرورها از سریع به کند مرتب شوند</string>
+    <string name="sub_auto_remove_invalid_title">حذف خراب‌ها بعد از تست</string>
+    <string name="sub_auto_remove_invalid_desc">بعد از تست، سرورهای خراب حذف شوند</string>
+    <string name="core_loglevel_title">سطح لاگ هسته</string>
+    <string name="core_loglevel_desc">چقدر از لاگ Xray ثبت شود؛ روی ضربه بزنید تا عوض شود</string>
+    <string name="domain_strategy_title">استراتژی دامنه</string>
+    <string name="domain_strategy_desc">نحوه حل دامنه‌ها در مسیریابی؛ روی ضربه بزنید تا عوض شود</string>
+    <string name="domestic_dns_title">DNS داخلی</string>
+    <string name="domestic_dns_desc">یک سرور DNS اضافه برای دامنه‌های داخلی</string>
+    <string name="dns_hosts_title">میزبان‌های DNS</string>
+    <string name="dns_hosts_desc">نگاشت ثابت دامنه به IP؛ به شکل دامنه=IP و با کاما جدا کنید</string>
+    <string name="mux_concurrency_title">همزمانی Mux</string>
+    <string name="mux_concurrency_desc">تعداد جریان‌ها روی یک اتصال؛ پیش‌فرض 8</string>
+    <string name="mux_xudp_concurrency_title">همزمانی XUDP</string>
+    <string name="mux_xudp_concurrency_desc">تعداد جریان‌های UDP روی Mux؛ پیش‌فرض 8</string>
+    <string name="mux_xudp_quic_title">XUDP با QUIC</string>
+    <string name="mux_xudp_quic_desc">بسته‌های UDP روی Mux با QUIC حمل شوند</string>
+    <string name="hev_loglevel_title">سطح لاگ تونل</string>
+    <string name="hev_loglevel_desc">چقدر از لاگ پل تونل ثبت شود؛ روی ضربه بزنید تا عوض شود</string>
+    <string name="hev_rw_timeout_title">تایم‌اوت خواندن/نوشتن تونل</string>
+    <string name="hev_rw_timeout_desc">به ثانیه؛ 0 یعنی پیش‌فرض سیستم</string>
+    <string name="real_ping_concurrency_title">همزمانی تست واقعی</string>
+    <string name="real_ping_concurrency_desc">چند تست همزمان اجرا شود؛ پیش‌فرض 5</string>
+    <string name="ip_api_url_title">آدرس سرویس موقعیت</string>
+    <string name="ip_api_url_desc">سرویسی که کشور و شهر سرور متصل را می‌دهد</string>
+    <string name="show_speed_notif_title">سرعت در نوتیفیکیشن</string>
+    <string name="show_speed_notif_desc">سرعت دانلود و آپلود در نوتیفیکیشن نشان داده شود</string>
+    <string name="confirm_delete_title">تأیید پیش از حذف</string>
+    <string name="confirm_delete_desc">پیش از حذف سرور، پنجره تأیید باز شود</string>
+    <string name="show_all_groups_title">نمایش همه گروه‌ها</string>
+    <string name="show_all_groups_desc">یک نمای ترکیبی از همه گروه‌ها در تب سرورها</string>
+    <string name="language_title">زبان</string>
+    <string name="language_desc">زبان برنامه؛ خودکار یعنی زبان گوشی — بعد از تغییر، برنامه دوباره باز می‌شود</string>
+    <string name="language_auto">خودکار</string>
+    <string name="language_fa">فارسی</string>
+    <string name="language_en">English</string>
+    <string name="system_vpn_settings_title">تنظیمات VPN سیستم</string>
+    <string name="system_vpn_settings_desc">باز کردن صفحه VPN در تنظیمات اندروید</string>
+    <string name="routing_preset_bypass_ir">ایران مستقیم</string>
+    <string name="routing_preset_block_ads">مسدود کردن تبلیغات</string>
+    <string name="routing_builtin_title">قوانین داخلی (قفل)</string>
+    <string name="routing_builtin_private">شبکه‌های خصوصی (10/8، 172.16/12، 192.168/16)</string>
+    <string name="routing_builtin_torrent">ترافیک تورنت</string>
+    <string name="routing_builtin_ads">دامنه‌های تبلیغاتی (با فایل geo)</string>
+    <string name="logs_source_app">لاگ برنامه</string>
+    <string name="logs_source_core">لاگ هسته</string>
+    <string name="shortcut_connect">اتصال سریع</string>
+    <string name="shortcut_disconnect">قطع اتصال</string>
+    <string name="update_check_title">بررسی به‌روزرسانی</string>
+    <string name="update_check_desc">بررسی نسخه جدید در گیت‌هاب</string>
+    <string name="update_check_checking">در حال بررسی…</string>
+    <string name="update_check_available">نسخه %1$s موجود است — برای دانلود بزنید</string>
+    <string name="update_check_latest">آخرین نسخه نصب است</string>
+    <string name="update_check_failed">بررسی ناموفق بود — دوباره تلاش کنید</string>
+    <string name="geo_import_geoip">وارد کردن geoip.dat</string>
+    <string name="geo_import_geosite">وارد کردن geosite.dat</string>
+    <string name="geo_import_ok">فایل geo وارد شد</string>
+    <string name="geo_import_fail">وارد کردن فایل geo ناموفق بود</string>
+    <string name="add_qr_scan">اسکن QR</string>
+    <string name="qr_scan_title">اسکن QR</string>
+    <string name="qr_scan_hint">دوربین را روی کد QR کانفیگ یا اشتراک بگیرید</string>
+    <string name="qr_need_permission">برای اسکن، دسترسی دوربین لازم است</string>
+    <string name="qr_added">کانفیگ اضافه شد</string>
+    <string name="add_manual_build">ساخت دستی کانفیگ</string>
+    <string name="manual_title">ساخت دستی کانفیگ</string>
+    <string name="manual_name">نام</string>
+    <string name="manual_address">آدرس سرور</string>
+    <string name="manual_port">پورت</string>
+    <string name="manual_uuid">UUID</string>
+    <string name="manual_password">رمز عبور</string>
+    <string name="manual_method">روش رمزنگاری</string>
+    <string name="manual_username">نام کاربری</string>
+    <string name="manual_security">امنیت</string>
+    <string name="manual_network">شبکه</string>
+    <string name="manual_sni">SNI</string>
+    <string name="manual_path">مسیر (Path)</string>
+    <string name="manual_host">هاست (Host)</string>
+    <string name="manual_insecure">رد کردن گواهی (Insecure)</string>
+    <string name="manual_private_key">کلید خصوصی</string>
+    <string name="manual_public_key">کلید عمومی همتا</string>
+    <string name="manual_allowed_ips">Allowed IPs</string>
+    <string name="manual_local_address">آدرس محلی (مثلا 10.0.0.2/32)</string>
+    <string name="manual_mtu">MTU</string>
+    <string name="manual_json">کانفیگ Xray (JSON کامل)</string>
+    <string name="manual_json_hint">کانفیگ کامل Xray — باید یک outbound با برچسب «proxy» و یک inbound socks روی پورت SOCKS تنظیمات داشته باشد.</string>
+    <string name="manual_invalid">فیلدهای لازم را کامل کنید</string>
+    <string name="manual_added">کانفیگ اضافه شد</string>
+    <string name="manual_add">افزودن</string>
+    <string name="servers_group_all">همه</string>
+    <string name="servers_group_manual">دستی</string>
+    <string name="servers_group_count">%1$s سرور</string>
+    <string name="sub_card_updated_now">به‌روز شده همین حالا</string>
+    <string name="sub_card_updated_minutes">به‌روز شده %1$s دقیقه پیش</string>
+    <string name="sub_card_updated_hours">به‌روز شده %1$s ساعت پیش</string>
+    <string name="sub_card_updated_days">به‌روز شده %1$s روز پیش</string>
+    <string name="sub_card_updated_never">هنوز به‌روز نشده</string>
+    <string name="sub_card_used">%1$s استفاده شده</string>
+    <string name="sub_card_remaining">%1$s باقی‌مانده</string>
+    <string name="sub_card_expires">انقضا: %1$s</string>
+    <string name="sub_card_unlimited">نامحدود</string>
+    <string name="sub_card_support">پشتیبانی</string>
+    <string name="sub_card_website">وب‌سایت</string>
+    <string name="sub_card_subscriptions">سابسکریپشن‌ها</string>
+    <string name="auto_card_title">خودکار · %1$s</string>
+    <string name="auto_card_desc">سریع‌ترین از %1$s سرور. اگر یکی قطع شود، اتصال در یک لحظه جابه‌جا می‌شود.</string>
+    <string name="auto_info_title">انتخاب خودکار سرور</string>
+    <string name="auto_info_body">لایت همیشه سریع‌ترین سرور این سابسکریپشن را انتخاب می‌کند و اگر آن سرور قطع شود، در یک لحظه به سرور بعدی می‌رود. برای خاموش کردن خودکار، تیک را بزن.</string>
+    <string name="dialog_ok">باشه</string>
+    <string name="server_menu_edit">ویرایش</string>
+    <string name="server_menu_duplicate">تکثیر</string>
+    <string name="server_menu_share">اشتراک‌گذاری</string>
+    <string name="server_menu_test">تست</string>
+    <string name="server_menu_move">انتقال به گروه…</string>
+    <string name="server_menu_delete">حذف</string>
+    <string name="server_menu_connect">اتصال</string>
+    <string name="server_edit_title">ویرایش سرور</string>
+    <string name="server_edit_name">نام</string>
+    <string name="server_edit_link">لینک کانفیگ</string>
+    <string name="server_edit_invalid">لینک کانفیگ معتبر نیست</string>
+    <string name="server_edit_save">ذخیره</string>
+    <string name="server_share_title">اشتراک‌گذاری سرور</string>
+    <string name="server_share_copy">کپی لینک</string>
+    <string name="server_share_send">ارسال…</string>
+    <string name="server_move_title">انتقال به گروه</string>
+    <string name="server_delete_multi_title">حذف سرورها</string>
+    <string name="server_delete_multi_body">%1$d سرور حذف شود؟</string>
+    <string name="multiselect_test">تست</string>
+    <string name="multiselect_delete">حذف</string>
+    <string name="multiselect_cancel">لغو</string>
+    <string name="multiselect_count">%1$s انتخاب شده</string>
+    <string name="add_sheet_title">افزودن سرور</string>
+    <string name="add_from_clipboard">از کلیپ‌بورد</string>
+    <string name="add_manual">دستی (لینک کانفیگ)</string>
+    <string name="add_subscription">سابسکریپشن (لینک URL)</string>
+    <string name="add_clipboard_empty">کلیپ‌بورد لینک کانفیگی ندارد</string>
+
+    <!-- 3.1.0 — PattNG: subscriptions -->
+    <string name="subs_title">سابسکریپشن‌ها</string>
+    <string name="subs_empty">هنوز سابسکریپشنی اضافه نشده است</string>
+    <string name="subs_updated_never">هرگز به‌روز نشده</string>
+    <string name="subs_updated_today">امروز به‌روز شده</string>
+    <string name="subs_profiles_count">%1$s سرور</string>
+    <string name="sub_menu_update">به‌روزرسانی</string>
+    <string name="sub_menu_rename">تغییر نام</string>
+    <string name="sub_menu_delete">حذف اشتراک</string>
+    <string name="sub_delete_title">حذف اشتراک</string>
+    <string name="sub_delete_body">اشتراک «%1$s» و همه سرورهای آن حذف شوند؟</string>
+    <string name="sub_rename_title">تغییر نام اشتراک</string>
+    <string name="sub_rename_hint">نام اشتراک</string>
+    <string name="sub_auto_update_label">به‌روزرسانی خودکار</string>
+
+    <!-- 3.1.0 — PattNG: routing -->
+    <string name="routing_title">مسیریابی</string>
+    <string name="routing_mode_global">همه‌چیز از تونل</string>
+    <string name="routing_mode_global_desc">همه ترافیک از تونل عبور می‌کند</string>
+    <string name="routing_mode_bypass_lan">دور زدن شبکه محلی</string>
+    <string name="routing_mode_bypass_lan_desc">آدرس‌های شبکه محلی مستقیم می‌روند، بقیه از تونل</string>
+    <string name="routing_mode_custom">قوانین سفارشی</string>
+    <string name="routing_mode_custom_desc">قوانین خودت را اضافه کن — اول قوانین سفارشی اعمال می‌شوند</string>
+    <string name="routing_rules_title">قوانین سفارشی</string>
+    <string name="routing_add_rule">افزودن قانون</string>
+    <string name="routing_rule_name">نام قانون</string>
+    <string name="routing_rule_pattern">دامنه، IP یا CIDR (مثل example.com یا 10.0.0.0/8)</string>
+    <string name="routing_action_proxy">از تونل</string>
+    <string name="routing_action_direct">مستقیم</string>
+    <string name="routing_action_block">مسدود</string>
+    <string name="routing_empty">قانونی نیست — با دکمه زیر اضافه کن</string>
+    <string name="routing_delete_title">حذف قانون</string>
+    <string name="routing_delete_body">قانون «%1$s» حذف شود؟</string>
+
+    <!-- 3.1.0 — PattNG: per-app proxy -->
+    <string name="perapp_title">پروکسی برای برنامه‌ها</string>
+    <string name="perapp_mode_bypass">دور زدن VPN برای برنامه‌های انتخاب‌شده</string>
+    <string name="perapp_mode_bypass_desc">همه برنامه‌ها از VPN استفاده می‌کنند، جز برنامه‌های انتخاب‌شده</string>
+    <string name="perapp_mode_allow">فقط برنامه‌های انتخاب‌شده</string>
+    <string name="perapp_mode_allow_desc">فقط برنامه‌های انتخاب‌شده از VPN استفاده می‌کنند</string>
+    <string name="perapp_search_hint">جست‌وجوی برنامه…</string>
+    <string name="perapp_empty">برنامه‌ای پیدا نشد</string>
+    <string name="perapp_applies_next">از اتصال بعدی اعمال می‌شود</string>
+
+    <!-- 3.1.0 — PattNG: connection settings -->
+    <string name="settings_group_subscriptions">اشتراک‌ها</string>
+    <string name="settings_group_routing_apps">مسیریابی و برنامه‌ها</string>
+    <string name="settings_group_backup">پشتیبان‌گیری</string>
+    <string name="settings_group_logs">لاگ‌ها</string>
+    <string name="settings_subscriptions">مدیریت اشتراک‌ها</string>
+    <string name="settings_subscriptions_desc">به‌روزرسانی، تغییر نام و حذف سابسکریپشن‌ها</string>
+    <string name="settings_routing">مسیریابی</string>
+    <string name="settings_routing_desc">چه ترافیکی از تونل برود و چه ترافیکی مستقیم</string>
+    <string name="settings_perapp">پروکسی برای برنامه‌ها</string>
+    <string name="settings_perapp_desc">کدام برنامه‌ها از VPN استفاده کنند</string>
+    <string name="settings_logs">مشاهده لاگ‌ها</string>
+    <string name="settings_logs_desc">رویدادهای اتصال و خطاها</string>
+    <string name="settings_backup_export">خروجی پشتیبان</string>
+    <string name="settings_backup_export_desc">ذخیره سرورها، زنجیره‌ها و تنظیمات در یک فایل</string>
+    <string name="settings_backup_import">بازیابی پشتیبان</string>
+    <string name="settings_backup_import_desc">بازگردانی از یک فایل پشتیبان</string>
+    <string name="backup_export_ok">پشتیبان ذخیره شد</string>
+    <string name="backup_export_fail">ذخیره پشتیبان ناموفق بود</string>
+    <string name="backup_import_ok">پشتیبان بازیابی شد</string>
+    <string name="backup_import_fail">فایل پشتیبان معتبر نیست</string>
+    <string name="test_url_title">آدرس تست اتصال</string>
+    <string name="test_url_desc">آدرسی که برای بررسی واقعی تونل واکشی می‌شود</string>
+    <string name="mux_title">MUX</string>
+    <string name="mux_desc">چند جریان روی یک اتصال — در بعضی شبکه‌ها سریع‌تر است</string>
+    <string name="sniffing_title">تشخیص مقصد (Sniffing)</string>
+    <string name="sniffing_desc">مقصد واقعی ترافیک خوانده می‌شود تا مسیریابی دقیق‌تر شود</string>
+    <string name="fragment_title">تکه‌تکه کردن (Fragment)</string>
+    <string name="fragment_desc">تکه‌تکه کردن پیام TLS برای عبور از فیلتر — در بعضی شبکه‌ها کمک می‌کند</string>
+    <string name="dns_title">سرورهای DNS</string>
+    <string name="dns_desc">با کاما جدا کن — مثل 8.8.8.8,1.1.1.1</string>
+
+    <!-- 3.1.0 — PattNG: logs -->
+    <string name="logs_title">لاگ‌ها</string>
+    <string name="logs_empty">هنوز رویدادی ثبت نشده است</string>
+    <string name="logs_clear">پاک کردن</string>
+    <string name="logs_share">ارسال</string>
+
+    <!-- 3.1.0 — PattNG: stats -->
+    <string name="stats_usage_title">مصرف هر سرور</string>
+    <string name="stats_usage_empty">هنوز مصرفی ثبت نشده است</string>
+    <string name="stats_usage_total">مجموع: %1$s</string>
+
+    <!-- 3.2.2 — connection details + notification (were hardcoded Persian) -->
+    <string name="conn_error_generic">خطا: %1$s</string>
+    <string name="conn_no_server_responded">هیچ سروری پاسخ نداد — سرور دیگری را امتحان کنید</string>
+    <string name="conn_no_server">سروری برای اتصال نیست — اول یک سرور انتخاب کنید</string>
+    <string name="conn_server_no_response">سرور پاسخ نداد — سرور دیگری را امتحان کنید</string>
+    <string name="conn_config_failed">ساخت کانفیگ ناموفق بود</string>
+    <string name="conn_vpn_iface_failed">ساخت اینترفیس VPN ناموفق بود</string>
+    <string name="conn_core_failed">شروع هسته ناموفق بود: %1$s</string>
+    <string name="conn_tunnel_bridge_failed">شروع پل تونل ناموفق بود</string>
+    <string name="conn_dropped_reconnecting">اتصال قطع شد — در حال اتصال دوباره…</string>
+    <string name="notif_connecting">در حال اتصال…</string>
+    <string name="notif_totals">دانلود: %1$s · آپلود: %2$s</string>
+    <string name="log_connecting_selected">وصل به سرور انتخاب‌شده…</string>
+    <string name="geo_file_corrupt">فایل دانلودشده خراب است — دوباره تلاش کنید</string>
+    <string name="geo_download_failed">دانلود ناموفق بود — اتصال اینترنت را بررسی کنید</string>
+    <string name="widget_connected">متصل</string>
+    <string name="widget_connecting">در حال اتصال…</string>
+    <string name="widget_disconnected">قطع</string>
+    <string name="update_not_found">یافت نشد</string>
+    <string name="update_error">خطا</string>
+    <string name="routing_preset_iran_domains">دامنه‌های ایران</string>
+    <string name="routing_preset_iran_ips">IPهای ایران</string>
+    <string name="routing_preset_ads">تبلیغات</string>
+    <string name="profile_copy_suffix"> (کپی)</string>
+    <string name="chain_default_name">زنجیرهٔ %1$d</string>
+
+    <!-- 3.2.5 — day & night theme -->
+    <string name="theme_title">تم شب و روز</string>
+    <string name="theme_desc">روز، شب یا هماهنگ با سیستم</string>
+    <string name="theme_system">خودکار</string>
+    <string name="theme_night">شب</string>
+    <string name="theme_day">روز</string>
+
+    <!-- 3.2.6 — quick settings tile -->
+    <string name="quick_settings_tile_title">دکمه کنترل سنتر</string>
+    <string name="quick_settings_tile_desc">اضافه کردن دکمه اتصال به کنترل سنتر گوشی</string>
+    <string name="quick_settings_tile_added">به کنترل سنتر اضافه شد</string>
+    <string name="quick_settings_tile_already">این دکمه قبلاً اضافه شده</string>
+    <string name="quick_settings_tile_not_added">اضافه نشد</string>
+    <string name="quick_settings_tile_old_android">برای این کار به اندروید ۱۳ یا بالاتر نیاز است</string>
+
+    <!-- 3.2.7 — stream security (PattNG) -->
+    <string name="manual_fingerprint">فینگرپرینت</string>
+    <string name="manual_fingerprint_default">پیش‌فرض (chrome)</string>
+    <string name="manual_allow_insecure">اجازه به گواهی نامعتبر</string>
+    <string name="manual_alpn">ALPN</string>
+    <string name="manual_cipher_suites">Cipher suites</string>
+    <string name="manual_reality_pbk">کلید عمومی Reality</string>
+    <string name="manual_reality_sid">Short ID (Reality)</string>
+
+    <!-- 3.2.7 — two-column server list (PattNG) -->
+    <string name="settings_double_column_title">نمایش دو ستونه</string>
+    <string name="settings_double_column_desc">سرورها دو تا دو تا کنار هم</string>
+</resources>
