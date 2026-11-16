@@ -173,6 +173,11 @@
     <string name="fake_dns_desc">Xray gives every domain a fake IP and routes by domain</string>
     <string name="http_proxy_title">HTTP proxy</string>
     <string name="http_proxy_desc">An HTTP proxy opens on SOCKS port + 1</string>
+    <!-- 3.2.9 — local proxy + HEV tun (PattNG) -->
+    <string name="local_proxy_title">Local proxy</string>
+    <string name="local_proxy_desc">SOCKS and HTTP inbounds for other apps</string>
+    <string name="use_hev_title">HEV tunnel</string>
+    <string name="use_hev_desc">On: the HEV bridge; off: Xray\'s built-in tun</string>
     <string name="mtu_title">MTU</string>
     <string name="mtu_desc">Tunnel packet size; default 1500</string>
     <string name="iface_addr_title">Interface address</string>
@@ -515,7 +520,18 @@
     <string name="manual_reality_pbk">Reality public key</string>
     <string name="manual_reality_sid">Reality short ID</string>
 
+    <!-- 3.2.9 — ECH + pinning + ML-DSA (PattNG, the rest) -->
+    <string name="manual_ech">ECH config list</string>
+    <string name="manual_ech_outbound">ECH outbound (JSON)</string>
+    <string name="manual_vcn">Verify peer cert by name</string>
+    <string name="manual_pcs">Pinned CA SHA-256</string>
+    <string name="manual_spx">SpiderX (Reality)</string>
+    <string name="manual_pqv">ML-DSA-65 verify key</string>
+
     <!-- 3.2.7 — two-column server list (PattNG) -->
     <string name="settings_double_column_title">Two-column display</string>
     <string name="settings_double_column_desc">Show servers two side by side</string>
+    <!-- 3.2.9 — dynamic color (PattNG) -->
+    <string name="dynamic_color_title">Dynamic color</string>
+    <string name="dynamic_color_desc">Colors from the wallpaper (Android 12+)</string>
 </resources>
