@@ -414,6 +414,7 @@
 
     <!-- 3.1.0 — PattNG: subscriptions -->
     <string name="subs_title">سابسکریپشن‌ها</string>
+    <string name="subs_update">به‌روز کردن</string>
     <string name="subs_empty">هنوز سابسکریپشنی اضافه نشده است</string>
     <string name="subs_updated_never">هرگز به‌روز نشده</string>
     <string name="subs_updated_today">امروز به‌روز شده</string>
