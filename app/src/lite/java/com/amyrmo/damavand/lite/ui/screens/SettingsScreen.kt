@@ -52,6 +52,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.amyrmo.damavand.lite.BuildConfig
@@ -85,6 +86,10 @@ fun SettingsScreen(
     val batterySaver by vm.batterySaver.collectAsState(initial = true)
     val subAutoUpdate by vm.subAutoUpdate.collectAsState(initial = true)
     val geoState by vm.geoState.collectAsState()
+    // 3.2.11 (PattNG UserAssetUrlActivity): the URL each asset downloads from.
+    val assetGeoipUrl by vm.assetGeoipUrl.collectAsState(initial = "")
+    val assetGeositeUrl by vm.assetGeositeUrl.collectAsState(initial = "")
+    val assetPsiphonUrl by vm.assetPsiphonUrl.collectAsState(initial = "")
     val updateCheck by vm.updateCheck.collectAsState()
     // 3.1.0 (PattNG): connection settings.
     val testUrl by vm.testUrl.collectAsState(initial = "https://www.google.com/generate_204")
@@ -143,7 +148,13 @@ fun SettingsScreen(
     // 3.2.10 (PattNG root mode).
     val rootMode by vm.rootMode.collectAsState(initial = false)
     val rootLanShare by vm.rootLanShare.collectAsState(initial = false)
+    // 3.2.11 (PattNG full parity): IPv6 + prefer-IPv6 + Aether listen port.
+    val ipv6Enabled by vm.ipv6Enabled.collectAsState(initial = true)
+    val preferIpv6 by vm.preferIpv6.collectAsState(initial = false)
+    val aetherListenPort by vm.aetherListenPort.collectAsState(initial = "10819")
     var editField by remember { mutableStateOf<String?>(null) } // see the dialog below
+    // 3.2.11 (PattNG UserAssetUrlActivity): which asset's URL dialog is open, if any.
+    var assetUrlKind by remember { mutableStateOf<String?>(null) }
 
     Column(
         modifier = Modifier
@@ -340,6 +351,26 @@ fun SettingsScreen(
                 )
             }
             GroupDivider()
+            // 3.2.11 (PattNG PREF_IPV6_ENABLED, default true): the tun
+            // takes an IPv6 address + route and WireGuard keeps its
+            // IPv6 addresses; prefer-IPv6 picks the IPv6 address when
+            // a hostname resolves to both families.
+            SwitchRow(
+                titleRes = R.string.ipv6_enabled_title,
+                descRes = R.string.ipv6_enabled_desc,
+                checked = ipv6Enabled,
+                onCheckedChange = { vm.setIpv6Enabled(it) }
+            )
+            if (ipv6Enabled) {
+                GroupDivider()
+                SwitchRow(
+                    titleRes = R.string.prefer_ipv6_title,
+                    descRes = R.string.prefer_ipv6_desc,
+                    checked = preferIpv6,
+                    onCheckedChange = { vm.setPreferIpv6(it) }
+                )
+            }
+            GroupDivider()
             TextEditRow(
                 titleRes = R.string.mtu_title,
                 desc = mtu,
@@ -350,6 +381,14 @@ fun SettingsScreen(
                 titleRes = R.string.iface_addr_title,
                 desc = ifaceAddr,
                 onClick = { editField = "iface_addr" }
+            )
+            GroupDivider()
+            // 3.2.11 (PattNG title_pref_aether_listen_port): the port
+            // the app dials for the Aether core's SOCKS listener.
+            TextEditRow(
+                titleRes = R.string.aether_listen_port_title,
+                desc = aetherListenPort,
+                onClick = { editField = "aether_listen_port" }
             )
             GroupDivider()
             SwitchRow(
@@ -489,6 +528,26 @@ fun SettingsScreen(
                 onDownload = { vm.downloadGeo() },
                 onCancel = { vm.cancelGeoDownload() },
                 onImportGeo = onImportGeo
+            )
+            // 3.2.11 (PattNG UserAssetUrlActivity): the URL each asset
+            // file downloads from — tap a row to change it or download it now.
+            GroupDivider()
+            AssetUrlRow(
+                title = "geoip.dat",
+                url = assetGeoipUrl.ifBlank { vm.defaultAssetUrl("geoip") },
+                onClick = { assetUrlKind = "geoip" }
+            )
+            GroupDivider()
+            AssetUrlRow(
+                title = "geosite.dat",
+                url = assetGeositeUrl.ifBlank { vm.defaultAssetUrl("geosite") },
+                onClick = { assetUrlKind = "geosite" }
+            )
+            GroupDivider()
+            AssetUrlRow(
+                title = "psiphon_servers.dat",
+                url = assetPsiphonUrl.ifBlank { vm.defaultAssetUrl("psiphon") },
+                onClick = { assetUrlKind = "psiphon" }
             )
             // 3.2.0 (PattNG): core / mux / DNS details.
             GroupDivider()
@@ -862,6 +921,10 @@ fun SettingsScreen(
                 R.string.iface_addr_title, R.string.iface_addr_desc, ifaceAddr,
                 { v: String -> vm.setIfaceAddr(v) }
             )
+            "aether_listen_port" -> Quadruple(
+                R.string.aether_listen_port_title, R.string.aether_listen_port_desc, aetherListenPort,
+                { v: String -> vm.setAetherListenPort(v) }
+            )
             "domestic_dns" -> Quadruple(
                 R.string.domestic_dns_title, R.string.domestic_dns_desc, domesticDns,
                 { v: String -> vm.setDomesticDns(v) }
@@ -907,6 +970,40 @@ fun SettingsScreen(
             onSave = { v ->
                 onSave(v)
                 editField = null
+            }
+        )
+    }
+
+    // Asset-URL dialog (3.2.11, PattNG UserAssetUrlActivity).
+    val assetKind = assetUrlKind
+    if (assetKind != null) {
+        val fileName = when (assetKind) {
+            "geoip" -> "geoip.dat"
+            "geosite" -> "geosite.dat"
+            else -> "psiphon_servers.dat"
+        }
+        val currentUrl = when (assetKind) {
+            "geoip" -> assetGeoipUrl.ifBlank { vm.defaultAssetUrl("geoip") }
+            "geosite" -> assetGeositeUrl.ifBlank { vm.defaultAssetUrl("geosite") }
+            else -> assetPsiphonUrl.ifBlank { vm.defaultAssetUrl("psiphon") }
+        }
+        AssetUrlDialog(
+            title = fileName,
+            initial = currentUrl,
+            onDismiss = { assetUrlKind = null },
+            onSave = { url -> vm.setAssetUrl(assetKind, url) },
+            onDownload = { url ->
+                vm.setAssetUrl(assetKind, url)
+                vm.downloadAssetUrl(assetKind, url) { ok ->
+                    Toast.makeText(
+                        context,
+                        context.getString(
+                            if (ok) R.string.asset_url_downloaded else R.string.asset_url_failed
+                        ),
+                        Toast.LENGTH_SHORT
+                    ).show()
+                }
+                assetUrlKind = null
             }
         )
     }
@@ -1554,6 +1651,129 @@ private fun GeoRow(
             }
         }
     }
+}
+
+// ---- Asset-URL rows (3.2.11, PattNG UserAssetUrlActivity) ----
+
+/** One asset file with the URL it downloads from; tap to change the URL or download it now. */
+@Composable
+private fun AssetUrlRow(title: String, url: String, onClick: () -> Unit) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .defaultMinSize(minHeight = 56.dp)
+            .clickable(onClick = onClick)
+            .padding(horizontal = 16.dp, vertical = 12.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                text = title,
+                fontSize = 14.sp,
+                fontWeight = FontWeight.SemiBold,
+                color = LiteColors.text,
+                fontFamily = Vazirmatn
+            )
+            Text(
+                text = url,
+                fontSize = 12.sp,
+                color = LiteColors.textSecondary,
+                fontFamily = Vazirmatn,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+        }
+    }
+}
+
+/** The URL an asset file downloads from: save it, or save it and download the file now. */
+@Composable
+private fun AssetUrlDialog(
+    title: String,
+    initial: String,
+    onDismiss: () -> Unit,
+    onSave: (String) -> Unit,
+    onDownload: (String) -> Unit
+) {
+    var url by remember { mutableStateOf(initial) }
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = {
+            Text(
+                text = title,
+                fontSize = 16.sp,
+                fontWeight = FontWeight.Bold,
+                color = LiteColors.text,
+                fontFamily = Vazirmatn
+            )
+        },
+        text = {
+            Column {
+                Text(
+                    text = stringResource(R.string.asset_url_desc),
+                    fontSize = 12.sp,
+                    color = LiteColors.textSecondary,
+                    fontFamily = Vazirmatn
+                )
+                Spacer(Modifier.height(12.dp))
+                OutlinedTextField(
+                    value = url,
+                    onValueChange = { url = it },
+                    singleLine = true,
+                    textStyle = TextStyle(
+                        fontFamily = Vazirmatn,
+                        fontSize = 14.sp,
+                        color = LiteColors.text,
+                        textDirection = androidx.compose.ui.text.style.TextDirection.Ltr
+                    ),
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedBorderColor = LiteColors.hairlineStrong,
+                        unfocusedBorderColor = LiteColors.hairline,
+                        cursorColor = LiteColors.accent,
+                        focusedContainerColor = Color.Transparent,
+                        unfocusedContainerColor = Color.Transparent
+                    ),
+                    shape = RoundedCornerShape(10.dp),
+                    modifier = Modifier.fillMaxWidth()
+                )
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = { onDownload(url.trim()) }) {
+                Text(
+                    text = stringResource(R.string.asset_url_download),
+                    fontSize = 14.sp,
+                    color = LiteColors.accent,
+                    fontFamily = Vazirmatn
+                )
+            }
+        },
+        dismissButton = {
+            Row {
+                TextButton(onClick = {
+                    onSave(url.trim())
+                    onDismiss()
+                }) {
+                    Text(
+                        text = stringResource(R.string.server_edit_save),
+                        fontSize = 14.sp,
+                        color = LiteColors.textSecondary,
+                        fontFamily = Vazirmatn
+                    )
+                }
+                TextButton(onClick = onDismiss) {
+                    Text(
+                        text = stringResource(R.string.sub_import_cancel),
+                        fontSize = 14.sp,
+                        color = LiteColors.textSecondary,
+                        fontFamily = Vazirmatn
+                    )
+                }
+            }
+        },
+        containerColor = LiteColors.surface,
+        shape = RoundedCornerShape(20.dp)
+    )
 }
 
 @Composable
