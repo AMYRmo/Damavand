@@ -7,7 +7,9 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -31,6 +33,8 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.TextStyle
@@ -41,6 +45,7 @@ import com.amyrmo.damavand.lite.Profile
 import com.amyrmo.damavand.lite.R
 import com.amyrmo.damavand.lite.XrayConfig
 import com.amyrmo.damavand.lite.ui.LiteViewModel
+import com.amyrmo.damavand.lite.ui.components.ChevronDownIcon
 import com.amyrmo.damavand.lite.ui.theme.LiteColors
 import com.amyrmo.damavand.lite.ui.theme.Vazirmatn
 import org.json.JSONObject
@@ -60,6 +65,11 @@ import java.net.URLEncoder
  * [EditConfigDialog] edits one in place, with the protocol locked
  * (PattNG edits one protocol per screen) and the fields pre-filled
  * from the parsed link.
+ *
+ * 3.2.19: the changeable parts sit in collapsible sections — the core
+ * fields (name, address, port, identity) stay visible, and transport,
+ * security, ECH/pinning and advanced fields hide behind a section that
+ * opens by itself when it already holds a non-default value.
  */
 @Composable
 fun ManualConfigDialog(vm: LiteViewModel, onDismiss: () -> Unit) {
@@ -204,6 +214,36 @@ private fun ManualConfigEditor(
     fun f(key: String): String = fields[key].orEmpty()
     fun setF(key: String, v: String) { fields[key] = v }
 
+    // 3.2.19: each section opens by itself when it already holds a
+    // non-default value (an edit of a link that set one), and stays
+    // closed on a fresh add.
+    var showTransport by remember {
+        mutableStateOf(
+            (f("security").isNotBlank() && f("security") != "tls") ||
+                (f("net").isNotBlank() && f("net") != "tcp") ||
+                f("sni").isNotBlank() || f("path").isNotBlank() || f("host").isNotBlank()
+        )
+    }
+    var showSecurity by remember {
+        mutableStateOf(
+            f("fp").isNotBlank() || f("allowInsecure") == "1" || f("alpn").isNotBlank() ||
+                f("cs").isNotBlank() || f("pbk").isNotBlank() || f("sid").isNotBlank() ||
+                f("spx").isNotBlank() || f("pqv").isNotBlank() || f("ech").isNotBlank() ||
+                f("echOutbound").isNotBlank() || f("vcn").isNotBlank() || f("pcs").isNotBlank()
+        )
+    }
+    var showEch by remember {
+        mutableStateOf(
+            f("ech").isNotBlank() || f("echOutbound").isNotBlank() ||
+                f("vcn").isNotBlank() || f("pcs").isNotBlank()
+        )
+    }
+    var showAdvanced by remember {
+        mutableStateOf(
+            f("allowedIps").isNotBlank() || f("localAddress").isNotBlank() || f("mtu").isNotBlank()
+        )
+    }
+
     AlertDialog(
         onDismissRequest = { if (!saving) onDismiss() },
         title = {
@@ -288,41 +328,57 @@ private fun ManualConfigEditor(
                                 value = f("uuid"),
                                 onValueChange = { setF("uuid", it) }
                             )
-                            ManualChipRow(
-                                labelRes = R.string.manual_security,
-                                options = listOf("none", "tls", "reality"),
-                                selected = f("security").ifEmpty { "tls" },
-                                onSelect = { setF("security", it) }
-                            )
-                            ManualChipRow(
-                                labelRes = R.string.manual_network,
-                                options = listOf("tcp", "ws", "grpc", "xhttp"),
-                                selected = f("net").ifEmpty { "tcp" },
-                                onSelect = { setF("net", it) }
-                            )
-                            ManualField(
-                                labelRes = R.string.manual_sni,
-                                value = f("sni"),
-                                onValueChange = { setF("sni", it) }
-                            )
+                            ManualSection(
+                                titleRes = R.string.manual_section_transport,
+                                expanded = showTransport,
+                                onExpandedChange = { showTransport = it },
+                            ) {
+                                ManualChipRow(
+                                    labelRes = R.string.manual_security,
+                                    options = listOf("none", "tls", "reality"),
+                                    selected = f("security").ifEmpty { "tls" },
+                                    onSelect = { setF("security", it) }
+                                )
+                                ManualChipRow(
+                                    labelRes = R.string.manual_network,
+                                    options = listOf("tcp", "ws", "grpc", "xhttp"),
+                                    selected = f("net").ifEmpty { "tcp" },
+                                    onSelect = { setF("net", it) }
+                                )
+                                ManualField(
+                                    labelRes = R.string.manual_sni,
+                                    value = f("sni"),
+                                    onValueChange = { setF("sni", it) }
+                                )
+                                ManualField(
+                                    labelRes = R.string.manual_path,
+                                    value = f("path"),
+                                    onValueChange = { setF("path", it) }
+                                )
+                                ManualField(
+                                    labelRes = R.string.manual_host,
+                                    value = f("host"),
+                                    onValueChange = { setF("host", it) }
+                                )
+                            }
                             // 3.2.7 (PattNG stream security): fingerprint,
                             // allow-insecure, ALPN, cipher suites, and
-                            // Reality's public key + short id.
-                            TlsFields(
-                                security = f("security").ifEmpty { "tls" },
-                                f = ::f,
-                                setF = ::setF
-                            )
-                            ManualField(
-                                labelRes = R.string.manual_path,
-                                value = f("path"),
-                                onValueChange = { setF("path", it) }
-                            )
-                            ManualField(
-                                labelRes = R.string.manual_host,
-                                value = f("host"),
-                                onValueChange = { setF("host", it) }
-                            )
+                            // Reality's public key + short id. Hidden when
+                            // the security is "none" — TlsFields renders
+                            // nothing then either.
+                            if (f("security").ifEmpty { "tls" } != "none") {
+                                ManualSection(
+                                    titleRes = R.string.manual_section_security,
+                                    expanded = showSecurity,
+                                    onExpandedChange = { showSecurity = it },
+                                ) {
+                                    TlsFields(
+                                        security = f("security").ifEmpty { "tls" },
+                                        f = ::f,
+                                        setF = ::setF
+                                    )
+                                }
+                            }
                         }
                         "trojan" -> {
                             ManualField(
@@ -330,23 +386,35 @@ private fun ManualConfigEditor(
                                 value = f("password"),
                                 onValueChange = { setF("password", it) }
                             )
-                            ManualChipRow(
-                                labelRes = R.string.manual_security,
-                                options = listOf("tls", "reality"),
-                                selected = f("security").ifEmpty { "tls" },
-                                onSelect = { setF("security", it) }
-                            )
-                            ManualField(
-                                labelRes = R.string.manual_sni,
-                                value = f("sni"),
-                                onValueChange = { setF("sni", it) }
-                            )
+                            ManualSection(
+                                titleRes = R.string.manual_section_transport,
+                                expanded = showTransport,
+                                onExpandedChange = { showTransport = it },
+                            ) {
+                                ManualChipRow(
+                                    labelRes = R.string.manual_security,
+                                    options = listOf("tls", "reality"),
+                                    selected = f("security").ifEmpty { "tls" },
+                                    onSelect = { setF("security", it) }
+                                )
+                                ManualField(
+                                    labelRes = R.string.manual_sni,
+                                    value = f("sni"),
+                                    onValueChange = { setF("sni", it) }
+                                )
+                            }
                             // 3.2.7 (PattNG stream security).
-                            TlsFields(
-                                security = f("security").ifEmpty { "tls" },
-                                f = ::f,
-                                setF = ::setF
-                            )
+                            ManualSection(
+                                titleRes = R.string.manual_section_security,
+                                expanded = showSecurity,
+                                onExpandedChange = { showSecurity = it },
+                            ) {
+                                TlsFields(
+                                    security = f("security").ifEmpty { "tls" },
+                                    f = ::f,
+                                    setF = ::setF
+                                )
+                            }
                         }
                         "ss" -> {
                             ManualField(
@@ -391,26 +459,32 @@ private fun ManualConfigEditor(
                             )
                             // 3.2.9 (PattNG): ECH + pinning ride on
                             // Hysteria2 too (its blank security is TLS).
-                            ManualField(
-                                labelRes = R.string.manual_ech,
-                                value = f("ech"),
-                                onValueChange = { setF("ech", it) }
-                            )
-                            ManualField(
-                                labelRes = R.string.manual_ech_outbound,
-                                value = f("echOutbound"),
-                                onValueChange = { setF("echOutbound", it) }
-                            )
-                            ManualField(
-                                labelRes = R.string.manual_vcn,
-                                value = f("vcn"),
-                                onValueChange = { setF("vcn", it) }
-                            )
-                            ManualField(
-                                labelRes = R.string.manual_pcs,
-                                value = f("pcs"),
-                                onValueChange = { setF("pcs", it) }
-                            )
+                            ManualSection(
+                                titleRes = R.string.manual_section_ech,
+                                expanded = showEch,
+                                onExpandedChange = { showEch = it },
+                            ) {
+                                ManualField(
+                                    labelRes = R.string.manual_ech,
+                                    value = f("ech"),
+                                    onValueChange = { setF("ech", it) }
+                                )
+                                ManualField(
+                                    labelRes = R.string.manual_ech_outbound,
+                                    value = f("echOutbound"),
+                                    onValueChange = { setF("echOutbound", it) }
+                                )
+                                ManualField(
+                                    labelRes = R.string.manual_vcn,
+                                    value = f("vcn"),
+                                    onValueChange = { setF("vcn", it) }
+                                )
+                                ManualField(
+                                    labelRes = R.string.manual_pcs,
+                                    value = f("pcs"),
+                                    onValueChange = { setF("pcs", it) }
+                                )
+                            }
                         }
                         "wg" -> {
                             ManualField(
@@ -423,21 +497,27 @@ private fun ManualConfigEditor(
                                 value = f("publicKey"),
                                 onValueChange = { setF("publicKey", it) }
                             )
-                            ManualField(
-                                labelRes = R.string.manual_allowed_ips,
-                                value = f("allowedIps").ifEmpty { "0.0.0.0/0,::/0" },
-                                onValueChange = { setF("allowedIps", it) }
-                            )
-                            ManualField(
-                                labelRes = R.string.manual_local_address,
-                                value = f("localAddress"),
-                                onValueChange = { setF("localAddress", it) }
-                            )
-                            ManualField(
-                                labelRes = R.string.manual_mtu,
-                                value = f("mtu"),
-                                onValueChange = { setF("mtu", it) }
-                            )
+                            ManualSection(
+                                titleRes = R.string.manual_section_advanced,
+                                expanded = showAdvanced,
+                                onExpandedChange = { showAdvanced = it },
+                            ) {
+                                ManualField(
+                                    labelRes = R.string.manual_allowed_ips,
+                                    value = f("allowedIps").ifEmpty { "0.0.0.0/0,::/0" },
+                                    onValueChange = { setF("allowedIps", it) }
+                                )
+                                ManualField(
+                                    labelRes = R.string.manual_local_address,
+                                    value = f("localAddress"),
+                                    onValueChange = { setF("localAddress", it) }
+                                )
+                                ManualField(
+                                    labelRes = R.string.manual_mtu,
+                                    value = f("mtu"),
+                                    onValueChange = { setF("mtu", it) }
+                                )
+                            }
                         }
                     }
                 }
@@ -493,6 +573,60 @@ private fun ManualConfigEditor(
         containerColor = LiteColors.surface,
         shape = RoundedCornerShape(20.dp)
     )
+}
+
+/**
+ * A collapsible section (3.2.19, in the shape of the settings
+ * screen's SettingsGroup): a surface card with a hairline border, a
+ * header row with a chevron that turns as it opens, and the content
+ * below it. The core fields stay outside the sections, always
+ * visible; the changeable parts hide behind one of these.
+ */
+@Composable
+private fun ManualSection(
+    titleRes: Int,
+    expanded: Boolean,
+    onExpandedChange: (Boolean) -> Unit,
+    content: @Composable ColumnScope.() -> Unit,
+) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(bottom = 8.dp)
+            .background(LiteColors.surface, RoundedCornerShape(14.dp))
+            .border(1.dp, LiteColors.hairline, RoundedCornerShape(14.dp))
+            .clip(RoundedCornerShape(14.dp)),
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clickable { onExpandedChange(!expanded) }
+                .padding(horizontal = 14.dp, vertical = 12.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text(
+                text = stringResource(titleRes),
+                fontSize = 13.sp,
+                fontWeight = androidx.compose.ui.text.font.FontWeight.SemiBold,
+                color = LiteColors.textSecondary,
+                fontFamily = Vazirmatn,
+                modifier = Modifier.weight(1f),
+            )
+            Box(
+                modifier = Modifier.graphicsLayer { rotationZ = if (expanded) 0f else -90f },
+            ) {
+                ChevronDownIcon(size = 16.dp, color = LiteColors.textSecondary)
+            }
+        }
+        if (expanded) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(start = 14.dp, end = 14.dp, bottom = 12.dp),
+                content = content,
+            )
+        }
+    }
 }
 
 @Composable
