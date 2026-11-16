@@ -47,7 +47,9 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.NonCancellable
+import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -55,6 +57,9 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.resume
+import kotlinx.coroutines.resumeWithException
+import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.sync.withPermit
 import kotlinx.coroutines.withContext
 import java.util.concurrent.TimeUnit
@@ -443,6 +448,16 @@ class LiteViewModel(app: Application) : AndroidViewModel(app) {
     /** Profile ids currently being ping-tested (rows show «…»). */
     private val _testingIds = MutableStateFlow<Set<String>>(emptySet())
     val testingIds: StateFlow<Set<String>> = _testingIds.asStateFlow()
+    // 3.2.18 (#62): the running test-all job, so the user can cancel
+    // it — before this the sweep kept no handle at all and the pill
+    // was disabled while testing, so a long real test could not be
+    // stopped. Set on the main thread (all entry points run there).
+    private var testJob: Job? = null
+
+    /** Cancel a running test-all / real-test-all (3.2.18, #62). */
+    fun cancelTestAll() {
+        testJob?.cancel()
+    }
 
     // ---- subscription import ----
     private val _subImport = MutableStateFlow<SubImportState>(SubImportState.Idle)
@@ -828,7 +843,9 @@ class LiteViewModel(app: Application) : AndroidViewModel(app) {
         _isTesting.value = true
         _testProgress.value = 0 to list.size
         _testingIds.value = list.map { it.id }.toSet()
-        viewModelScope.launch(Dispatchers.IO) {
+        // 3.2.18 (#62): the job is kept so the user can cancel the
+        // sweep — see cancelTestAll().
+        testJob = viewModelScope.launch(Dispatchers.IO) {
             // 3.2.0: cap the parallel tests (PattNG real-ping concurrency).
             val concurrency = try {
                 settings.realPingConcurrencyNow()
@@ -861,42 +878,53 @@ class LiteViewModel(app: Application) : AndroidViewModel(app) {
             // on-device (3.1.0). The file itself is also locked +
             // atomically written now (ProfileRepository).
             val results = java.util.concurrent.ConcurrentHashMap<String, Long>()
-            val jobs = list.map { profile ->
-                launch {
-                    semaphore.withPermit {
-                        val ping = if (profile.isAether) {
-                            // 3.2.13 (PattNG AetherDelayTester): measured
-                            // through a test tunnel, not the server ping
-                            // — the core has no server to ping. Refused
-                            // beside a live Aether session; the tester
-                            // serialises the Aether profiles itself.
-                            if (aetherSessionLive()) -1L
-                            else AetherDelayTester.measure(
-                                context,
-                                AetherSettings.fromJson(profile.aetherJson),
-                                aetherPort,
-                                testUrl,
-                            )
-                        } else {
-                            PingTester.ping(profile, preferIpv6)
-                        }
-                        results[profile.id] = ping
-                        withContext(Dispatchers.Main) {
-                            _testingIds.update { it - profile.id }
-                            val (done, total) = _testProgress.value
-                            _testProgress.value = (done + 1) to total
+            try {
+                val jobs = list.map { profile ->
+                    launch {
+                        semaphore.withPermit {
+                            val ping = if (profile.isAether) {
+                                // 3.2.13 (PattNG AetherDelayTester): measured
+                                // through a test tunnel, not the server ping
+                                // — the core has no server to ping. Refused
+                                // beside a live Aether session; the tester
+                                // serialises the Aether profiles itself.
+                                if (aetherSessionLive()) -1L
+                                else AetherDelayTester.measure(
+                                    context,
+                                    AetherSettings.fromJson(profile.aetherJson),
+                                    aetherPort,
+                                    testUrl,
+                                )
+                            } else {
+                                PingTester.ping(profile, preferIpv6)
+                            }
+                            results[profile.id] = ping
+                            withContext(Dispatchers.Main) {
+                                _testingIds.update { it - profile.id }
+                                val (done, total) = _testProgress.value
+                                _testProgress.value = (done + 1) to total
+                            }
                         }
                     }
                 }
+                jobs.forEach { it.join() }
+            } finally {
+                // 3.2.18 (#62): results measured so far are kept even
+                // when cancelled, and the testing state always resets
+                // — without this a cancel would leave the pill stuck
+                // on "Testing…". The Main switch is NonCancellable so
+                // the reset itself is not skipped by the cancel.
+                if (results.isNotEmpty()) repo.updatePings(results)
+                withContext(NonCancellable + Dispatchers.Main) {
+                    refreshProfiles()
+                    _testingIds.value = emptySet()
+                    _isTesting.value = false
+                    testJob = null
+                }
             }
-            jobs.forEach { it.join() }
-            repo.updatePings(results)
-            withContext(Dispatchers.Main) {
-                refreshProfiles()
-                _testingIds.value = emptySet()
-                _isTesting.value = false
-                onDone?.invoke()
-            }
+            // Reached only on a full run — a cancel throws out of the
+            // try above, so post-test actions (onDone) are skipped.
+            withContext(Dispatchers.Main) { onDone?.invoke() }
         }
     }
 
@@ -920,7 +948,9 @@ class LiteViewModel(app: Application) : AndroidViewModel(app) {
         _isTesting.value = true
         _testProgress.value = 0 to list.size
         _testingIds.value = list.map { it.id }.toSet()
-        viewModelScope.launch(Dispatchers.IO) {
+        // 3.2.18 (#62): the job is kept so the user can cancel the
+        // sweep — see cancelTestAll().
+        testJob = viewModelScope.launch(Dispatchers.IO) {
             val geoReady = GeoDownloader(context).isReady()
             val settingsSnapshot = try {
                 settings.xraySettingsNow(RoutingStore(context))
@@ -931,31 +961,45 @@ class LiteViewModel(app: Application) : AndroidViewModel(app) {
                 "https://www.google.com/generate_204"
             }
             val results = mutableMapOf<String, Long>()
-            for (profile in list) {
-                val ping = realPingOne(profile, geoReady, settingsSnapshot, testUrl)
-                results[profile.id] = ping
-                withContext(Dispatchers.Main) {
-                    _testingIds.update { it - profile.id }
-                    val (done, total) = _testProgress.value
-                    _testProgress.value = (done + 1) to total
+            try {
+                for (profile in list) {
+                    // 3.2.18 (#62): stop between profiles when cancelled.
+                    currentCoroutineContext().ensureActive()
+                    val ping = realPingOne(profile, geoReady, settingsSnapshot, testUrl)
+                    results[profile.id] = ping
+                    withContext(Dispatchers.Main) {
+                        _testingIds.update { it - profile.id }
+                        val (done, total) = _testProgress.value
+                        _testProgress.value = (done + 1) to total
+                    }
                 }
-            }
-            repo.updatePings(results)
-            withContext(Dispatchers.Main) {
-                refreshProfiles()
-                _testingIds.value = emptySet()
-                _isTesting.value = false
+            } finally {
+                // 3.2.18 (#62): results measured so far are kept even
+                // when cancelled, and the testing state always resets
+                // (same shape as testAll above).
+                if (results.isNotEmpty()) repo.updatePings(results)
+                withContext(NonCancellable + Dispatchers.Main) {
+                    refreshProfiles()
+                    _testingIds.value = emptySet()
+                    _isTesting.value = false
+                    testJob = null
+                }
             }
         }
     }
 
     /** One real tunnel test: fetch the test URL through this profile. */
-    private fun realPingOne(
+    // 3.2.18 (#62): this is now a SUSPEND function and cooperative —
+    // a cancel ends the SOCKS wait and aborts the in-flight fetch
+    // instead of blocking up to the 8 s read timeout. The finally
+    // below still stops the test Xray core on every path.
+    private suspend fun realPingOne(
         profile: Profile,
         geoReady: Boolean,
         settingsSnapshot: XrayConfig.XraySettings,
         testUrl: String,
     ): Long {
+        currentCoroutineContext().ensureActive()
         // The service is not running here (testAllRealPing refuses while
         // connected), so the fixed test port 1180 cannot collide.
         val cfg = XrayConfig.buildLinks(listOf(profile.link), 1180, geoReady, settingsSnapshot)
@@ -970,9 +1014,10 @@ class LiteViewModel(app: Application) : AndroidViewModel(app) {
                     }
                     break
                 } catch (_: Exception) {
-                    Thread.sleep(200)
+                    delay(200)
                 }
             }
+            currentCoroutineContext().ensureActive()
             val fetchStart = System.currentTimeMillis()
             val proxy = java.net.Proxy(
                 java.net.Proxy.Type.SOCKS,
@@ -982,9 +1027,25 @@ class LiteViewModel(app: Application) : AndroidViewModel(app) {
             conn.connectTimeout = 8000
             conn.readTimeout = 8000
             conn.instanceFollowRedirects = false
-            val code = conn.responseCode
+            // 3.2.18 (#62): responseCode is a blocking call, so the
+            // fetch runs inside suspendCancellableCoroutine — cancelling
+            // the test disconnects the connection at once instead of
+            // waiting out the read timeout.
+            val code = suspendCancellableCoroutine { cont ->
+                cont.invokeOnCancellation {
+                    try { conn.disconnect() } catch (_: Exception) { }
+                }
+                try {
+                    val c = conn.responseCode
+                    if (cont.isActive) cont.resume(c)
+                } catch (e: Exception) {
+                    if (cont.isActive) cont.resumeWithException(e)
+                }
+            }
             conn.disconnect()
             if (code == 204 || code == 200) System.currentTimeMillis() - fetchStart else -1
+        } catch (e: CancellationException) {
+            throw e
         } catch (_: Exception) {
             -1
         } finally {
