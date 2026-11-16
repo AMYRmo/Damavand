@@ -216,6 +216,11 @@ class LiteViewModel(app: Application) : AndroidViewModel(app) {
     val autoSwitchMargin = settings.autoSwitchMargin
     val autoRetry = settings.autoRetry
 
+    // 3.2.9 (PattNG, the rest): dynamic color, local proxy, HEV tun.
+    val dynamicColor = settings.dynamicColor
+    val localProxy = settings.localProxy
+    val useHev = settings.useHev
+
     fun selectGroup(key: String?) =
         viewModelScope.launch { settings.setSelectedGroup(key) }
 
@@ -242,6 +247,9 @@ class LiteViewModel(app: Application) : AndroidViewModel(app) {
     fun setAutoSweepMinutes(v: String) = viewModelScope.launch { settings.setAutoSweepMinutes(v) }
     fun setAutoSwitchMargin(v: String) = viewModelScope.launch { settings.setAutoSwitchMargin(v) }
     fun setAutoRetry(v: Boolean) = viewModelScope.launch { settings.setAutoRetry(v) }
+    fun setDynamicColor(v: Boolean) = viewModelScope.launch { settings.setDynamicColor(v) }
+    fun setLocalProxy(v: Boolean) = viewModelScope.launch { settings.setLocalProxy(v) }
+    fun setUseHev(v: Boolean) = viewModelScope.launch { settings.setUseHev(v) }
     val autoStartBoot = settings.autoStartBoot
     val subAutoTest = settings.subAutoTest
     val subAutoSort = settings.subAutoSort
