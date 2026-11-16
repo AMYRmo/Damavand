@@ -57,8 +57,6 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.resume
-import kotlinx.coroutines.resumeWithException
 import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.sync.withPermit
 import kotlinx.coroutines.withContext
@@ -1030,14 +1028,17 @@ class LiteViewModel(app: Application) : AndroidViewModel(app) {
             // 3.2.18 (#62): responseCode is a blocking call, so the
             // fetch runs inside suspendCancellableCoroutine — cancelling
             // the test disconnects the connection at once instead of
-            // waiting out the read timeout.
+            // waiting out the read timeout. (resume/resumeWithException
+            // are the CancellableContinuation members — the
+            // kotlinx.coroutines.resume import resolves to an internal
+            // overload instead, so no import for them.)
             val code = suspendCancellableCoroutine { cont ->
                 cont.invokeOnCancellation {
                     try { conn.disconnect() } catch (_: Exception) { }
                 }
                 try {
                     val c = conn.responseCode
-                    if (cont.isActive) cont.resume(c)
+                    if (cont.isActive) cont.resume(c, null)
                 } catch (e: Exception) {
                     if (cont.isActive) cont.resumeWithException(e)
                 }
