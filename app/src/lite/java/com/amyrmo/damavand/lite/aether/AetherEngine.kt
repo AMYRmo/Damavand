@@ -247,9 +247,28 @@ object AetherEngine {
     fun awaitListening(timeoutMs: Long): Boolean {
         val deadline = System.nanoTime() + TimeUnit.MILLISECONDS.toNanos(timeoutMs)
         while (System.nanoTime() < deadline) {
-            val current = session ?: return false
+            val current = session
+            if (current == null) {
+                AppLog.i(TAG, "AetherCore: the session ended while waiting for the listener")
+                return false
+            }
             if (current.wordSeen && answersSocks(current.port)) return true
-            if (current.process?.isAlive != true && session === current) return false
+            // 3.2.24: the process is assigned by open() on the
+            // lifecycle executor, which runs AFTER start() returns —
+            // a null process here means "not started yet", not "dead".
+            // The old check (`process?.isAlive != true`) treated null
+            // as dead, so the first poll — milliseconds after start(),
+            // long before open() finished its /proc scan and fork —
+            // returned false at once; startAether then stop()ed the
+            // core microseconds after open() had started it (exit 143,
+            // same second, every start, since 3.2.10). Only give up
+            // once a process exists AND has exited.
+            val proc = current.process
+            if (proc != null && !proc.isAlive && session === current) {
+                val code = runCatching { proc.exitValue() }.getOrNull()
+                AppLog.e(TAG, "AetherCore: the core exited before listening (code $code)")
+                return false
+            }
             try {
                 Thread.sleep(READY_POLL_MS)
             } catch (_: InterruptedException) {
@@ -257,6 +276,7 @@ object AetherEngine {
                 return false
             }
         }
+        AppLog.e(TAG, "AetherCore: timed out waiting for the listener")
         return false
     }
 
