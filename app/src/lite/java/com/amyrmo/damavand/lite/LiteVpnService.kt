@@ -499,7 +499,9 @@ class LiteVpnService : VpnService() {
     /** Start Xray with [links] on the resolved test port and fetch the test URL through it. */
     private fun realTest(links: List<String>, testUrl: String): Boolean {
         val geoReady = GeoDownloader(applicationContext).isReady()
-        val settings = loadXraySettings()
+        // The fastest-connect probe talks SOCKS to the core, so the
+        // local proxy is forced on here whatever the setting says.
+        val settings = loadXraySettings().copy(tunMode = false, localProxyEnabled = true)
         val cfg = XrayConfig.buildLinks(links, activeTestPort, geoReady, settings) ?: return false
         if (!XrayController.start(cfg)) return false
         try {
@@ -546,7 +548,26 @@ class LiteVpnService : VpnService() {
 
     private fun connectWinner(links: List<String>) {
         val geoReady = GeoDownloader(applicationContext).isReady()
-        val settings = loadXraySettings()
+        val baseSettings = loadXraySettings()
+        // 3.2.9 (PattNG, the rest): tun mode + local-proxy switch.
+        // HEV on = Lite's current path (core behind SOCKS, HEV bridges
+        // the tun fd). HEV off = Xray's own tun inbound reads the VPN
+        // fd straight from the core. The local proxy is forced on in
+        // VPN+HEV mode (HEV forwards into it), in proxy-only mode (it
+        // IS the service) and when LAN sharing is on — PattNG's
+        // effectiveLocalProxy rule.
+        val (useHev, localProxyOn) = try {
+            kotlinx.coroutines.runBlocking {
+                val s = SettingsStore(applicationContext)
+                s.useHevNow() to s.localProxyNow()
+            }
+        } catch (_: Exception) {
+            true to true
+        }
+        val tunMode = !proxyOnlyMode && !useHev
+        val effectiveLocalProxy = localProxyOn ||
+            (useHev && !proxyOnlyMode) || proxyOnlyMode || baseSettings.socksShareLan
+        val settings = baseSettings.copy(tunMode = tunMode, localProxyEnabled = effectiveLocalProxy)
         // 3.2.8 (Auto): an autoselect group over the member links —
         // the group measures and switches by itself. Anything else is
         // a chain or a single profile.
@@ -647,29 +668,35 @@ class LiteVpnService : VpnService() {
         }
         if (!proxyOnlyMode) {
             tun = descriptor
-            if (!XrayController.start(cfg)) {
+            // Xray-tun mode (3.2.9): hand the VPN fd to the core — Go
+            // dups it at start, so the descriptor stays owned here and
+            // closes normally in stopTunnel. HEV mode keeps the bridge.
+            val tunFd = if (tunMode) descriptor!!.fd else 0
+            if (!XrayController.start(cfg, tunFd)) {
                 lastDetail = getString(R.string.conn_core_failed, XrayController.lastError ?: "")
                 broadcastStatus(); stopTunnel(); return
             }
-            // 3.2.0: hev log level + rw timeout from settings.
-            val (hevLog, hevTimeout) = try {
-                kotlinx.coroutines.runBlocking {
-                    val s = SettingsStore(applicationContext)
-                    s.hevLogLevelNow() to s.hevRwTimeoutNow()
+            if (!tunMode) {
+                // 3.2.0: hev log level + rw timeout from settings.
+                val (hevLog, hevTimeout) = try {
+                    kotlinx.coroutines.runBlocking {
+                        val s = SettingsStore(applicationContext)
+                        s.hevLogLevelNow() to s.hevRwTimeoutNow()
+                    }
+                } catch (_: Exception) {
+                    "warning" to "0"
                 }
-            } catch (_: Exception) {
-                "warning" to "0"
-            }
-            // descriptor is non-null here: the null check above returns
-            // when !proxyOnlyMode; in proxy-only mode the fd is unused.
-            if (!HevTunCore.start(
-                    this, descriptor!!, activeSocksPort, settings.mtu,
-                    settings.ifaceAddr, null, false, pipeline = true,
-                    logLevel = hevLog, rwTimeout = hevTimeout
-                )
-            ) {
-                lastDetail = getString(R.string.conn_tunnel_bridge_failed)
-                broadcastStatus(); stopTunnel(); return
+                // descriptor is non-null here: the null check above returns
+                // when !proxyOnlyMode; in proxy-only mode the fd is unused.
+                if (!HevTunCore.start(
+                        this, descriptor!!, activeSocksPort, settings.mtu,
+                        settings.ifaceAddr, null, false, pipeline = true,
+                        logLevel = hevLog, rwTimeout = hevTimeout
+                    )
+                ) {
+                    lastDetail = getString(R.string.conn_tunnel_bridge_failed)
+                    broadcastStatus(); stopTunnel(); return
+                }
             }
         } else {
             if (!XrayController.start(cfg)) {
