@@ -9,6 +9,7 @@ import android.content.pm.PackageManager
 import android.net.Uri
 import android.net.VpnService
 import android.os.Build
+import androidx.compose.runtime.mutableStateOf
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import androidx.work.Constraints
@@ -40,6 +41,7 @@ import com.amyrmo.damavand.lite.SettingsStore
 import com.amyrmo.damavand.lite.Subscription
 import com.amyrmo.damavand.lite.XrayConfig
 import com.amyrmo.damavand.lite.XrayController
+import com.amyrmo.damavand.lite.ui.screens.SortMode
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -159,6 +161,10 @@ class LiteViewModel(app: Application) : AndroidViewModel(app) {
     fun cancelChainPick() {
         _chainPick.value = emptyList()
     }
+
+    /** Servers tab search + sort, kept across tab switches. */
+    val serversSearchQuery = mutableStateOf("")
+    internal val serversSortMode = mutableStateOf(SortMode.FASTEST)
 
     fun createChainFromPick() {
         val pick = _chainPick.value

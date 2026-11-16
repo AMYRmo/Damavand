@@ -27,6 +27,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListState
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
@@ -48,6 +49,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -98,7 +100,7 @@ import com.amyrmo.damavand.lite.ui.theme.LiteFormat
 import com.amyrmo.damavand.lite.ui.theme.Vazirmatn
 import kotlinx.coroutines.launch
 
-private enum class SortMode { FASTEST, NAME, NEWEST }
+internal enum class SortMode { FASTEST, NAME, NEWEST }
 
 private data class ServerGroup(
     val key: String, // subscription URL, or "" for manual profiles
@@ -147,14 +149,16 @@ fun ServersScreen(
 
     var showAddSheet by remember { mutableStateOf(false) }
     var addInitialUrl by remember { mutableStateOf("") }
-    var showAddDialog by remember { mutableStateOf(false) }
+    var showAddDialog by rememberSaveable { mutableStateOf(false) }
     // 3.2.0 (PattNG): manual per-protocol editor dialog.
-    var showManualDialog by remember { mutableStateOf(false) }
+    var showManualDialog by rememberSaveable { mutableStateOf(false) }
     // 3.2.10 (Aether): the Aether profile editor dialog.
-    var showAetherDialog by remember { mutableStateOf(false) }
-    var searchOpen by remember { mutableStateOf(false) }
-    var searchQuery by remember { mutableStateOf("") }
-    var sortMode by remember { mutableStateOf(SortMode.FASTEST) }
+    var showAetherDialog by rememberSaveable { mutableStateOf(false) }
+    // Search + sort live in the ViewModel: only the visible tab is
+    // composed, so local state was reset on every tab switch.
+    var searchQuery by vm.serversSearchQuery
+    var sortMode by vm.serversSortMode
+    var searchOpen by rememberSaveable { mutableStateOf(searchQuery.isNotEmpty()) }
     var sortMenuOpen by remember { mutableStateOf(false) }
     var moreMenuOpen by remember { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
@@ -172,6 +176,18 @@ fun ServersScreen(
     var chainToDelete by remember { mutableStateOf<Chain?>(null) }
     val pickMode = chainPick.isNotEmpty()
     val multiMode = selectedIds.isNotEmpty()
+    // Back leaves multi-select, chain pick or search first, instead of
+    // jumping to the Home tab with the mode still active.
+    BackHandler(enabled = multiMode || pickMode || searchOpen) {
+        when {
+            multiMode -> selectedIds = emptySet()
+            pickMode -> vm.cancelChainPick()
+            else -> {
+                searchOpen = false
+                searchQuery = ""
+            }
+        }
+    }
 
     // Freeze the display order while a test runs (spec §5.2).
     var frozenIds by remember { mutableStateOf<List<String>?>(null) }
@@ -2288,7 +2304,7 @@ fun AddSubscriptionDialog(
     initialUrl: String = "",
     onDismiss: () -> Unit
 ) {
-    var url by remember { mutableStateOf(initialUrl) }
+    var url by rememberSaveable { mutableStateOf(initialUrl) }
     val subImport by vm.subImport.collectAsState()
     val adding = subImport == LiteViewModel.SubImportState.Adding
 

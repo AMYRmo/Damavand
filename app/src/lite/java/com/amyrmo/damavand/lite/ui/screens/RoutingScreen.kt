@@ -31,6 +31,7 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -58,7 +59,7 @@ import com.amyrmo.damavand.lite.ui.theme.Vazirmatn
 fun RoutingScreen(vm: LiteViewModel, onBack: () -> Unit) {
     val mode by vm.routingMode.collectAsState(initial = "bypass_lan")
     val rules by vm.routingRules.collectAsState()
-    var showAddRule by remember { mutableStateOf(false) }
+    var showAddRule by rememberSaveable { mutableStateOf(false) }
     var ruleToDelete by remember { mutableStateOf<RoutingRule?>(null) }
 
     Column(
@@ -425,9 +426,9 @@ private fun AddRuleDialog(
     onDismiss: () -> Unit,
     onAdd: (String, String, String) -> Unit
 ) {
-    var name by remember { mutableStateOf("") }
-    var pattern by remember { mutableStateOf("") }
-    var action by remember { mutableStateOf("proxy") }
+    var name by rememberSaveable { mutableStateOf("") }
+    var pattern by rememberSaveable { mutableStateOf("") }
+    var action by rememberSaveable { mutableStateOf("proxy") }
 
     AlertDialog(
         onDismissRequest = onDismiss,
