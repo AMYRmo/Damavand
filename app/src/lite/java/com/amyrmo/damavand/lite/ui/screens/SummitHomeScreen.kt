@@ -154,6 +154,15 @@ fun SummitHomeScreen(
         )
         Spacer(Modifier.height(16.dp))
         UnderRingCaption(connection = connection, profile = profile)
+        // 3.2.21 (Damavand ConnectionInfoPill): while connected, the
+        // flag of the exit place + the exit IP under the ring.
+        if (connection.state == ConnState.CONNECTED) {
+            Spacer(Modifier.height(16.dp))
+            ConnectionInfoPill(
+                connection = connection,
+                onRefresh = { vm.refreshLocation() },
+            )
+        }
         Spacer(Modifier.height(24.dp))
         StatsRow(connection = connection)
         Spacer(Modifier.height(24.dp))
