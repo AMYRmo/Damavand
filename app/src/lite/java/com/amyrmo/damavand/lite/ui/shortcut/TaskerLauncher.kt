@@ -7,6 +7,7 @@ import com.amyrmo.damavand.lite.LiteVpnService
 import com.amyrmo.damavand.lite.MainActivity
 import com.amyrmo.damavand.lite.ProfileRepository
 import com.amyrmo.damavand.lite.SettingsStore
+import com.amyrmo.damavand.lite.StartIntent
 import kotlinx.coroutines.runBlocking
 
 /**
@@ -52,19 +53,22 @@ object TaskerLauncher {
             return false
         }
         val profiles = repo.loadProfiles()
-        val intent = Intent(context, LiteVpnService::class.java).apply {
-            action = LiteVpnService.ACTION_START
-            if (guid != null && guid != TASKER_DEFAULT_GUID) {
-                val profile = profiles.firstOrNull { it.id == guid } ?: return false
+        val intent: Intent = if (guid != null && guid != TASKER_DEFAULT_GUID) {
+            val profile = profiles.firstOrNull { it.id == guid } ?: return false
+            Intent(context, LiteVpnService::class.java).apply {
+                action = LiteVpnService.ACTION_START
                 putExtra(LiteVpnService.EXTRA_LINK, profile.link)
                 if (profile.isAether) putExtra(LiteVpnService.EXTRA_AETHER, true)
-            } else {
-                val selectedId = runBlocking { store.selectedProfileIdNow() }
-                val selected = profiles.firstOrNull { it.id == selectedId }
-                if (selected != null) {
-                    putExtra(LiteVpnService.EXTRA_LINK, selected.link)
-                    if (selected.isAether) putExtra(LiteVpnService.EXTRA_AETHER, true)
-                } else {
+                putExtra(LiteVpnService.EXTRA_TEST_URL, testUrl)
+                putExtra(LiteVpnService.EXTRA_KILL_SWITCH, killSwitch)
+            }
+        } else {
+            val selectedId = runBlocking { store.selectedProfileIdNow() }
+            // 3.2.16 (#50): a selected chain/Auto entry connects as
+            // itself instead of falling back to the fastest five.
+            StartIntent.build(context, selectedId)
+                ?: Intent(context, LiteVpnService::class.java).apply {
+                    action = LiteVpnService.ACTION_START
                     val candidates = profiles.filter { it.lastPingMs > 0 }
                         .sortedBy { it.lastPingMs }.take(5).map { it.link }
                     if (candidates.isNotEmpty()) {
@@ -75,10 +79,9 @@ object TaskerLauncher {
                             if (it.isAether) putExtra(LiteVpnService.EXTRA_AETHER, true)
                         } ?: run { openApp(context); return false }
                     }
+                    putExtra(LiteVpnService.EXTRA_TEST_URL, testUrl)
+                    putExtra(LiteVpnService.EXTRA_KILL_SWITCH, killSwitch)
                 }
-            }
-            putExtra(LiteVpnService.EXTRA_TEST_URL, testUrl)
-            putExtra(LiteVpnService.EXTRA_KILL_SWITCH, killSwitch)
         }
         return try {
             context.startForegroundService(intent)
