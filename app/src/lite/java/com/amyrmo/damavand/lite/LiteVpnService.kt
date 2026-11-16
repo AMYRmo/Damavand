@@ -13,6 +13,14 @@ import android.os.ParcelFileDescriptor
 import android.os.PowerManager
 import android.service.quicksettings.TileService
 import androidx.core.app.NotificationCompat
+import com.amyrmo.damavand.lite.aether.AetherArgs
+import com.amyrmo.damavand.lite.aether.AetherCore
+import com.amyrmo.damavand.lite.aether.AetherEngine
+import com.amyrmo.damavand.lite.aether.AetherExit
+import com.amyrmo.damavand.lite.aether.AetherPsiphon
+import com.amyrmo.damavand.lite.aether.AetherSettings
+import com.amyrmo.damavand.lite.aether.AetherTor
+import com.amyrmo.damavand.lite.root.RootProxyManager
 import com.amyrmo.damavand.lite.ui.theme.LiteFormat
 import org.json.JSONObject
 import java.net.HttpURLConnection
@@ -54,6 +62,9 @@ class LiteVpnService : VpnService() {
         // of the Auto entry that started it ("auto:all" / "auto:sub:…").
         const val EXTRA_AUTO_SELECT = "auto_select"
         const val EXTRA_AUTO_ID = "auto_id"
+        // 3.2.10 (Aether): the single link is an Aether profile
+        // ("aether://<uuid>") — no pre-test, the core measures itself.
+        const val EXTRA_AETHER = "aether"
         // 3.2.0: the display name for a group (notification title).
         const val EXTRA_NAME = "name"
         /** 3.1.0: the URL a real tunnel test fetches. */
@@ -109,9 +120,15 @@ class LiteVpnService : VpnService() {
     @Volatile private var activeTestPort: Int = TEST_PORT
     // Proxy-only mode (3.2.0): Xray + SOCKS, no tun, no hev bridge.
     @Volatile private var proxyOnlyMode: Boolean = false
+    // Root mode (3.2.10, PattNG): no tun either — system traffic is
+    // steered into the core's SOCKS inbound by iptables + a root-run hev.
+    @Volatile private var rootMode: Boolean = false
     // Auto mode (3.2.8, Damavand): the links are an autoselect group.
     @Volatile private var autoMode: Boolean = false
     @Volatile private var autoId: String? = null
+    // Aether mode (3.2.10, PattNG): the link is an Aether profile;
+    // the config is buildAether and the core process runs beside Xray.
+    @Volatile private var aetherMode: Boolean = false
     @Volatile private var autoSessionActive: Boolean = false
     private var networkWatch: android.net.ConnectivityManager.NetworkCallback? = null
     // Show live speeds in the notification (3.2.0 setting, cached per connect).
@@ -155,8 +172,10 @@ class LiteVpnService : VpnService() {
                 // 3.2.8 (Auto): the links are an autoselect group.
                 val autoSelect = intent.getBooleanExtra(EXTRA_AUTO_SELECT, false)
                 val autoId = intent.getStringExtra(EXTRA_AUTO_ID)
+                // 3.2.10 (Aether): the link is an Aether profile.
+                val aether = intent.getBooleanExtra(EXTRA_AETHER, false)
                 displayName = intent.getStringExtra(EXTRA_NAME)
-                if (!running) startTunnel(links ?: emptyList(), candidates, testUrl, autoSelect, autoId)
+                if (!running) startTunnel(links ?: emptyList(), candidates, testUrl, autoSelect, autoId, aether)
             }
             ACTION_STOP -> {
                 intentionalStop = true
@@ -347,12 +366,14 @@ class LiteVpnService : VpnService() {
         testUrl: String = "https://www.google.com/generate_204",
         autoSelect: Boolean = false,
         autoId: String? = null,
+        aether: Boolean = false,
     ) {
         running = true
         connected = false
         intentionalStop = false
         autoMode = autoSelect
         this.autoId = autoId
+        aetherMode = aether
         autoSessionActive = false
         AutoSelect.end()
         location = ""
@@ -404,13 +425,13 @@ class LiteVpnService : VpnService() {
         // 3.2.0: resolve the per-connect ports before any test runs, so
         // the test port and the connect port always belong together.
         val settings0 = loadXraySettings()
-        val (dynamicPort, proxyOnly) = try {
+        val (dynamicPort, proxyOnly, root) = try {
             kotlinx.coroutines.runBlocking {
                 val s = SettingsStore(applicationContext)
-                s.socksDynamicPortNow() to s.proxyOnlyNow()
+                Triple(s.socksDynamicPortNow(), s.proxyOnlyNow(), s.rootModeNow())
             }
         } catch (_: Exception) {
-            false to false
+            Triple(false, false, false)
         }
         // 3.2.0: show live speeds in the notification only when enabled.
         showSpeedNotif = try {
@@ -423,6 +444,12 @@ class LiteVpnService : VpnService() {
         activeSocksPort = if (dynamicPort) (20000..39900).random() else settings0.socksPort
         activeTestPort = (activeSocksPort + 100).coerceAtMost(65535)
         proxyOnlyMode = proxyOnly
+        // 3.2.10 (PattNG root mode): root wins over proxy-only — both
+        // skip the tun, but root also installs the system-wide rules.
+        // Aether + root are NOT combined in 3.2.10 (the Aether core
+        // is a child process, not the core the root rules steer to) —
+        // an Aether connect takes the tun path instead.
+        rootMode = root && !aetherMode
         // 3.2.8 (Auto): the members are the config — no pre-test, the
         // autoselect group measures them itself and keeps switching.
         if (autoMode) {
@@ -474,7 +501,9 @@ class LiteVpnService : VpnService() {
                 }
             }
             else -> {
-                val profiles = repo.loadProfiles()
+                // 3.2.10 (Aether): an Aether profile has no ping and
+                // no server to test — it never wins the fallback pick.
+                val profiles = repo.loadProfiles().filter { !it.isAether }
                 val ranked = profiles.sortedBy { it.lastPingMs.takeIf { p -> p > 0 } ?: Long.MAX_VALUE }
                 ranked.firstOrNull()?.link?.let { listOf(it) } ?: emptyList()
             }
@@ -487,6 +516,13 @@ class LiteVpnService : VpnService() {
         }
         currentLinks = chosen
         broadcastLog(getString(R.string.log_connecting_selected))
+        if (aetherMode) {
+            // 3.2.10 (Aether): no pre-test — PattNG doesn't pre-test
+            // Aether either; the core measures its own endpoints and
+            // the connect fails at awaitListening when it never comes up.
+            connectWinner(chosen)
+            return
+        }
         if (links.isNotEmpty() && !realTest(chosen, testUrl)) {
             lastDetail = getString(R.string.conn_server_no_response)
             broadcastStatus()
@@ -546,6 +582,75 @@ class LiteVpnService : VpnService() {
         }
     }
 
+    /** The Aether config + routed core for [links]' single Aether profile, or null when it cannot be built. */
+    private fun buildAetherConfig(
+        links: List<String>,
+        settings: XrayConfig.XraySettings,
+        geoReady: Boolean,
+    ): Pair<String, AetherCore>? {
+        val repo = ProfileRepository(applicationContext)
+        val profiles = repo.loadProfiles()
+        val profile = profiles.firstOrNull { it.link == links.firstOrNull() && it.isAether } ?: return null
+        if (!AetherEngine.isSupported(this)) return null
+        val aetherSettings = AetherSettings.fromJson(profile.aetherJson)
+        // Exit-node outbound (PattNG): the named profile's outbound,
+        // as a chain builds it, tagged "exit-node"; its link's digest
+        // fills the node content of the core's exit key.
+        var exitOutbound: kotlinx.serialization.json.JsonObject? = null
+        var exitNodeContent: String? = null
+        val exitName = aetherSettings.exitNode?.trim()?.takeIf { it.isNotEmpty() }
+        if (exitName != null) {
+            val exitProfile = profiles.firstOrNull { it.name == exitName && !it.isAether } ?: return null
+            val parsed = XrayConfig.parse(exitProfile.link) ?: return null
+            exitOutbound = XrayConfig.outbound(parsed, AetherArgs.TAG_EXIT_NODE, null, settings) ?: return null
+            exitNodeContent = AetherExit.digest(exitProfile.link)
+        }
+        return XrayConfig.buildAether(
+            aetherSettings,
+            socksPort = activeSocksPort,
+            geoAvailable = geoReady,
+            xraySettings = settings,
+            exitOutbound = exitOutbound,
+            exitNodeContent = exitNodeContent,
+        )
+    }
+
+    /**
+     * Starts the Aether core process after Xray is up and waits for its
+     * listener to answer a SOCKS greeting; false when it never comes up.
+     * Runs on the connect worker thread (awaitListening blocks up to 30 s).
+     */
+    private fun startAether(core: AetherCore): Boolean {
+        // Psiphon modes need the bundled Psiphon client, which Lite
+        // excludes from packaging (+35 MB installed) — refuse with a
+        // plain message instead of a core that can never carry traffic.
+        if (AetherArgs.psiphonModeOf(core.arguments) != AetherPsiphon.OFF && !AetherEngine.isPsiphonSupported(this)) {
+            lastDetail = getString(R.string.conn_aether_no_psiphon)
+            return false
+        }
+        // Tor without the transport binary still runs — direct Tor,
+        // just no bridges where Tor is blocked; the core says so itself.
+        AetherEngine.start(this, core) { onAetherExit() }
+        if (!AetherEngine.awaitListening(30_000)) {
+            val reason = AetherEngine.stoppedMessage()
+            lastDetail = if (reason != null) getString(R.string.conn_aether_stopped, reason)
+            else getString(R.string.conn_aether_failed)
+            AetherEngine.stop()
+            return false
+        }
+        return true
+    }
+
+    /** The Aether core ended on its own while connected — the tunnel is dead. */
+    private fun onAetherExit() {
+        if (!connected || intentionalStop) return
+        val reason = AetherEngine.stoppedMessage()
+        lastDetail = if (reason != null) getString(R.string.conn_aether_stopped, reason)
+        else getString(R.string.conn_core_failed, "")
+        broadcastStatus()
+        stopTunnel()
+    }
+
     private fun connectWinner(links: List<String>) {
         val geoReady = GeoDownloader(applicationContext).isReady()
         val baseSettings = loadXraySettings()
@@ -564,42 +669,45 @@ class LiteVpnService : VpnService() {
         } catch (_: Exception) {
             true to true
         }
-        val tunMode = !proxyOnlyMode && !useHev
+        val tunMode = !proxyOnlyMode && !rootMode && !useHev
         val effectiveLocalProxy = localProxyOn ||
-            (useHev && !proxyOnlyMode) || proxyOnlyMode || baseSettings.socksShareLan
+            (useHev && !proxyOnlyMode) || proxyOnlyMode || baseSettings.socksShareLan || rootMode
         val settings = baseSettings.copy(tunMode = tunMode, localProxyEnabled = effectiveLocalProxy)
-        // 3.2.8 (Auto): an autoselect group over the member links —
-        // the group measures and switches by itself. Anything else is
-        // a chain or a single profile.
-        val cfg = if (autoMode) {
-            val tuning = try {
-                kotlinx.coroutines.runBlocking {
-                    SettingsStore(applicationContext).autoTuningNow()
-                }
-            } catch (_: Exception) {
-                AutoSelectTuning()
-            }
-            val initialTag = autoId?.let { id ->
-                try {
-                    val picked = kotlinx.coroutines.runBlocking {
-                        SettingsStore(applicationContext).autoLastPickNow(id)
+        // 3.2.10 (Aether): the config is buildAether and the core
+        // process runs beside Xray — it starts after Xray below.
+        val aetherResult = if (aetherMode) buildAetherConfig(links, settings, geoReady) else null
+        val cfg = when {
+            aetherMode -> aetherResult?.first
+            autoMode -> {
+                val tuning = try {
+                    kotlinx.coroutines.runBlocking {
+                        SettingsStore(applicationContext).autoTuningNow()
                     }
-                    val profiles = ProfileRepository(applicationContext).loadProfiles()
-                    val idx = links.indexOfFirst { link ->
-                        profiles.firstOrNull { it.link == link }?.id == picked
-                    }
-                    if (idx >= 0) "proxy@$idx" else null
                 } catch (_: Exception) {
-                    null
+                    AutoSelectTuning()
                 }
+                val initialTag = autoId?.let { id ->
+                    try {
+                        val picked = kotlinx.coroutines.runBlocking {
+                            SettingsStore(applicationContext).autoLastPickNow(id)
+                        }
+                        val profiles = ProfileRepository(applicationContext).loadProfiles()
+                        val idx = links.indexOfFirst { link ->
+                            profiles.firstOrNull { it.link == link }?.id == picked
+                        }
+                        if (idx >= 0) "proxy@$idx" else null
+                    } catch (_: Exception) {
+                        null
+                    }
+                }
+                XrayConfig.buildAutoSelect(links, tuning, initialTag, activeSocksPort, geoReady, settings)
             }
-            XrayConfig.buildAutoSelect(links, tuning, initialTag, activeSocksPort, geoReady, settings)
-        } else {
-            XrayConfig.buildLinks(links, activeSocksPort, geoReady, settings)
+            else -> XrayConfig.buildLinks(links, activeSocksPort, geoReady, settings)
         } ?: run {
             lastDetail = getString(R.string.conn_config_failed)
             broadcastStatus(); stopTunnel(); return
         }
+        val aetherCore = aetherResult?.second
         // 3.2.8 (Auto): the session maps member tags to profile ids —
         // the UI reads it to show the live exit, and the service polls
         // it for switch events. Prepared BEFORE the core starts, so
@@ -630,7 +738,9 @@ class LiteVpnService : VpnService() {
         }
         // Proxy-only mode (3.2.0): no tun at all — Xray + SOCKS only,
         // like RakhshApp. The tun + hev bridge are skipped entirely.
-        val descriptor = if (proxyOnlyMode) {
+        // Root mode (3.2.10): no tun either — iptables + a root-run hev
+        // steer system traffic into the core's SOCKS inbound instead.
+        val descriptor = if (proxyOnlyMode || rootMode) {
             null
         } else try {
             Builder().apply {
@@ -662,11 +772,25 @@ class LiteVpnService : VpnService() {
             AppLog.e("LiteVpnService", "establish failed", e)
             null
         }
-        if (descriptor == null && !proxyOnlyMode) {
+        if (descriptor == null && !proxyOnlyMode && !rootMode) {
             lastDetail = getString(R.string.conn_vpn_iface_failed)
             broadcastStatus(); stopTunnel(); return
         }
-        if (!proxyOnlyMode) {
+        if (rootMode) {
+            // 3.2.10 (PattNG root mode): no tun — the core starts first,
+            // then the root rules steer system traffic into its SOCKS
+            // inbound (PattNG's CoreRootService order). The SOCKS inbound
+            // is forced on above (effectiveLocalProxy), because the
+            // root-run hev forwards into it.
+            if (!XrayController.start(cfg, 0)) {
+                lastDetail = getString(R.string.conn_core_failed, XrayController.lastError ?: "")
+                broadcastStatus(); stopTunnel(); return
+            }
+            if (!RootProxyManager.start(this)) {
+                lastDetail = getString(R.string.conn_root_failed)
+                broadcastStatus(); stopTunnel(); return
+            }
+        } else if (!proxyOnlyMode) {
             tun = descriptor
             // Xray-tun mode (3.2.9): hand the VPN fd to the core — Go
             // dups it at start, so the descriptor stays owned here and
@@ -674,6 +798,11 @@ class LiteVpnService : VpnService() {
             val tunFd = if (tunMode) descriptor!!.fd else 0
             if (!XrayController.start(cfg, tunFd)) {
                 lastDetail = getString(R.string.conn_core_failed, XrayController.lastError ?: "")
+                broadcastStatus(); stopTunnel(); return
+            }
+            // 3.2.10 (Aether): Xray is up — start the core now, before
+            // the tun bridge forwards traffic into the SOCKS inbound.
+            if (aetherMode && aetherCore != null && !startAether(aetherCore)) {
                 broadcastStatus(); stopTunnel(); return
             }
             if (!tunMode) {
@@ -701,6 +830,10 @@ class LiteVpnService : VpnService() {
         } else {
             if (!XrayController.start(cfg)) {
                 lastDetail = getString(R.string.conn_core_failed, XrayController.lastError ?: "")
+                broadcastStatus(); stopTunnel(); return
+            }
+            // 3.2.10 (Aether): Xray is up — start the core now.
+            if (aetherMode && aetherCore != null && !startAether(aetherCore)) {
                 broadcastStatus(); stopTunnel(); return
             }
         }
@@ -1021,9 +1154,19 @@ class LiteVpnService : VpnService() {
         running = false
         connected = false
         stopAutoSelectSession()
+        // 3.2.10 (Aether): end the core process with the session.
+        try { AetherEngine.stop() } catch (_: Exception) {}
+        aetherMode = false
         try { worker?.interrupt() } catch (_: Exception) {}
         try { poller?.interrupt() } catch (_: Exception) {}
         worker = null; poller = null
+        // 3.2.10 (PattNG root mode): remove the root rules BEFORE stopping
+        // the core, so traffic is never redirected to a dead listener.
+        // Guarded by the connect-time flag: on a non-root session there
+        // are no rules to remove (and no su to run).
+        if (rootMode) {
+            try { RootProxyManager.stop(this) } catch (_: Exception) {}
+        }
         try { HevTunCore.stop() } catch (_: Exception) {}
         try { XrayController.stop() } catch (_: Exception) {}
         try { tun?.close() } catch (_: Exception) {}
@@ -1035,6 +1178,15 @@ class LiteVpnService : VpnService() {
 
     override fun onDestroy() {
         stopAutoSelectSession()
+        // 3.2.10 (Aether): the core dies with the service, even when
+        // it is killed without a clean stopTunnel.
+        try { AetherEngine.stop() } catch (_: Exception) {}
+        aetherMode = false
+        // 3.2.10 (PattNG root mode): rules out before the core dies,
+        // even when the service is killed without a clean stopTunnel.
+        if (rootMode) {
+            try { RootProxyManager.stop(this) } catch (_: Exception) {}
+        }
         try { HevTunCore.stop() } catch (_: Exception) {}
         try { XrayController.stop() } catch (_: Exception) {}
         try { tun?.close() } catch (_: Exception) {}
