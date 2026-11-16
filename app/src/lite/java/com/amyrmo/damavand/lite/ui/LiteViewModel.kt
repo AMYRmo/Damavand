@@ -72,6 +72,10 @@ data class ConnectionUiState(
     val detail: String = "",
     val location: String = "",
     val countryCode: String = "",
+    // 3.2.21 (Damavand ConnectionInfoPill): the exit IP + ISP of
+    // the connected tunnel, from the service's fetchLocation.
+    val ip: String = "",
+    val isp: String = "",
     val pingMs: Long = -1,
     val downSpeed: Long = 0,
     val upSpeed: Long = 0,
@@ -493,6 +497,8 @@ class LiteViewModel(app: Application) : AndroidViewModel(app) {
                     detail = detail,
                     location = intent.getStringExtra("location") ?: "",
                     countryCode = intent.getStringExtra("countryCode") ?: "",
+                    ip = intent.getStringExtra("ip") ?: "",
+                    isp = intent.getStringExtra("isp") ?: "",
                     pingMs = ping,
                     downSpeed = intent.getLongExtra("downSpeed", 0),
                     upSpeed = intent.getLongExtra("upSpeed", 0),
@@ -1512,15 +1518,35 @@ class LiteViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     /** Re-fetch ONE subscription from the network. */
+    // 3.2.21 (Damavand BentoProviderCard): the set of subscription
+    // URLs currently updating — the card shows a spinner instead of
+    // the sync button for those.
+    private val _updatingSubs = MutableStateFlow<Set<String>>(emptySet())
+    val updatingSubs: StateFlow<Set<String>> = _updatingSubs.asStateFlow()
+
     fun updateSubscription(url: String) {
         viewModelScope.launch(Dispatchers.IO) {
-            repo.refreshOne(url)
+            _updatingSubs.update { it + url }
+            try {
+                repo.refreshOne(url)
+            } finally {
+                _updatingSubs.update { it - url }
+            }
             withContext(Dispatchers.Main) {
                 refreshProfiles()
                 refreshSubscriptions()
                 runSubscriptionAutoActions()
             }
         }
+    }
+
+    /** Re-fetch the exit location/IP/ISP (the Home pill's refresh). */
+    fun refreshLocation() {
+        context.startService(
+            Intent(context, LiteVpnService::class.java).apply {
+                action = LiteVpnService.ACTION_REFRESH_LOCATION
+            }
+        )
     }
 
     /**
