@@ -158,6 +158,21 @@ class MainActivity : ComponentActivity() {
         }
     }
 
+    // 3.2.11 (PattNG ImportConfigLocal): import configs from a file.
+    private val importFileLauncher = registerForActivityResult(
+        ActivityResultContracts.OpenDocument()
+    ) { uri ->
+        if (uri != null) {
+            vm.importFile(uri) { added ->
+                Toast.makeText(
+                    this,
+                    if (added >= 0) getString(R.string.import_file_ok, added) else getString(R.string.import_file_fail),
+                    Toast.LENGTH_SHORT
+                ).show()
+            }
+        }
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         // 2.0.0: if the first Compose frame throws, show a plain error
@@ -234,6 +249,7 @@ class MainActivity : ComponentActivity() {
                         onFastestRequest = { requestFastestConnect() },
                         onExportBackup = { exportBackupLauncher.launch("damavand-lite-backup.json") },
                         onImportBackup = { importBackupLauncher.launch(arrayOf("application/json")) },
+                        onImportFile = { importFileLauncher.launch(arrayOf("*/*")) },
                         onImportGeo = { kind ->
                             pendingGeoKind = kind
                             importGeoLauncher.launch(arrayOf("*/*"))
@@ -307,6 +323,7 @@ private fun LiteRoot(
     onFastestRequest: () -> Unit,
     onExportBackup: () -> Unit,
     onImportBackup: () -> Unit,
+    onImportFile: () -> Unit,
     onImportGeo: (String) -> Unit
 ) {
     var tab by remember { mutableIntStateOf(0) } // 0 Home, 1 Servers, 2 Stats, 3 Settings
@@ -379,6 +396,7 @@ private fun LiteRoot(
                         onNavigate = { subScreen = it },
                         onExportBackup = onExportBackup,
                         onImportBackup = onImportBackup,
+                        onImportFile = onImportFile,
                         onImportGeo = onImportGeo,
                         onOpenQrScan = { subScreen = SubScreen.QR_SCAN },
                         homeScroll = homeScroll,
@@ -414,6 +432,7 @@ private fun TabContent(
     onNavigate: (SubScreen) -> Unit,
     onExportBackup: () -> Unit,
     onImportBackup: () -> Unit,
+    onImportFile: () -> Unit,
     onImportGeo: (String) -> Unit,
     onOpenQrScan: () -> Unit,
     homeScroll: androidx.compose.foundation.ScrollState,
@@ -440,6 +459,7 @@ private fun TabContent(
             isConnected = connection.state == ConnState.CONNECTED,
             listState = serversList,
             onOpenQrScan = onOpenQrScan,
+            onImportFile = onImportFile,
             onOpenSubscriptions = { onNavigate(SubScreen.SUBSCRIPTIONS) },
         )
         2 -> StatsScreen(vm = vm, connection = connection, scrollState = statsScroll)
