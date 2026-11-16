@@ -2,6 +2,8 @@ package com.amyrmo.damavand.lite.aether
 
 import android.content.Context
 import com.amyrmo.damavand.lite.AppLog
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.ensureActive
 import java.io.File
 import java.io.IOException
 import java.net.InetSocketAddress
@@ -327,7 +329,21 @@ object AetherEngine {
      * ends or [timeoutMs] passes first; [onOutput] sees every line. The process is ended on every path out.
      * Blocking: call it off the main thread.
      */
-    internal fun runOneShot(
+    /**
+     * One run of the core that ends by itself: it starts the process,
+     * watches its output for the line [match] picks, and ends the
+     * process once it appears or [timeoutMs] passes. Returns the
+     * matched line, or null on timeout/failure.
+     *
+     * 3.2.17 (#60): this is a SUSPEND function. The old plain version
+     * blocked its caller on `done.await()` for up to 4 minutes (10
+     * through Tor/Psiphon), and the renewal ran it on the MAIN thread,
+     * so getting WARP keys froze the UI and Android raised an ANR.
+     * The wait is now a cancellable poll (PattNG waits on a flow with
+     * `withTimeoutOrNull`); cancelling the renewal job destroys the
+     * core at once instead of waiting out the timeout.
+     */
+    internal suspend fun runOneShot(
         context: Context,
         arguments: List<String>,
         identityDir: File,
@@ -360,10 +376,24 @@ object AetherEngine {
                 done.countDown()
             }
         }
-        val matched = done.await(timeoutMs, TimeUnit.MILLISECONDS)
+        // Cancellable wait: poll the latch in short slices so a
+        // cancelled renewal ends the core now, and never wait past
+        // the timeout.
+        val deadline = System.currentTimeMillis() + timeoutMs
+        var matched = false
         try {
-            process.destroy()
-        } catch (_: Exception) {
+            while (System.currentTimeMillis() < deadline) {
+                if (done.await(200, TimeUnit.MILLISECONDS)) {
+                    matched = true
+                    break
+                }
+                currentCoroutineContext().ensureActive()
+            }
+        } finally {
+            try {
+                process.destroy()
+            } catch (_: Exception) {
+            }
         }
         try {
             if (!process.waitFor(2, TimeUnit.SECONDS)) process.destroyForcibly()
