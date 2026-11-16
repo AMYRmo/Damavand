@@ -53,6 +53,11 @@ object XrayConfig {
         val dnsHosts: Map<String, String> = emptyMap(),
         val mtu: Int = 1500,
         val ifaceAddr: String = "10.8.0.2",
+        // 3.2.9 (PattNG, the rest): Xray-tun mode (no HEV — the core
+        // reads the VPN fd itself) and the local-proxy switch. The
+        // SOCKS/HTTP inbounds exist only when localProxyEnabled.
+        val tunMode: Boolean = false,
+        val localProxyEnabled: Boolean = true,
         // 3.2.0: Xray writes its error log here (shown in Logs).
         val errorLogPath: String = "",
     )
@@ -79,6 +84,14 @@ object XrayConfig {
         val realityPublicKey: String = "",
         val realityShortId: String = "",
         val spiderX: String = "",
+        // 3.2.9 (PattNG parity, the rest): ECH + pinning extras, read
+        // exactly like PattNG's FmtBase (ech, echOutbound, vcn, pcs,
+        // pqv) and honoured in streamSettings below.
+        val echConfigList: String = "",
+        val echOutbound: String = "",
+        val verifyPeerCertByName: String = "",
+        val pinnedCA256: String = "",
+        val mldsa65Verify: String = "",
         // 3.2.0 (PattNG): WireGuard / Hysteria2 / custom-JSON extras.
         val wgPublicKey: String = "",
         val wgPresharedKey: String = "",
@@ -137,6 +150,12 @@ object XrayConfig {
                     serviceName = "",
                     alpn = j.optString("alpn"),
                     fp = j.optString("fp"),
+                    echConfigList = j.optString("ech"),
+                    echOutbound = j.optString("echOutbound"),
+                    verifyPeerCertByName = j.optString("vcn"),
+                    pinnedCA256 = j.optString("pcs"),
+                    mldsa65Verify = j.optString("pqv"),
+                    spiderX = j.optString("spx"),
                 )
             }
             // SOCKS / HTTP may arrive as base64(user:pass@host:port).
@@ -174,7 +193,10 @@ object XrayConfig {
                 // 3.2.7 (PattNG FmtBase): fingerprint, allow-insecure
                 // (insecure / allowInsecure / allow_insecure), cipher
                 // suites (cs), Reality public key (pbk) + short id
-                // (sid) + spiderX (spx).
+                // (sid) + spiderX (spx). 3.2.9 (the rest): ECH config
+                // list (ech) + ECH outbound JSON (echOutbound), verify
+                // peer cert by name (vcn), pinned CA SHA-256 (pcs),
+                // ML-DSA-65 verify key (pqv).
                 fp = q["fp"] ?: "",
                 allowInsecure = listOf("insecure", "allowInsecure", "allow_insecure")
                     .any { q[it] == "1" || q[it].equals("true", ignoreCase = true) },
@@ -182,6 +204,11 @@ object XrayConfig {
                 realityPublicKey = q["pbk"] ?: "",
                 realityShortId = q["sid"] ?: "",
                 spiderX = q["spx"] ?: "",
+                echConfigList = q["ech"] ?: "",
+                echOutbound = q["echOutbound"] ?: "",
+                verifyPeerCertByName = q["vcn"] ?: "",
+                pinnedCA256 = q["pcs"] ?: "",
+                mldsa65Verify = q["pqv"] ?: "",
                 // 3.2.0: WireGuard + Hysteria2 query params.
                 wgPublicKey = q["publicKey"] ?: "",
                 wgPresharedKey = q["presharedKey"] ?: "",
@@ -265,15 +292,20 @@ object XrayConfig {
             put("network", net)
             // 3.2.7 (PattNG CoreOutboundBuilder.populateTlsSettings):
             // TLS honours the link's fingerprint (default chrome, like
-            // before), allowInsecure and cipher suites; REALITY builds
-            // realitySettings instead of tlsSettings (publicKey/shortId
-            // from pbk/sid). A link without either stays plain.
+            // before) and cipher suites; REALITY builds realitySettings
+            // instead of tlsSettings (publicKey/shortId from pbk/sid).
+            // A link without either stays plain.
+            // 3.2.9: allowInsecure is REMOVED in this Xray-core
+            // (infra/conf TLSConfig.Build fails the whole config when
+            // it is true, pointing at pcs/vcn instead) — it is parsed
+            // and kept for the editor/round-trip, but NEVER emitted.
+            // Pinning replaces it: pcs pins a cert hash, vcn pins the
+            // name to verify.
             if (p.tls == "tls") {
                 put("security", "tls")
                 putJsonObject("tlsSettings") {
                     put("serverName", p.sni.ifEmpty { p.addr })
                     put("fingerprint", p.fp.ifEmpty { "chrome" })
-                    put("allowInsecure", p.allowInsecure)
                     if (p.alpn.isNotEmpty()) {
                         putJsonArray("alpn") { p.alpn.split(",").forEach { add(JsonPrimitive(it.trim())) } }
                     }
@@ -281,6 +313,17 @@ object XrayConfig {
                     if (suites.isNotEmpty()) {
                         putJsonArray("cipherSuites") { suites.forEach { add(JsonPrimitive(it)) } }
                     }
+                    // 3.2.9 (PattNG FmtBase/CoreOutboundBuilder): ECH +
+                    // pinning. echConfigList is the pinned base64 ECH
+                    // config list; echOutbound is the raw JSON of the
+                    // outbound the ECH query goes through — it is NOT
+                    // emitted as-is; attachEchOutbounds (assemble)
+                    // checks it, appends it and points echSockopt at
+                    // its tag.
+                    if (p.echConfigList.isNotEmpty()) put("echConfigList", p.echConfigList)
+                    if (p.verifyPeerCertByName.isNotEmpty()) put("verifyPeerCertByName", p.verifyPeerCertByName)
+                    if (p.pinnedCA256.isNotEmpty()) put("pinnedPeerCertSha256", p.pinnedCA256)
+                    if (p.echOutbound.isNotEmpty()) put("echOutbound", p.echOutbound)
                 }
             } else if (p.tls == "reality") {
                 put("security", "reality")
@@ -290,6 +333,7 @@ object XrayConfig {
                     put("publicKey", p.realityPublicKey)
                     put("shortId", p.realityShortId)
                     if (p.spiderX.isNotEmpty()) put("spiderX", p.spiderX)
+                    if (p.mldsa65Verify.isNotEmpty()) put("mldsa65Verify", p.mldsa65Verify)
                 }
             }
             // Fragment (3.1.0): split the TLS hello so DPI sees noise.
@@ -463,10 +507,15 @@ object XrayConfig {
                     put("security", "tls")
                     putJsonObject("tlsSettings") {
                         put("serverName", p.sni.ifEmpty { p.addr })
-                        put(
-                            "allowInsecure",
-                            p.hyInsecure == "1" || p.hyInsecure.lowercase() == "true"
-                        )
+                        // 3.2.9: allowInsecure is removed in this core —
+                        // never emitted (see streamSettings). Pinning and
+                        // ECH fields are honoured when the link carries
+                        // them (PattNG applies its ECH outbound to
+                        // Hysteria2 too, whose blank security is TLS).
+                        if (p.pinnedCA256.isNotEmpty()) put("pinnedPeerCertSha256", p.pinnedCA256)
+                        if (p.verifyPeerCertByName.isNotEmpty()) put("verifyPeerCertByName", p.verifyPeerCertByName)
+                        if (p.echConfigList.isNotEmpty()) put("echConfigList", p.echConfigList)
+                        if (p.echOutbound.isNotEmpty()) put("echOutbound", p.echOutbound)
                     }
                 }
                 if (dialerProxy != null) {
@@ -660,7 +709,7 @@ object XrayConfig {
         socksPort: Int,
         geoAvailable: Boolean,
         settings: XraySettings = XraySettings(),
-    ): String {
+    ): String? {
         val json = buildJsonObject {
             val logLevel = settings.coreLogLevel.takeIf {
                 it in setOf("debug", "info", "warning", "error", "none")
@@ -697,27 +746,17 @@ object XrayConfig {
                 }
             }
             putJsonArray("inbounds") {
-                add(buildJsonObject {
-                    put("tag", "socks")
-                    put("port", socksPort)
-                    put("listen", if (settings.socksShareLan) "0.0.0.0" else "127.0.0.1")
-                    put("protocol", "socks")
-                    putJsonObject("settings") {
-                        if (settings.socksUser.isNotEmpty()) {
-                            put("auth", "password")
-                            putJsonArray("accounts") {
-                                add(buildJsonObject {
-                                    put("user", settings.socksUser)
-                                    put("pass", settings.socksPass)
-                                })
-                            }
-                        } else {
-                            put("auth", "noauth")
+                // Xray-tun mode (3.2.9, PattNG): the core reads the VPN
+                // interface itself from the "xray.tun.fd" env flag the
+                // Go side sets — no HEV bridge in between.
+                if (settings.tunMode) {
+                    add(buildJsonObject {
+                        put("tag", "tun")
+                        put("protocol", "tun")
+                        putJsonObject("settings") {
+                            put("name", "xray0")
+                            put("MTU", settings.mtu)
                         }
-                        put("udp", settings.socksUdp)
-                    }
-                    // Sniffing (3.1.0): route by the real destination.
-                    if (settings.sniffingEnabled) {
                         putJsonObject("sniffing") {
                             put("enabled", true)
                             putJsonArray("destOverride") {
@@ -725,18 +764,55 @@ object XrayConfig {
                                 add(JsonPrimitive("tls"))
                             }
                         }
-                    }
-                })
-                // HTTP proxy inbound (3.2.0): a plain HTTP proxy on
-                // socksPort+1, for apps that cannot speak SOCKS.
-                if (settings.httpProxyEnabled) {
-                    add(buildJsonObject {
-                        put("tag", "http")
-                        put("port", socksPort + 1)
-                        put("listen", if (settings.socksShareLan) "0.0.0.0" else "127.0.0.1")
-                        put("protocol", "http")
-                        putJsonObject("settings") { put("allowTransparent", false) }
                     })
+                }
+                // Local proxy (3.2.9, PattNG): the SOCKS inbound — and
+                // the HTTP one below it — exist only when the local
+                // proxy is on. In VPN+HEV mode it is forced on by the
+                // service (HEV forwards into it); in proxy-only mode
+                // it is the whole point of the service.
+                if (settings.localProxyEnabled) {
+                    add(buildJsonObject {
+                        put("tag", "socks")
+                        put("port", socksPort)
+                        put("listen", if (settings.socksShareLan) "0.0.0.0" else "127.0.0.1")
+                        put("protocol", "socks")
+                        putJsonObject("settings") {
+                            if (settings.socksUser.isNotEmpty()) {
+                                put("auth", "password")
+                                putJsonArray("accounts") {
+                                    add(buildJsonObject {
+                                        put("user", settings.socksUser)
+                                        put("pass", settings.socksPass)
+                                    })
+                                }
+                            } else {
+                                put("auth", "noauth")
+                            }
+                            put("udp", settings.socksUdp)
+                        }
+                        // Sniffing (3.1.0): route by the real destination.
+                        if (settings.sniffingEnabled) {
+                            putJsonObject("sniffing") {
+                                put("enabled", true)
+                                putJsonArray("destOverride") {
+                                    add(JsonPrimitive("http"))
+                                    add(JsonPrimitive("tls"))
+                                }
+                            }
+                        }
+                    })
+                    // HTTP proxy inbound (3.2.0): a plain HTTP proxy on
+                    // socksPort+1, for apps that cannot speak SOCKS.
+                    if (settings.httpProxyEnabled) {
+                        add(buildJsonObject {
+                            put("tag", "http")
+                            put("port", socksPort + 1)
+                            put("listen", if (settings.socksShareLan) "0.0.0.0" else "127.0.0.1")
+                            put("protocol", "http")
+                            putJsonObject("settings") { put("allowTransparent", false) }
+                        })
+                    }
                 }
             }
             putJsonArray("outbounds") {
@@ -791,6 +867,63 @@ object XrayConfig {
                 }
             }
         }
-        return Json.encodeToString(JsonObject.serializer(), json)
+        val text = Json.encodeToString(JsonObject.serializer(), json)
+        // 3.2.9 (PattNG EchOutbound.serialize): link the ECH outbounds.
+        return attachEchOutbounds(text)
+    }
+
+    /**
+     * ECH outbounds (3.2.9) — a port of PattNG's EchOutbound.serialize:
+     * each outbound whose tlsSettings carries an "echOutbound" marker
+     * (the raw JSON of the outbound the ECH config query goes through,
+     * as written in the link/editor) is checked — a JSON object, next
+     * to an echConfigList, with a tag that is not empty, not direct or
+     * block, and does not start with "proxy" — then appended once to
+     * the config after every other outbound, and the TLS settings get
+     * echSockopt { dialerProxy: <tag> } pointing at it. Outbounds with
+     * the same ECH outbound share it; a different one under a tag an
+     * earlier one has gets a numbered tag ("ech-2"). A tag as written
+     * that another outbound already has is a conflict, and an unchecked
+     * ECH outbound fails the configuration rather than letting the
+     * query go direct — so this returns null and the caller refuses
+     * the connect, exactly like PattNG.
+     */
+    private fun attachEchOutbounds(jsonText: String): String? {
+        val root = try { JSONObject(jsonText) } catch (_: Exception) { return null }
+        val outbounds = root.optJSONArray("outbounds") ?: return jsonText
+        val usedTags = HashSet<String>()
+        for (i in 0 until outbounds.length()) {
+            outbounds.optJSONObject(i)?.optString("tag")?.takeIf { it.isNotEmpty() }?.let { usedTags += it }
+        }
+        val linked = ArrayList<Pair<JSONObject, String>>()
+        for (i in 0 until outbounds.length()) {
+            val ob = outbounds.optJSONObject(i) ?: continue
+            val tls = ob.optJSONObject("streamSettings")?.optJSONObject("tlsSettings") ?: continue
+            val marker = tls.optString("echOutbound", "")
+            if (marker.isEmpty()) continue
+            val ech = try { JSONObject(marker) } catch (_: Exception) { return null }
+            if (tls.optString("echConfigList", "").isBlank()) return null
+            val rawTag = ech.optString("tag", "")
+            if (rawTag.isBlank() || rawTag == "direct" || rawTag == "block" || rawTag.startsWith("proxy")) return null
+            val existing = linked.firstOrNull { it.first.toString() == ech.toString() }?.second
+            val tag = existing ?: freeEchTag(rawTag, usedTags, linked.map { it.second })
+            if (existing == null) linked.add(ech to tag)
+            tls.put("echSockopt", JSONObject().put("dialerProxy", tag))
+            tls.remove("echOutbound")
+        }
+        if (linked.any { it.second in usedTags }) return null
+        for ((ech, tag) in linked) {
+            ech.put("tag", tag)
+            outbounds.put(ech)
+        }
+        return root.toString()
+    }
+
+    /** [tag] as written, or, when an earlier ECH outbound has it, its first number that no outbound has. */
+    private fun freeEchTag(tag: String, usedTags: Set<String>, linkedTags: List<String>): String {
+        if (tag !in linkedTags) return tag
+        var number = 2
+        while ("$tag-$number" in linkedTags || "$tag-$number" in usedTags) number++
+        return "$tag-$number"
     }
 }
