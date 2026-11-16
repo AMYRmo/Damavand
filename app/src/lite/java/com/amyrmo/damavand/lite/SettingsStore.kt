@@ -88,6 +88,9 @@ class SettingsStore(private val context: Context) {
         val KEY_DYNAMIC_COLOR = booleanPreferencesKey("dynamic_color")
         val KEY_LOCAL_PROXY = booleanPreferencesKey("local_proxy")
         val KEY_USE_HEV = booleanPreferencesKey("use_hev_tun")
+        // 3.2.10 (PattNG root mode): system-wide routing via iptables + hev tun.
+        val KEY_ROOT_MODE = booleanPreferencesKey("root_mode")
+        val KEY_ROOT_LAN_SHARE = booleanPreferencesKey("root_lan_share")
     }
 
     val killSwitch: Flow<Boolean> = context.liteDataStore.data.map { it[KEY_KILL_SWITCH] ?: false }
@@ -177,6 +180,11 @@ class SettingsStore(private val context: Context) {
         context.liteDataStore.data.map { it[KEY_LOCAL_PROXY] ?: true }
     val useHev: Flow<Boolean> =
         context.liteDataStore.data.map { it[KEY_USE_HEV] ?: true }
+    // 3.2.10 (PattNG root mode): off by default — needs a rooted phone.
+    val rootMode: Flow<Boolean> =
+        context.liteDataStore.data.map { it[KEY_ROOT_MODE] ?: false }
+    val rootLanShare: Flow<Boolean> =
+        context.liteDataStore.data.map { it[KEY_ROOT_LAN_SHARE] ?: false }
 
     suspend fun setKillSwitch(v: Boolean) = context.liteDataStore.edit { it[KEY_KILL_SWITCH] = v }
     suspend fun setAutoConnect(v: Boolean) = context.liteDataStore.edit { it[KEY_AUTO_CONNECT] = v }
@@ -262,6 +270,13 @@ class SettingsStore(private val context: Context) {
     suspend fun setDynamicColor(v: Boolean) = context.liteDataStore.edit { it[KEY_DYNAMIC_COLOR] = v }
     suspend fun setLocalProxy(v: Boolean) = context.liteDataStore.edit { it[KEY_LOCAL_PROXY] = v }
     suspend fun setUseHev(v: Boolean) = context.liteDataStore.edit { it[KEY_USE_HEV] = v }
+    // 3.2.10 (PattNG root mode).
+    suspend fun setRootMode(v: Boolean) = context.liteDataStore.edit { it[KEY_ROOT_MODE] = v }
+    suspend fun setRootLanShare(v: Boolean) = context.liteDataStore.edit { it[KEY_ROOT_LAN_SHARE] = v }
+    suspend fun rootModeNow(): Boolean = rootMode.first()
+    suspend fun rootLanShareNow(): Boolean = rootLanShare.first()
+    suspend fun socksUserNow(): String = socksUser.first()
+    suspend fun socksPassNow(): String = socksPass.first()
 
     /** Remember the Auto pick for one auto id (the "initial" member). */
     suspend fun setAutoLastPick(autoId: String, profileId: String) {
