@@ -100,8 +100,13 @@ fun SummitHomeScreen(
     } ?: emptyList()
     // 3.2.8 (Auto): when an Auto is selected, the ring and the card
     // show the LIVE member the core picked — the real exit.
-    val selectedAutoId by vm.selectedAutoId.collectAsState()
-    val autoSession by vm.autoSession.collectAsState()
+    // selectedAutoId is a plain VM getter (not a flow) — derive it
+    // from the already-reactive selectedId param MainActivity passes.
+    val selectedAutoId = selectedId?.takeIf { AutoSelectIds.isAuto(it) }
+    // The no-arg StateFlow collectAsState() overload failed to resolve
+    // for this flow in CI — collect it as a plain Flow with an
+    // explicit initial instead (same values, same recomposition).
+    val autoSession by vm.autoSession.collectAsState(initial = null)
     val autoGroupKey = selectedAutoId?.let { AutoSelectIds.groupKeyOf(it) }
     val autoMembers = autoGroupKey?.let { vm.profilesForGroup(it) } ?: emptyList()
     val autoLive = autoSession?.takeIf { it.profileId == selectedAutoId }
