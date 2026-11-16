@@ -844,7 +844,15 @@ class LiteVpnService : VpnService() {
                 broadcastStatus(); stopTunnel(); return
             }
         } else if (!proxyOnlyMode) {
+            // A kill-switch reconnect keeps the previous tun open until
+            // the new one exists (no leak window); establish() has now
+            // replaced that interface, so close the old descriptor here
+            // or it leaks one fd + a dead interface per reconnect.
+            val previousTun = tun
             tun = descriptor
+            if (previousTun != null && previousTun !== descriptor) {
+                try { previousTun.close() } catch (_: Exception) {}
+            }
             // Xray-tun mode (3.2.9): hand the VPN fd to the core — Go
             // dups it at start, so the descriptor stays owned here and
             // closes normally in stopTunnel. HEV mode keeps the bridge.
