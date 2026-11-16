@@ -149,6 +149,8 @@ fun ServersScreen(
     var showAddDialog by remember { mutableStateOf(false) }
     // 3.2.0 (PattNG): manual per-protocol editor dialog.
     var showManualDialog by remember { mutableStateOf(false) }
+    // 3.2.10 (Aether): the Aether profile editor dialog.
+    var showAetherDialog by remember { mutableStateOf(false) }
     var searchOpen by remember { mutableStateOf(false) }
     var searchQuery by remember { mutableStateOf("") }
     var sortMode by remember { mutableStateOf(SortMode.FASTEST) }
@@ -852,6 +854,14 @@ fun ServersScreen(
                             showManualDialog = true
                         }
                     )
+                    // 3.2.10 (Aether): a standalone Aether profile.
+                    AddSheetRow(
+                        labelRes = R.string.add_aether,
+                        onClick = {
+                            showAddSheet = false
+                            showAetherDialog = true
+                        }
+                    )
                 }
             },
             confirmButton = {},
@@ -881,6 +891,11 @@ fun ServersScreen(
     // 3.2.0 (PattNG): manual per-protocol editor.
     if (showManualDialog) {
         ManualConfigDialog(vm = vm, onDismiss = { showManualDialog = false })
+    }
+
+    // 3.2.10 (Aether): a standalone Aether profile.
+    if (showAetherDialog) {
+        AetherAddDialog(vm = vm, onDismiss = { showAetherDialog = false })
     }
 
     // ---- Row ⋮ menu (3.1.0, PattNG) ----
@@ -949,6 +964,15 @@ fun ServersScreen(
     // raw link box stays as the fallback for unparseable links.
     val editing = editProfile
     if (editing != null) {
+        // 3.2.10 (Aether): an Aether profile edits its settings,
+        // not a link — the link is just its stable id.
+        if (editing.isAether) {
+            AetherEditDialog(
+                profile = editing,
+                vm = vm,
+                onDismiss = { editProfile = null }
+            )
+        } else {
         val parsed = XrayConfig.parse(editing.link)
         if (parsed != null && parsed.proto != "custom") {
             EditConfigDialog(
@@ -978,6 +1002,7 @@ fun ServersScreen(
                     }
                 }
             )
+        }
         }
     }
 
