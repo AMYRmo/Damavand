@@ -344,6 +344,26 @@ private fun LiteRoot(
     // (LaunchedEffect, not a call during composition.)
     LaunchedEffect(tab) { vm.setStatsVisible(tab == 2) }
 
+    // Android 13+: POST_NOTIFICATIONS is a runtime permission. Without
+    // it the connection notification (live speed, Disconnect) never
+    // shows. Ask once per screen session, when a connection starts.
+    val notifContext = androidx.compose.ui.platform.LocalContext.current
+    val notifPermissionLauncher = androidx.activity.compose.rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestPermission()
+    ) { }
+    var notifAsked by androidx.compose.runtime.saveable.rememberSaveable { mutableStateOf(false) }
+    LaunchedEffect(connection.state) {
+        if (connection.state == ConnState.CONNECTING && !notifAsked &&
+            Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
+            androidx.core.content.ContextCompat.checkSelfPermission(
+                notifContext, android.Manifest.permission.POST_NOTIFICATIONS
+            ) != android.content.pm.PackageManager.PERMISSION_GRANTED
+        ) {
+            notifAsked = true
+            notifPermissionLauncher.launch(android.Manifest.permission.POST_NOTIFICATIONS)
+        }
+    }
+
     // Android back from any tab goes to Home; back from Home exits the app.
     // A sub-screen closes first.
     BackHandler(enabled = subScreen != null) { subScreen = null }
