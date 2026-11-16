@@ -14,6 +14,15 @@ import kotlinx.coroutines.runBlocking
 class BootReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
         if (intent.action != Intent.ACTION_BOOT_COMPLETED) return
+        // Nothing runs right after a boot: drop the tile state persisted
+        // before the reboot, or the tile and shortcuts stay "connected".
+        try {
+            context.getSharedPreferences("lite_tile", Context.MODE_PRIVATE).edit()
+                .putBoolean("connected", false)
+                .putBoolean("connecting", false)
+                .apply()
+        } catch (_: Exception) {
+        }
         runBlocking {
             val store = SettingsStore(context)
             if (!store.autoStartBootNow()) return@runBlocking
