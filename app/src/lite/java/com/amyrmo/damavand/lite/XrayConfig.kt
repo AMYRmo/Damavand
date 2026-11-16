@@ -385,14 +385,18 @@ object XrayConfig {
         dialerProxy: String? = null,
         settings: XraySettings = XraySettings(),
     ): JsonObject? {
-        val stream = streamSettings(p, settings)
+        // Chain hop: Xray reads dialerProxy ONLY from
+        // streamSettings.sockopt — the outbound object itself has no
+        // "sockopt" field, and an unknown key there is silently ignored
+        // (the hop would then dial its server directly).
+        val sockopt: JsonObject? = dialerProxy?.let { dp -> buildJsonObject { put("dialerProxy", dp) } }
+        val stream = streamSettings(p, settings).let { base ->
+            if (sockopt != null) JsonObject(base + ("sockopt" to sockopt)) else base
+        }
         fun withProxy(body: JsonObjectBuilder.() -> Unit): JsonObject = buildJsonObject {
             put("tag", tag)
             body()
             put("streamSettings", stream)
-            if (dialerProxy != null) {
-                putJsonObject("sockopt") { put("dialerProxy", dialerProxy) }
-            }
             // MUX (3.1.0): several streams over one connection.
             // 3.2.0: concurrency + XUDP concurrency from settings.
             if (settings.muxEnabled) {
@@ -525,9 +529,7 @@ object XrayConfig {
                         if (p.echConfigList.isNotEmpty()) put("echConfigList", p.echConfigList)
                         if (p.echOutbound.isNotEmpty()) put("echOutbound", p.echOutbound)
                     }
-                }
-                if (dialerProxy != null) {
-                    putJsonObject("sockopt") { put("dialerProxy", dialerProxy) }
+                    if (sockopt != null) put("sockopt", sockopt)
                 }
             }
             // 3.2.0 (PattNG): WireGuard (no streamSettings, no mux).
@@ -576,8 +578,8 @@ object XrayConfig {
                         }
                     }
                 }
-                if (dialerProxy != null) {
-                    putJsonObject("sockopt") { put("dialerProxy", dialerProxy) }
+                if (sockopt != null) {
+                    putJsonObject("streamSettings") { put("sockopt", sockopt) }
                 }
             }
             else -> null
