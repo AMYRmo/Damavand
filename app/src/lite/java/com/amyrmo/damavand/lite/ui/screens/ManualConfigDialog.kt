@@ -130,6 +130,13 @@ private fun fieldsFromParsed(p: XrayConfig.Parsed, name: String): Map<String, St
             f["pbk"] = p.realityPublicKey
             f["sid"] = p.realityShortId
             f["flow"] = p.flow
+            // 3.2.9 (PattNG, the rest): ECH + pinning + ML-DSA.
+            f["ech"] = p.echConfigList
+            f["echOutbound"] = p.echOutbound
+            f["vcn"] = p.verifyPeerCertByName
+            f["pcs"] = p.pinnedCA256
+            f["spx"] = p.spiderX
+            f["pqv"] = p.mldsa65Verify
         }
         "trojan" -> {
             f["password"] = p.id
@@ -141,6 +148,12 @@ private fun fieldsFromParsed(p: XrayConfig.Parsed, name: String): Map<String, St
             f["cs"] = p.cipherSuites
             f["pbk"] = p.realityPublicKey
             f["sid"] = p.realityShortId
+            f["ech"] = p.echConfigList
+            f["echOutbound"] = p.echOutbound
+            f["vcn"] = p.verifyPeerCertByName
+            f["pcs"] = p.pinnedCA256
+            f["spx"] = p.spiderX
+            f["pqv"] = p.mldsa65Verify
         }
         "ss" -> {
             f["method"] = p.id.substringBefore(":")
@@ -154,6 +167,11 @@ private fun fieldsFromParsed(p: XrayConfig.Parsed, name: String): Map<String, St
             f["password"] = p.id
             f["sni"] = p.sni
             f["insecure"] = p.hyInsecure
+            // 3.2.9: ECH + pinning ride on Hysteria2 too (PattNG).
+            f["ech"] = p.echConfigList
+            f["echOutbound"] = p.echOutbound
+            f["vcn"] = p.verifyPeerCertByName
+            f["pcs"] = p.pinnedCA256
         }
         "wg" -> {
             f["privateKey"] = p.id
@@ -371,6 +389,28 @@ private fun ManualConfigEditor(
                                 selected = f("insecure").ifEmpty { "0" },
                                 onSelect = { setF("insecure", it) }
                             )
+                            // 3.2.9 (PattNG): ECH + pinning ride on
+                            // Hysteria2 too (its blank security is TLS).
+                            ManualField(
+                                labelRes = R.string.manual_ech,
+                                value = f("ech"),
+                                onValueChange = { setF("ech", it) }
+                            )
+                            ManualField(
+                                labelRes = R.string.manual_ech_outbound,
+                                value = f("echOutbound"),
+                                onValueChange = { setF("echOutbound", it) }
+                            )
+                            ManualField(
+                                labelRes = R.string.manual_vcn,
+                                value = f("vcn"),
+                                onValueChange = { setF("vcn", it) }
+                            )
+                            ManualField(
+                                labelRes = R.string.manual_pcs,
+                                value = f("pcs"),
+                                onValueChange = { setF("pcs", it) }
+                            )
                         }
                         "wg" -> {
                             ManualField(
@@ -533,6 +573,29 @@ private fun TlsFields(
             value = f("cs"),
             onValueChange = { setF("cs", it) }
         )
+        // 3.2.9 (PattNG, the rest): ECH config list + the outbound
+        // the ECH query goes through (raw JSON), verify peer cert by
+        // name, pinned CA SHA-256.
+        ManualField(
+            labelRes = R.string.manual_ech,
+            value = f("ech"),
+            onValueChange = { setF("ech", it) }
+        )
+        ManualField(
+            labelRes = R.string.manual_ech_outbound,
+            value = f("echOutbound"),
+            onValueChange = { setF("echOutbound", it) }
+        )
+        ManualField(
+            labelRes = R.string.manual_vcn,
+            value = f("vcn"),
+            onValueChange = { setF("vcn", it) }
+        )
+        ManualField(
+            labelRes = R.string.manual_pcs,
+            value = f("pcs"),
+            onValueChange = { setF("pcs", it) }
+        )
     }
     if (security == "reality") {
         ManualField(
@@ -544,6 +607,16 @@ private fun TlsFields(
             labelRes = R.string.manual_reality_sid,
             value = f("sid"),
             onValueChange = { setF("sid", it) }
+        )
+        ManualField(
+            labelRes = R.string.manual_spx,
+            value = f("spx"),
+            onValueChange = { setF("spx", it) }
+        )
+        ManualField(
+            labelRes = R.string.manual_pqv,
+            value = f("pqv"),
+            onValueChange = { setF("pqv", it) }
         )
     }
 }
@@ -696,6 +769,8 @@ private fun buildManualLink(proto: String, f: Map<String, String>): String? {
                 "host" to f["host"].orEmpty(),
                 // 3.2.7 (PattNG share link): fingerprint, allow-insecure,
                 // ALPN, cipher suites, Reality key/id, flow.
+                // 3.2.9 (the rest): ECH, ECH outbound, verify-by-name,
+                // pinned CA, spiderX, ML-DSA verify.
                 "fp" to f["fp"].orEmpty(),
                 "allowInsecure" to if (f["allowInsecure"] == "1") "1" else "",
                 "alpn" to f["alpn"].orEmpty(),
@@ -703,6 +778,12 @@ private fun buildManualLink(proto: String, f: Map<String, String>): String? {
                 "pbk" to f["pbk"].orEmpty(),
                 "sid" to f["sid"].orEmpty(),
                 "flow" to f["flow"].orEmpty(),
+                "ech" to f["ech"].orEmpty(),
+                "echOutbound" to f["echOutbound"].orEmpty(),
+                "vcn" to f["vcn"].orEmpty(),
+                "pcs" to f["pcs"].orEmpty(),
+                "spx" to f["spx"].orEmpty(),
+                "pqv" to f["pqv"].orEmpty(),
             ) + frag
         }
         "vmess" -> {
@@ -723,8 +804,15 @@ private fun buildManualLink(proto: String, f: Map<String, String>): String? {
                 put("tls", f["security"].orEmpty().ifEmpty { "tls" })
                 put("sni", f["sni"].orEmpty())
                 // 3.2.7: fingerprint + ALPN ride in the VMess JSON too.
+                // 3.2.9: ECH + pinning + ML-DSA + spiderX ride too.
                 put("fp", f["fp"].orEmpty())
                 put("alpn", f["alpn"].orEmpty())
+                put("ech", f["ech"].orEmpty())
+                put("echOutbound", f["echOutbound"].orEmpty())
+                put("vcn", f["vcn"].orEmpty())
+                put("pcs", f["pcs"].orEmpty())
+                put("pqv", f["pqv"].orEmpty())
+                put("spx", f["spx"].orEmpty())
             }
             "vmess://" + Base64.encodeToString(
                 j.toString().toByteArray(Charsets.UTF_8),
@@ -737,13 +825,19 @@ private fun buildManualLink(proto: String, f: Map<String, String>): String? {
             "trojan://$pass@$addr:$port" + query(
                 "security" to f["security"].orEmpty().ifEmpty { "tls" },
                 "sni" to f["sni"].orEmpty(),
-                // 3.2.7 (PattNG share link).
+                // 3.2.7 (PattNG share link). 3.2.9 (the rest).
                 "fp" to f["fp"].orEmpty(),
                 "allowInsecure" to if (f["allowInsecure"] == "1") "1" else "",
                 "alpn" to f["alpn"].orEmpty(),
                 "cs" to f["cs"].orEmpty(),
                 "pbk" to f["pbk"].orEmpty(),
                 "sid" to f["sid"].orEmpty(),
+                "ech" to f["ech"].orEmpty(),
+                "echOutbound" to f["echOutbound"].orEmpty(),
+                "vcn" to f["vcn"].orEmpty(),
+                "pcs" to f["pcs"].orEmpty(),
+                "spx" to f["spx"].orEmpty(),
+                "pqv" to f["pqv"].orEmpty(),
             ) + frag
         }
         "ss" -> {
@@ -769,6 +863,11 @@ private fun buildManualLink(proto: String, f: Map<String, String>): String? {
             "hysteria2://$pass@$addr:$port" + query(
                 "sni" to f["sni"].orEmpty(),
                 "insecure" to f["insecure"].orEmpty(),
+                // 3.2.9 (PattNG): ECH + pinning ride on Hysteria2 too.
+                "ech" to f["ech"].orEmpty(),
+                "echOutbound" to f["echOutbound"].orEmpty(),
+                "vcn" to f["vcn"].orEmpty(),
+                "pcs" to f["pcs"].orEmpty(),
             ) + frag
         }
         "wg" -> {
