@@ -6,8 +6,10 @@ import java.io.File
 import java.io.IOException
 import java.net.InetSocketAddress
 import java.net.Socket
+import java.util.concurrent.CountDownLatch
 import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
+import java.util.concurrent.atomic.AtomicReference
 import kotlin.concurrent.thread
 
 /**
@@ -20,16 +22,16 @@ import kotlin.concurrent.thread
  *
  * Lite adaptations:
  * - One session at a time (a singleton, like the service's single core);
- *   no scans, key renewals or standalone test cores — those are PattNG's
- *   test/scan features, not the session path.
+ *   no scans or standalone test cores — those are PattNG's test/scan
+ *   features, not the session path. Key renewals DO run here now
+ *   (3.2.11): [runOneShot] is the one-shot run a renewal uses.
  * - No AetherIdentityManager: the WARP identity files live at
  *   <filesDir>/aether/{aether,masque,wg}.toml, as Damavand's engine did;
  *   the core creates and reads them itself.
- * - No Psiphon server list shipped in the APK: Lite excludes
- *   libpsiphon-tunnel-core.so from packaging, so Psiphon modes are
- *   refused before start (see [isPsiphonSupported]); the shipped-list
- *   argument is still passed through when a command names it, and the
- *   core reports the missing file itself.
+ * - 3.2.11 (PattNG full parity): the Psiphon server list IS shipped
+ *   now (psiphon_servers.dat in assets, unpacked by PsiphonServerList
+ *   into the work dir), and libpsiphon-tunnel-core.so + liblyrebird.so
+ *   are packaged again — so Psiphon modes and Tor bridges work.
  * - The readiness probe is a plain SOCKS5 greeting (PattNG's SocksAnswers
  *   does the same over one connection per port at a time).
  */
@@ -267,14 +269,37 @@ object AetherEngine {
         thread(name = "aether-core-output", isDaemon = true) { watch(target, process) }
     }
 
-    private fun startProcess(context: Context, arguments: List<String>, exitKey: String?): Process {
+    private fun startProcess(
+        context: Context,
+        arguments: List<String>,
+        exitKey: String?,
+        identityDir: File? = null,
+        session: Boolean = true,
+    ): Process {
         val workDir = workDir(context).apply { mkdirs() }
-        val builder = ProcessBuilder(listOf(binary(context).absolutePath) + arguments)
+        // A one-shot run (a key renewal) writes its identity files into
+        // its own folder, not the folder in use; a session writes them
+        // into the work dir.
+        val identityDir = (identityDir ?: workDir).apply { mkdirs() }
+        // 3.2.11 (PattNG AetherCoreManager.startProcess): the word
+        // "shipped-list" after --psiphon-server-entries gives way to the
+        // app's unpacked list, or the flag goes when there is no such
+        // file. A file of the command's own is left as written.
+        val shippedList = if (AetherArgs.PSIPHON_SERVER_ENTRIES in arguments) {
+            PsiphonServerList.entriesFile(File(context.filesDir, "assets"), workDir) { problem ->
+                AppLog.w(TAG, "psiphon_servers.dat is not a usable Psiphon list; the entries kept from before stay: $problem")
+            }
+        } else {
+            null
+        }
+        val builder = ProcessBuilder(listOf(binary(context).absolutePath) + withShippedList(arguments, shippedList))
             .directory(workDir)
             .redirectErrorStream(true)
         builder.environment().apply {
-            put(OWNER_ENV, android.os.Process.myPid().toString())
-            put(SESSION_ENV, "1")
+            if (session) {
+                put(OWNER_ENV, android.os.Process.myPid().toString())
+                put(SESSION_ENV, "1")
+            }
             exitKey?.let { put(EXIT_ENV, it) }
             File(context.applicationInfo.nativeLibraryDir, PSIPHON_BINARY_NAME)
                 .takeIf { it.canExecute() }?.let { put(PSIPHON_BIN_ENV, it.absolutePath) }
@@ -288,11 +313,79 @@ object AetherEngine {
             put(PSIPHON_DIR_ENV, File(workDir, "psiphon").absolutePath)
             put("HOME", workDir.absolutePath)
             put("TMPDIR", context.cacheDir.absolutePath)
-            put("AETHER_CONFIG", File(workDir, "aether.toml").absolutePath)
-            put("AETHER_MASQUE_CONFIG", File(workDir, "masque.toml").absolutePath)
-            put("AETHER_WG_CONFIG", File(workDir, "wg.toml").absolutePath)
+            put("AETHER_CONFIG", File(identityDir, "aether.toml").absolutePath)
+            put("AETHER_MASQUE_CONFIG", File(identityDir, "masque.toml").absolutePath)
+            put("AETHER_WG_CONFIG", File(identityDir, "wg.toml").absolutePath)
         }
         return builder.start()
+    }
+
+    /**
+     * Runs the core once on [arguments] and ends it: the one-shot runs PattNG uses for scans, tests and key
+     * registrations (3.2.11: the WARP keys renewal). Unlike the session path it is not owned by this process
+     * and writes its identity files into [identityDir]. Returns the line [match] picks, or null when the core
+     * ends or [timeoutMs] passes first; [onOutput] sees every line. The process is ended on every path out.
+     * Blocking: call it off the main thread.
+     */
+    internal fun runOneShot(
+        context: Context,
+        arguments: List<String>,
+        identityDir: File,
+        exitKey: String?,
+        timeoutMs: Long,
+        onOutput: (String) -> Unit,
+        match: (String) -> String?,
+    ): String? {
+        val process = try {
+            startProcess(context, arguments, exitKey, identityDir = identityDir, session = false)
+        } catch (e: IOException) {
+            AppLog.e(TAG, "AetherCore: failed to launch the one-shot core", e)
+            return null
+        }
+        val result = AtomicReference<String?>(null)
+        val done = CountDownLatch(1)
+        thread(name = "aether-one-shot-output", isDaemon = true) {
+            try {
+                process.inputStream.bufferedReader().forEachLine { line ->
+                    val text = line.trim()
+                    if (text.isNotEmpty()) {
+                        AppLog.i(TAG, "[aether] $text")
+                        onOutput(text)
+                    }
+                    match(text)?.let { if (result.compareAndSet(null, it)) done.countDown() }
+                }
+            } catch (_: IOException) {
+                // The process ended under the reader; the latch below settles it.
+            } finally {
+                done.countDown()
+            }
+        }
+        val matched = done.await(timeoutMs, TimeUnit.MILLISECONDS)
+        try {
+            process.destroy()
+        } catch (_: Exception) {
+        }
+        try {
+            if (!process.waitFor(2, TimeUnit.SECONDS)) process.destroyForcibly()
+        } catch (_: Exception) {
+        }
+        return if (matched) result.get() else null
+    }
+
+    /**
+     * [arguments] as the core is started with them: the word [AetherArgs.SHIPPED_LIST]
+     * after [AetherArgs.PSIPHON_SERVER_ENTRIES] gives way to [entries], the app's unpacked
+     * list, or the flag goes when there is no such file. A file of the command's own is
+     * left as written. (PattNG AetherCoreManager.withShippedList.)
+     */
+    internal fun withShippedList(arguments: List<String>, entries: File?): List<String> {
+        val at = arguments.indexOf(AetherArgs.PSIPHON_SERVER_ENTRIES)
+        if (at < 0 || arguments.getOrNull(at + 1) != AetherArgs.SHIPPED_LIST) return arguments
+        return if (entries == null) {
+            arguments.filterIndexed { index, _ -> index != at && index != at + 1 }
+        } else {
+            arguments.toMutableList().also { it[at + 1] = entries.absolutePath }
+        }
     }
 
     /** The Psiphon overlay in [workDir], written when it is missing or says something else; null when it cannot be written. */
