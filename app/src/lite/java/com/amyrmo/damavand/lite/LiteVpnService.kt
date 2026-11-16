@@ -87,13 +87,23 @@ class LiteVpnService : VpnService() {
         }
     }
 
-    private var worker: Thread? = null
-    private var poller: Thread? = null
-    private var running = false
-    private var connected = false
-    private var killSwitchOn = false
-    private var intentionalStop = false
-    private var tun: ParcelFileDescriptor? = null
+    // Written from the main thread (start/stop commands) and read/written
+    // from the connect, reconnect and poller threads: all @Volatile.
+    @Volatile private var worker: Thread? = null
+    @Volatile private var poller: Thread? = null
+    @Volatile private var running = false
+    @Volatile private var connected = false
+    @Volatile private var killSwitchOn = false
+    @Volatile private var intentionalStop = false
+    @Volatile private var tun: ParcelFileDescriptor? = null
+    // Connect-session generation: bumped on every start and stop, so a
+    // connect/reconnect worker that is still blocked (in a real test, a
+    // core start, establish) when the user disconnects can tell its
+    // session is gone and must not bring the tunnel up afterwards.
+    private val sessionGen = java.util.concurrent.atomic.AtomicInteger(0)
+
+    private fun sessionLive(gen: Int): Boolean =
+        running && !intentionalStop && gen == sessionGen.get()
     private var currentLinks: List<String> = emptyList()
     private var currentCandidates: List<String> = emptyList()
     private var currentTestUrl: String = "https://www.google.com/generate_204"
@@ -334,6 +344,8 @@ class LiteVpnService : VpnService() {
     }
 
     private fun updateNotification() {
+        // Never repost the ongoing notification after the service stopped.
+        if (!running) return
         val nm = getSystemService(NOTIFICATION_SERVICE) as NotificationManager
         nm.notify(NOTIF_ID, notification())
     }
@@ -426,9 +438,10 @@ class LiteVpnService : VpnService() {
         startForeground(NOTIF_ID, notification())
         broadcastStatus()
 
+        val gen = sessionGen.incrementAndGet()
         worker = Thread({
             try {
-                runConnect(links, candidates, testUrl)
+                runConnect(links, candidates, testUrl, gen)
             } catch (e: Exception) {
                 lastDetail = getString(R.string.conn_error_generic, e.message ?: "")
                 lastError = e.message
@@ -452,6 +465,7 @@ class LiteVpnService : VpnService() {
         links: List<String>,
         candidates: List<String> = emptyList(),
         testUrl: String = "https://www.google.com/generate_204",
+        gen: Int,
     ) {
         // 3.2.0: resolve the per-connect ports before any test runs, so
         // the test port and the connect port always belong together.
@@ -492,7 +506,7 @@ class LiteVpnService : VpnService() {
             }
             currentLinks = links
             broadcastLog(getString(R.string.log_connecting_selected))
-            connectWinner(links)
+            connectWinner(links, gen)
             return
         }
         val repo = ProfileRepository(applicationContext)
@@ -504,6 +518,7 @@ class LiteVpnService : VpnService() {
                 // Home (3.2.0: "تست سرور 1 از 5…").
                 var winner: List<String>? = null
                 for ((index, candidate) in candidates.withIndex()) {
+                    if (!sessionLive(gen)) return
                     lastDetail = getString(
                         R.string.fastest_testing, index + 1, candidates.size,
                     )
@@ -551,7 +566,7 @@ class LiteVpnService : VpnService() {
             // 3.2.10 (Aether): no pre-test — PattNG doesn't pre-test
             // Aether either; the core measures its own endpoints and
             // the connect fails at awaitListening when it never comes up.
-            connectWinner(chosen)
+            connectWinner(chosen, gen)
             return
         }
         if (links.isNotEmpty() && !realTest(chosen, testUrl)) {
@@ -560,7 +575,8 @@ class LiteVpnService : VpnService() {
             stopTunnel()
             return
         }
-        connectWinner(chosen)
+        if (!sessionLive(gen)) return
+        connectWinner(chosen, gen)
     }
 
     /** Start Xray with [links] on the resolved test port and fetch the test URL through it. */
@@ -687,7 +703,8 @@ class LiteVpnService : VpnService() {
         stopTunnel()
     }
 
-    private fun connectWinner(links: List<String>) {
+    private fun connectWinner(links: List<String>, gen: Int) {
+        if (!sessionLive(gen)) return
         val geoReady = GeoDownloader(applicationContext).isReady()
         val baseSettings = loadXraySettings()
         // 3.2.9 (PattNG, the rest): tun mode + local-proxy switch.
@@ -825,6 +842,12 @@ class LiteVpnService : VpnService() {
         } else {
             establishTun(ipv6Enabled) ?: if (ipv6Enabled) establishTun(false) else null
         }
+        if (!sessionLive(gen)) {
+            // Disconnected while this worker was setting up: never hand
+            // a fresh VPN interface to a stopped service.
+            try { descriptor?.close() } catch (_: Exception) {}
+            return
+        }
         if (descriptor == null && !proxyOnlyMode && !rootMode) {
             lastDetail = getString(R.string.conn_vpn_iface_failed)
             broadcastStatus(); stopTunnel(); return
@@ -891,6 +914,12 @@ class LiteVpnService : VpnService() {
             }
         }
         connected = true
+        if (!sessionLive(gen)) {
+            // A stop arrived while the cores were starting: stopTunnel
+            // may already have run, so undo what this worker started.
+            abandonConnect(descriptor)
+            return
+        }
         connectedAt = System.currentTimeMillis()
         // 3.2.8 (Auto): attach the prepared session to the running
         // group and re-measure every member when the network changes.
@@ -1163,14 +1192,15 @@ class LiteVpnService : VpnService() {
             // disconnect (or when the service itself is destroyed).
             try { HevTunCore.stop() } catch (_: Exception) {}
             try { XrayController.stop() } catch (_: Exception) {}
+            val gen = sessionGen.get()
             worker = Thread({
                 try {
                     Thread.sleep(2000)
-                    if (running && !intentionalStop) {
+                    if (sessionLive(gen)) {
                         val links = currentLinks
                         if (links.isNotEmpty()) {
                             connected = false
-                            runConnect(links, currentCandidates, currentTestUrl)
+                            runConnect(links, currentCandidates, currentTestUrl, gen)
                         }
                     }
                 } catch (_: Exception) {
@@ -1206,6 +1236,7 @@ class LiteVpnService : VpnService() {
         }
         running = false
         connected = false
+        sessionGen.incrementAndGet()
         stopAutoSelectSession()
         // 3.2.10 (Aether): end the core process with the session.
         try { AetherEngine.stop() } catch (_: Exception) {}
@@ -1227,6 +1258,27 @@ class LiteVpnService : VpnService() {
         stopForeground(STOP_FOREGROUND_REMOVE)
         broadcastStatus()
         stopSelf()
+    }
+
+    /**
+     * Undo a connect whose session was stopped while it was starting.
+     * The cores are global singletons, so they are only stopped when no
+     * newer session is running (a newer start replaces them itself).
+     */
+    private fun abandonConnect(descriptor: ParcelFileDescriptor?) {
+        connected = false
+        if (!running) {
+            if (rootMode) {
+                try { RootProxyManager.stop(this) } catch (_: Exception) {}
+            }
+            try { AetherEngine.stop() } catch (_: Exception) {}
+            try { HevTunCore.stop() } catch (_: Exception) {}
+            try { XrayController.stop() } catch (_: Exception) {}
+        }
+        if (descriptor != null) {
+            if (tun === descriptor) tun = null
+            try { descriptor.close() } catch (_: Exception) {}
+        }
     }
 
     override fun onDestroy() {
