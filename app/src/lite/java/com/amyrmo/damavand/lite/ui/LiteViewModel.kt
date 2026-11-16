@@ -90,11 +90,33 @@ class LiteViewModel(app: Application) : AndroidViewModel(app) {
 
     val selectedProfile: Profile?
         get() {
-            // A chain selection is not a profile selection.
+            // A chain or Auto selection is not a profile selection.
             if (_selectedId.value?.startsWith("chain:") == true) return null
+            if (AutoSelectIds.isAuto(_selectedId.value)) return null
             return _profiles.value.firstOrNull { it.id == _selectedId.value }
                 ?: _profiles.value.firstOrNull()
         }
+
+    /** The selected Auto entry ("auto:all" / "auto:sub:<url>" / "auto:manual"), if any. */
+    val selectedAutoId: String?
+        get() = _selectedId.value?.takeIf { AutoSelectIds.isAuto(it) }
+
+    /** The live Auto session (the core's measured members + switches). */
+    val autoSession: StateFlow<AutoSelect.Session?> = AutoSelect.session
+
+    fun selectAuto(id: String) {
+        _selectedId.value = id
+        viewModelScope.launch { settings.setSelectedProfileId(id) }
+    }
+
+    /** Pin one Auto member as the exit ("" = back to automatic). */
+    fun pinAutoMember(tag: String) {
+        viewModelScope.launch(Dispatchers.IO) { AutoSelect.pin(tag) }
+    }
+
+    fun unpinAutoMember() {
+        viewModelScope.launch(Dispatchers.IO) { AutoSelect.pin("") }
+    }
 
     // ---- chains (3.0.0, PattNG PROXYCHAIN) ----
     private val _chains = MutableStateFlow<List<Chain>>(emptyList())
@@ -184,6 +206,42 @@ class LiteViewModel(app: Application) : AndroidViewModel(app) {
     val language = settings.language
     // 3.2.5: day/night theme — "system", "dark" or "light".
     val themeMode = settings.themeMode
+    // 3.2.8 (Auto): the selected group (Servers tab ↔ Home, shared so
+    // fastest-connect tests that group's configs), + Auto tuning.
+    val selectedGroupKey: StateFlow<String?> =
+        settings.selectedGroup.stateIn(viewModelScope, SharingStarted.Eagerly, null)
+    val autoProbeUrl = settings.autoProbeUrl
+    val autoCheckSeconds = settings.autoCheckSeconds
+    val autoSweepMinutes = settings.autoSweepMinutes
+    val autoSwitchMargin = settings.autoSwitchMargin
+    val autoRetry = settings.autoRetry
+
+    fun selectGroup(key: String?) =
+        viewModelScope.launch { settings.setSelectedGroup(key) }
+
+    /**
+     * The group fastest-connect (and Auto) works on: the stored group
+     * when the user picked one, else the selected profile's
+     * subscription, else every config ("__all__").
+     */
+    fun effectiveGroupKey(): String {
+        _selectedGroupKey.value?.let { return it }
+        val id = _selectedId.value
+        val profile = _profiles.value.firstOrNull { it.id == id }
+        if (profile != null) return profile.subscriptionUrl
+        return "__all__"
+    }
+
+    /** The profiles of one group ("__all__" = every config). */
+    fun profilesForGroup(groupKey: String): List<Profile> =
+        if (groupKey == "__all__") _profiles.value
+        else _profiles.value.filter { it.subscriptionUrl == groupKey }
+
+    fun setAutoProbeUrl(v: String) = viewModelScope.launch { settings.setAutoProbeUrl(v) }
+    fun setAutoCheckSeconds(v: String) = viewModelScope.launch { settings.setAutoCheckSeconds(v) }
+    fun setAutoSweepMinutes(v: String) = viewModelScope.launch { settings.setAutoSweepMinutes(v) }
+    fun setAutoSwitchMargin(v: String) = viewModelScope.launch { settings.setAutoSwitchMargin(v) }
+    fun setAutoRetry(v: Boolean) = viewModelScope.launch { settings.setAutoRetry(v) }
     val autoStartBoot = settings.autoStartBoot
     val subAutoTest = settings.subAutoTest
     val subAutoSort = settings.subAutoSort
@@ -254,8 +312,9 @@ class LiteViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
-    // ---- update check (3.2.0, PattNG): compare with the newest
-    // lite-v* release on GitHub. ----
+    // ---- update check (3.2.8): compare with the newest v* release
+    // of AMYRmo/DamavandLite — the app's own repo since the 2026-11-16
+    // move (the old Damavand repo + lite-v* tags never match again). ----
     sealed interface UpdateCheckState {
         data object Idle : UpdateCheckState
         data object Checking : UpdateCheckState
@@ -277,7 +336,7 @@ class LiteViewModel(app: Application) : AndroidViewModel(app) {
         viewModelScope.launch(Dispatchers.IO) {
             try {
                 val url = java.net.URL(
-                    "https://api.github.com/repos/AMYRmo/Damavand/releases?per_page=20"
+                    "https://api.github.com/repos/AMYRmo/DamavandLite/releases?per_page=20"
                 )
                 val conn = url.openConnection() as java.net.HttpURLConnection
                 conn.connectTimeout = 10_000
@@ -285,19 +344,19 @@ class LiteViewModel(app: Application) : AndroidViewModel(app) {
                 conn.setRequestProperty("Accept", "application/vnd.github+json")
                 val body = conn.inputStream.bufferedReader().readText()
                 conn.disconnect()
-                // Releases come newest-first; take the first lite-v* tag.
-                val tag = Regex("\"tag_name\"\\s*:\\s*\"(lite-v[0-9.]+)\"")
+                // Releases come newest-first; take the first v* tag.
+                val tag = Regex("\"tag_name\"\\s*:\\s*\"(v[0-9.]+)\"")
                     .find(body)?.groupValues?.getOrNull(1)
                 if (tag == null) {
                     _updateCheck.value = UpdateCheckState.Failed(context.getString(R.string.update_not_found))
                 } else {
-                    val latest = tag.removePrefix("lite-v")
+                    val latest = tag.removePrefix("v")
                     val current = com.amyrmo.damavand.lite.BuildConfig.VERSION_NAME
                     val available = compareVersions(latest, current) > 0
                     _updateCheck.value = UpdateCheckState.Result(
                         updateAvailable = available,
                         tag = tag,
-                        url = "https://github.com/AMYRmo/Damavand/releases/tag/$tag"
+                        url = "https://github.com/AMYRmo/DamavandLite/releases/tag/$tag"
                     )
                 }
             } catch (e: Exception) {
@@ -441,11 +500,12 @@ class LiteViewModel(app: Application) : AndroidViewModel(app) {
         viewModelScope.launch { settings.setSelectedProfileId("chain:$id") }
     }
 
-    /** Start the service with one link, a chain, or fastest candidates. */
+    /** Start the service with one link, a chain, fastest candidates, or an Auto group. */
     private fun startService(
         links: List<String>,
         candidates: List<String> = emptyList(),
-        balancer: Boolean = false,
+        autoSelect: Boolean = false,
+        autoId: String? = null,
         displayName: String? = null,
     ) {
         viewModelScope.launch {
@@ -462,8 +522,12 @@ class LiteViewModel(app: Application) : AndroidViewModel(app) {
                 }
                 putExtra(LiteVpnService.EXTRA_TEST_URL, testUrl)
                 putExtra(LiteVpnService.EXTRA_KILL_SWITCH, kill)
-                // 3.2.0 (PattNG): balancer mode + its display name.
-                if (balancer) putExtra(LiteVpnService.EXTRA_BALANCER, true)
+                // 3.2.8 (Auto): the service builds the autoselect
+                // group from these links + the auto id.
+                if (autoSelect) {
+                    putExtra(LiteVpnService.EXTRA_AUTO_SELECT, true)
+                    autoId?.let { putExtra(LiteVpnService.EXTRA_AUTO_ID, it) }
+                }
                 displayName?.let { putExtra(LiteVpnService.EXTRA_NAME, it) }
             }
             context.startService(intent)
@@ -472,13 +536,17 @@ class LiteViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     /**
-     * Connect to the SELECTED profile (the ring's job). Only when
-     * nothing is selected does it fall back to the fastest tested
-     * candidates. The Home "fastest" button must NOT call this —
-     * it calls connectFastest() below: this path prefers the
-     * selected profile, so the button's label was a lie (3.2.0).
+     * Connect to the SELECTED entry (the ring's job): an Auto entry
+     * connects through its group, a chain through its members, a
+     * profile directly. Only when nothing is selected does it fall
+     * back to the fastest tested candidates.
      */
     fun connect() {
+        val autoId = selectedAutoId
+        if (autoId != null) {
+            connectToAuto(autoId)
+            return
+        }
         val chain = selectedChain
         if (chain != null) {
             connectToChain(chain)
@@ -503,20 +571,25 @@ class LiteViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     /**
-     * REAL fastest-connect (3.2.0 fix). The old fastest path trusted
-     * stale lastPingMs — and worse, the Home "fastest" button called
-     * connect(), which prefers the SELECTED profile, so it never
-     * picked the fastest at all. This runs a FRESH parallel ping
-     * sweep over ALL profiles first (tested or not), saves the
-     * fresh pings once (batched, atomic — the 3.1.1 fix), then sends
-     * the top 5 by FRESH ping as candidates for the service's real
-     * tunnel test. Live progress shows on Home while it sweeps.
+     * REAL fastest-connect (3.2.0 fix, 3.2.8 scope). The old fastest
+     * path trusted stale lastPingMs — and worse, the Home "fastest"
+     * button called connect(), which prefers the SELECTED profile, so
+     * it never picked the fastest at all. This runs a FRESH parallel
+     * ping sweep, saves the fresh pings once (batched, atomic — the
+     * 3.1.1 fix), then sends the top 5 by FRESH ping as candidates
+     * for the service's real tunnel test. Live progress shows on Home
+     * while it sweeps.
+     *
+     * 3.2.8: the sweep covers ONLY the selected subscription's
+     * configs (the group the user is looking at — Home's card /
+     * the Servers tab's group), never every config in the app.
+     * "All" sweeps everything.
      */
     fun connectFastest() {
         if (_isTesting.value) return
         if (_connection.value.state == ConnState.CONNECTING) return
         if (_connection.value.state == ConnState.CONNECTED) return
-        val list = _profiles.value
+        val list = profilesForGroup(effectiveGroupKey())
         if (list.isEmpty()) {
             _connection.update {
                 it.copy(state = ConnState.ERROR, detail = context.getString(R.string.fastest_none))
@@ -563,8 +636,10 @@ class LiteViewModel(app: Application) : AndroidViewModel(app) {
                 refreshProfiles()
                 _testingIds.value = emptySet()
                 _isTesting.value = false
+                // 3.2.8: rank only the swept scope, never every profile.
+                val sweptIds = list.map { it.id }.toSet()
                 val ranked = _profiles.value
-                    .filter { it.lastPingMs > 0 }
+                    .filter { it.id in sweptIds && it.lastPingMs > 0 }
                     .sortedBy { it.lastPingMs }
                 if (ranked.isEmpty()) {
                     _connection.update {
@@ -575,6 +650,46 @@ class LiteViewModel(app: Application) : AndroidViewModel(app) {
                 startService(emptyList(), ranked.take(5).map { it.link })
             }
         }
+    }
+
+    // ---- Auto (3.2.8, Damavand-faithful) ----
+    /** The display label of one group (for the Auto card + notification). */
+    fun groupLabel(groupKey: String): String = when (groupKey) {
+        "__all__" -> context.getString(R.string.servers_group_all)
+        "" -> context.getString(R.string.servers_group_manual)
+        else -> _subscriptions.value.firstOrNull { it.url == groupKey }?.displayName
+            ?: groupKey.substringAfter("://").substringBefore("/")
+    }
+
+    /**
+     * Connect through an Auto entry: the core measures the group's
+     * members itself and keeps switching to the healthiest one. One
+     * member is just a direct connect (no group to measure).
+     */
+    fun connectToAuto(autoId: String) {
+        val groupKey = try {
+            AutoSelectIds.groupKeyOf(autoId)
+        } catch (_: IllegalArgumentException) {
+            return
+        }
+        val members = profilesForGroup(groupKey)
+        if (members.isEmpty()) {
+            _connection.update {
+                it.copy(state = ConnState.ERROR, detail = context.getString(R.string.fastest_none))
+            }
+            return
+        }
+        selectAuto(autoId)
+        if (members.size == 1) {
+            startService(listOf(members[0].link))
+            return
+        }
+        startService(
+            members.map { it.link },
+            autoSelect = true,
+            autoId = autoId,
+            displayName = context.getString(R.string.auto_card_title, groupLabel(groupKey)),
+        )
     }
 
     /** Connect to one specific profile (used by the Servers tab). */
@@ -591,32 +706,6 @@ class LiteViewModel(app: Application) : AndroidViewModel(app) {
         }
         if (links.size < 2) return // pruned below two members: not a chain
         startService(links)
-    }
-
-    // ---- balancer groups (3.2.0, PattNG policy groups) ----
-    val balancerGroups: StateFlow<Set<String>> = settings.balancerGroups
-        .stateIn(viewModelScope, SharingStarted.Eagerly, emptySet())
-
-    fun setBalancerGroup(key: String, on: Boolean) =
-        viewModelScope.launch { settings.setBalancerGroup(key, on) }
-
-    /** Connect to a group through a leastPing balancer (observatory).
-     *  3.2.3: "__all__" resolves to every profile, so Auto works
-     *  for all groups. */
-    fun connectToBalancerGroup(groupKey: String, groupName: String) {
-        val links = if (groupKey == "__all__") {
-            _profiles.value.map { it.link }
-        } else {
-            _profiles.value
-                .filter { it.subscriptionUrl == groupKey }
-                .map { it.link }
-        }
-        if (links.isEmpty()) return
-        if (links.size == 1) {
-            startService(links)
-            return
-        }
-        startService(links, balancer = true, displayName = groupName)
     }
 
     fun disconnect() {
