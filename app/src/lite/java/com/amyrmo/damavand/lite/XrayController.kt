@@ -60,12 +60,14 @@ object XrayController {
     val isRunning: Boolean
         get() = controller?.isRunning ?: false
 
-    fun start(configJson: String): Boolean {
+    /** Starts the core. [tunFd] is the VPN interface fd for Xray-tun
+     * mode (3.2.9, PattNG's useHevTun=false); 0 means the HEV bridge. */
+    fun start(configJson: String, tunFd: Int = 0): Boolean {
         val c = ready() ?: return false
         if (c.isRunning) stopQuietly(c)
         lastError = null
         return try {
-            c.startLoop(configJson, 0)
+            c.startLoop(configJson, tunFd)
             c.isRunning
         } catch (e: Exception) {
             AppLog.e(TAG, "startLoop failed", e)
