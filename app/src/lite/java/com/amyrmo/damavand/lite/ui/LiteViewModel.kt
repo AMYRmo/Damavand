@@ -1028,10 +1028,10 @@ class LiteViewModel(app: Application) : AndroidViewModel(app) {
             // 3.2.18 (#62): responseCode is a blocking call, so the
             // fetch runs inside suspendCancellableCoroutine — cancelling
             // the test disconnects the connection at once instead of
-            // waiting out the read timeout. (resume/resumeWithException
-            // are the CancellableContinuation members — the
-            // kotlinx.coroutines.resume import resolves to an internal
-            // overload instead, so no import for them.)
+            // waiting out the read timeout. (Only the resume(value,
+            // onCancellation) member exists in coroutines 1.8.1 — there
+            // is no resumeWithException — so a failed fetch resumes
+            // with a non-2xx sentinel, which reads as "no ping".)
             val code = suspendCancellableCoroutine { cont ->
                 cont.invokeOnCancellation {
                     try { conn.disconnect() } catch (_: Exception) { }
@@ -1039,8 +1039,8 @@ class LiteViewModel(app: Application) : AndroidViewModel(app) {
                 try {
                     val c = conn.responseCode
                     if (cont.isActive) cont.resume(c, null)
-                } catch (e: Exception) {
-                    if (cont.isActive) cont.resumeWithException(e)
+                } catch (_: Exception) {
+                    if (cont.isActive) cont.resume(-1, null)
                 }
             }
             conn.disconnect()
