@@ -15,6 +15,8 @@ import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.defaultMinSize
@@ -148,6 +150,9 @@ fun ServersScreen(
     val confirmDelete by vm.confirmDelete.collectAsState(initial = true)
     val doubleColumn by vm.doubleColumn.collectAsState(initial = false)
     val subscriptions by vm.subscriptions.collectAsState()
+    // 3.2.21 (Damavand BentoProviderCard): which subscription URLs
+    // are updating right now — their card shows a spinner.
+    val updatingSubs by vm.updatingSubs.collectAsState()
     val context = LocalContext.current
 
     var showAddSheet by remember { mutableStateOf(false) }
@@ -748,6 +753,7 @@ fun ServersScreen(
                         SubscriptionCard(
                             subscription = openSub,
                             count = selectedGroup!!.profiles.size,
+                            updating = openSub.url in updatingSubs,
                             onRefresh = { vm.updateSubscription(openSub.url) },
                             onOpenSubscriptions = onOpenSubscriptions,
                             modifier = Modifier.fillMaxWidth()
@@ -1341,18 +1347,27 @@ private fun GroupChip(
 // Lite's own (surface card, Damavand Red accent), NOT Damavand's
 // violet Bento tone — Amir: «رنگش باید هماهنگ با رنگ خود اپ باشه».
 @Composable
+@OptIn(ExperimentalLayoutApi::class)
 private fun SubscriptionCard(
     subscription: Subscription,
     count: Int,
+    updating: Boolean,
     onRefresh: () -> Unit,
     onOpenSubscriptions: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val context = LocalContext.current
+    // 3.2.21 (Damavand BentoProviderCard, re-imported): usage and
+    // expiry exactly as Damavand computes them — fraction from used
+    // / total, days left from the expiry epoch, alert when expired,
+    // exhausted or ≤ 3 days left.
+    val now = System.currentTimeMillis()
     val used = subscription.usedBytes
     val total = subscription.total
-    val hasUsage = used > 0 || total > 0
     val fraction = if (total > 0) (used.toFloat() / total.toFloat()).coerceIn(0f, 1f) else null
+    val expireAt = subscription.expire.takeIf { it > 0 }?.let { it * 1000 }
+    val expired = expireAt != null && expireAt <= now
+    val daysLeft = expireAt?.let { ((it - now) / 86_400_000L).toInt() }
     val exhausted = fraction != null && fraction >= 1f
     Column(
         modifier = modifier
@@ -1378,8 +1393,8 @@ private fun SubscriptionCard(
                     text = stringResource(
                         R.string.servers_group_count,
                         LiteFormat.toPersian(count.toString())
-                    ) + " · " + updatedAgoText(subscription.lastUpdated),
-                    fontSize = 12.sp,
+                    ) + (updatedAgoText(subscription.lastUpdated)?.let { " · $it" } ?: ""),
+                    fontSize = 12.5.sp,
                     color = LiteColors.textSecondary,
                     fontFamily = Vazirmatn,
                     maxLines = 1,
@@ -1387,20 +1402,35 @@ private fun SubscriptionCard(
                 )
             }
             Spacer(Modifier.width(8.dp))
-            Box(
-                modifier = Modifier
-                    .size(44.dp)
-                    .clip(CircleShape)
-                    .background(LiteColors.accent)
-                    .clickable(onClick = onRefresh),
-                contentAlignment = Alignment.Center
-            ) {
-                Icon(
-                    imageVector = RefreshVector,
-                    contentDescription = stringResource(R.string.subs_update),
-                    tint = Color.White,
-                    modifier = Modifier.size(22.dp)
-                )
+            // 3.2.21 (Damavand): while this subscription updates,
+            // a spinner takes the sync button's place.
+            if (updating) {
+                Box(
+                    modifier = Modifier.size(44.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    CircularProgressIndicator(
+                        modifier = Modifier.size(22.dp),
+                        color = LiteColors.accent,
+                        strokeWidth = 2.5.dp
+                    )
+                }
+            } else {
+                Box(
+                    modifier = Modifier
+                        .size(44.dp)
+                        .clip(CircleShape)
+                        .background(LiteColors.accent)
+                        .clickable(onClick = onRefresh),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        imageVector = RefreshVector,
+                        contentDescription = stringResource(R.string.subs_update),
+                        tint = Color.White,
+                        modifier = Modifier.size(22.dp)
+                    )
+                }
             }
         }
         if (fraction != null) {
@@ -1421,7 +1451,33 @@ private fun SubscriptionCard(
                 )
             }
         }
-        if (hasUsage) {
+        // 3.2.21 (Damavand): one row — usage on the left, expiry on
+        // the right; the expiry turns red when expired, exhausted or
+        // ≤ 3 days out. Shown only when either text exists.
+        val usageText = when {
+            used > 0 && total > 0 -> stringResource(
+                R.string.subs_usage,
+                LiteFormat.formatVolume(used),
+                LiteFormat.formatVolume(total)
+            )
+            used > 0 -> stringResource(
+                R.string.subs_usage_unlimited,
+                LiteFormat.formatVolume(used)
+            )
+            else -> null
+        }
+        val expiryText = when {
+            expired -> stringResource(R.string.subs_expired)
+            exhausted -> stringResource(R.string.subs_quota_exhausted)
+            daysLeft == null -> null
+            daysLeft <= 0 -> stringResource(R.string.subs_expires_today)
+            daysLeft == 1 -> stringResource(R.string.subs_one_day_left)
+            else -> stringResource(
+                R.string.subs_days_left,
+                LiteFormat.toPersian(daysLeft.toString())
+            )
+        }
+        if (usageText != null || expiryText != null) {
             Spacer(Modifier.height(10.dp))
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -1429,48 +1485,26 @@ private fun SubscriptionCard(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Text(
-                    text = stringResource(
-                        R.string.sub_card_used,
-                        LiteFormat.formatVolume(used)
-                    ),
-                    fontSize = 12.sp,
-                    fontWeight = FontWeight.SemiBold,
+                    text = usageText.orEmpty(),
+                    fontSize = 12.5.sp,
+                    fontWeight = FontWeight.Medium,
                     color = LiteColors.text,
                     fontFamily = Vazirmatn,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                     modifier = Modifier.weight(1f, fill = false)
                 )
-                Text(
-                    text = if (total > 0) {
-                        stringResource(
-                            R.string.sub_card_remaining,
-                            LiteFormat.formatVolume((total - used).coerceAtLeast(0))
-                        )
-                    } else {
-                        stringResource(R.string.sub_card_unlimited)
-                    },
-                    fontSize = 12.sp,
-                    color = LiteColors.textMuted,
-                    fontFamily = Vazirmatn,
-                    maxLines = 1
-                )
-            }
-        }
-        if (subscription.expire > 0) {
-            Spacer(Modifier.height(8.dp))
-            Text(
-                text = stringResource(
-                    R.string.sub_card_expires,
-                    LiteFormat.toPersian(
-                        java.text.SimpleDateFormat("yyyy/MM/dd", java.util.Locale.US)
-                            .format(java.util.Date(subscription.expire * 1000))
+                if (expiryText != null) {
+                    Text(
+                        text = expiryText,
+                        fontSize = 12.5.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        color = if (expired || exhausted || (daysLeft != null && daysLeft <= 3)) LiteColors.error else LiteColors.text,
+                        fontFamily = Vazirmatn,
+                        maxLines = 1
                     )
-                ),
-                fontSize = 12.sp,
-                color = LiteColors.textMuted,
-                fontFamily = Vazirmatn
-            )
+                }
+            }
         }
         // 3.2.2: like main Damavand — Support / Website only show
         // when the sub itself reports them (profile-web-page-url /
@@ -1479,7 +1513,12 @@ private fun SubscriptionCard(
         // origin. Subscriptions always shows — it opens the in-app
         // subscriptions screen, not a URL.
         Spacer(Modifier.height(14.dp))
-        Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+        // 3.2.21 (Damavand LinkChip + FlowRow): the chips wrap
+        // instead of clipping when the labels run long.
+        FlowRow(
+            horizontalArrangement = Arrangement.spacedBy(6.dp),
+            verticalArrangement = Arrangement.spacedBy(6.dp),
+        ) {
             if (subscription.supportUrl.isNotBlank()) {
                 SubCardButton(
                     label = stringResource(R.string.sub_card_support),
@@ -1500,8 +1539,9 @@ private fun SubscriptionCard(
     }
 }
 
-// 3.2.12: the link chips on the provider card — Lite's own pill
-// style (surface2, muted text), matching the rest of the app.
+// 3.2.21 (Damavand LinkChip): the card's accent at 14% alpha
+// behind accent text — Damavand's tone-content chip, in Lite's
+// colors.
 @Composable
 private fun SubCardButton(
     label: String,
@@ -1511,16 +1551,16 @@ private fun SubCardButton(
         modifier = Modifier
             .height(34.dp)
             .clip(RoundedCornerShape(17.dp))
-            .background(LiteColors.surface2)
+            .background(LiteColors.accent.copy(alpha = 0.14f))
             .clickable(onClick = onClick)
             .padding(horizontal = 14.dp),
         contentAlignment = Alignment.Center
     ) {
         Text(
             text = label,
-            fontSize = 13.sp,
+            fontSize = 13.5.sp,
             fontWeight = FontWeight.SemiBold,
-            color = LiteColors.textSecondary,
+            color = LiteColors.accent,
             fontFamily = Vazirmatn,
             maxLines = 1
         )
@@ -1536,9 +1576,11 @@ private fun openUrl(context: Context, url: String) {
     }
 }
 
+// 3.2.21 (Damavand bentoUpdatedAgo): null when never updated (the
+// meta line then shows the count alone), hours up to 48h.
 @Composable
-private fun updatedAgoText(lastUpdated: Long): String {
-    if (lastUpdated <= 0) return stringResource(R.string.sub_card_updated_never)
+private fun updatedAgoText(lastUpdated: Long): String? {
+    if (lastUpdated <= 0) return null
     val minutes = (System.currentTimeMillis() - lastUpdated) / 60_000
     return when {
         minutes < 1 -> stringResource(R.string.sub_card_updated_now)
@@ -1546,7 +1588,7 @@ private fun updatedAgoText(lastUpdated: Long): String {
             R.string.sub_card_updated_minutes,
             LiteFormat.toPersian(minutes.toString())
         )
-        minutes < 60 * 24 -> stringResource(
+        minutes < 48 * 60 -> stringResource(
             R.string.sub_card_updated_hours,
             LiteFormat.toPersian((minutes / 60).toString())
         )
