@@ -118,10 +118,15 @@ fun SettingsScreen(
     val proxyOnly by vm.proxyOnly.collectAsState(initial = false)
     val showSpeedNotif by vm.showSpeedNotif.collectAsState(initial = true)
     val confirmDelete by vm.confirmDelete.collectAsState(initial = true)
-    val showAllGroups by vm.showAllGroups.collectAsState(initial = false)
     val language by vm.language.collectAsState(initial = "auto")
     val themeMode by vm.themeMode.collectAsState(initial = "system")
     val doubleColumn by vm.doubleColumn.collectAsState(initial = false)
+    // 3.2.8 (Auto): tuning for the autoselect core.
+    val autoProbeUrl by vm.autoProbeUrl.collectAsState(initial = "https://www.gstatic.com/generate_204")
+    val autoCheckSeconds by vm.autoCheckSeconds.collectAsState(initial = 30)
+    val autoSweepMinutes by vm.autoSweepMinutes.collectAsState(initial = 10)
+    val autoSwitchMargin by vm.autoSwitchMargin.collectAsState(initial = 30)
+    val autoRetry by vm.autoRetry.collectAsState(initial = true)
     val autoStartBoot by vm.autoStartBoot.collectAsState(initial = false)
     val subAutoTest by vm.subAutoTest.collectAsState(initial = true)
     val subAutoSort by vm.subAutoSort.collectAsState(initial = false)
@@ -194,6 +199,48 @@ fun SettingsScreen(
                 titleRes = R.string.dns_title,
                 desc = dnsServers,
                 onClick = { editField = "dns" }
+            )
+        }
+        Spacer(Modifier.height(24.dp))
+
+        // ---- 1a. «خودکار» (3.2.8, Damavand Auto): the autoselect
+        // core probes the group's servers and switches by itself.
+        SettingsGroup(labelRes = R.string.settings_group_auto) {
+            TextEditRow(
+                titleRes = R.string.auto_probe_url_title,
+                desc = autoProbeUrl,
+                onClick = { editField = "auto_probe_url" }
+            )
+            GroupDivider()
+            CycleRow(
+                titleRes = R.string.auto_check_title,
+                descRes = R.string.auto_check_desc,
+                options = listOf("10", "20", "30", "60"),
+                current = autoCheckSeconds,
+                onSelect = { vm.setAutoCheckSeconds(it) }
+            )
+            GroupDivider()
+            CycleRow(
+                titleRes = R.string.auto_sweep_title,
+                descRes = R.string.auto_sweep_desc,
+                options = listOf("5", "10", "15", "30"),
+                current = autoSweepMinutes,
+                onSelect = { vm.setAutoSweepMinutes(it) }
+            )
+            GroupDivider()
+            CycleRow(
+                titleRes = R.string.auto_margin_title,
+                descRes = R.string.auto_margin_desc,
+                options = listOf("10", "20", "30", "50"),
+                current = autoSwitchMargin,
+                onSelect = { vm.setAutoSwitchMargin(it) }
+            )
+            GroupDivider()
+            SwitchRow(
+                titleRes = R.string.auto_retry_title,
+                descRes = R.string.auto_retry_desc,
+                checked = autoRetry,
+                onCheckedChange = { vm.setAutoRetry(it) }
             )
         }
         Spacer(Modifier.height(24.dp))
@@ -504,13 +551,6 @@ fun SettingsScreen(
                 onCheckedChange = { vm.setConfirmDelete(it) }
             )
             GroupDivider()
-            SwitchRow(
-                titleRes = R.string.show_all_groups_title,
-                descRes = R.string.show_all_groups_desc,
-                checked = showAllGroups,
-                onCheckedChange = { vm.setShowAllGroups(it) }
-            )
-            GroupDivider()
             LanguageRow(
                 current = language,
                 onSelect = { next ->
@@ -780,6 +820,10 @@ fun SettingsScreen(
             "hev_rw_timeout" -> Quadruple(
                 R.string.hev_rw_timeout_title, R.string.hev_rw_timeout_desc, hevRwTimeout,
                 { v: String -> vm.setHevRwTimeout(v) }
+            )
+            "auto_probe_url" -> Quadruple(
+                R.string.auto_probe_url_title, R.string.auto_probe_url_desc, autoProbeUrl,
+                { v: String -> vm.setAutoProbeUrl(v) }
             )
             else -> Quadruple(
                 R.string.test_url_title, R.string.test_url_desc, testUrl,
