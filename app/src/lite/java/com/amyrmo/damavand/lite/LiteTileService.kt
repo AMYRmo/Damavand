@@ -117,8 +117,9 @@ class LiteTileService : TileService() {
                 val selected = profiles.firstOrNull { it.id == selectedId }
                 if (selected != null) {
                     putExtra(LiteVpnService.EXTRA_LINK, selected.link)
+                    if (selected.isAether) putExtra(LiteVpnService.EXTRA_AETHER, true)
                 } else {
-                    val candidates = profiles.filter { it.lastPingMs > 0 }
+                    val candidates = profiles.filter { !it.isAether && it.lastPingMs > 0 }
                         .sortedBy { it.lastPingMs }.take(5).map { it.link }
                     if (candidates.isNotEmpty()) {
                         putStringArrayListExtra(
@@ -127,6 +128,7 @@ class LiteTileService : TileService() {
                     } else {
                         profiles.firstOrNull()?.let {
                             putExtra(LiteVpnService.EXTRA_LINK, it.link)
+                            if (it.isAether) putExtra(LiteVpnService.EXTRA_AETHER, true)
                         } ?: run { openApp(); return }
                     }
                 }

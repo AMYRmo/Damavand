@@ -19,6 +19,7 @@ class BootReceiver : BroadcastReceiver() {
             if (!store.autoStartBootNow()) return@runBlocking
             val repo = ProfileRepository(context)
             val selected = store.selectedProfileIdNow() ?: return@runBlocking
+            var aether = false
             val links: List<String> = if (selected.startsWith("chain:")) {
                 val chain = repo.loadChains()
                     .firstOrNull { "chain:${it.id}" == selected } ?: return@runBlocking
@@ -28,6 +29,7 @@ class BootReceiver : BroadcastReceiver() {
             } else {
                 val profile = repo.loadProfiles()
                     .firstOrNull { it.id == selected } ?: return@runBlocking
+                aether = profile.isAether
                 listOf(profile.link)
             }
             if (links.isEmpty()) return@runBlocking
@@ -40,6 +42,10 @@ class BootReceiver : BroadcastReceiver() {
                 }
                 putExtra(LiteVpnService.EXTRA_TEST_URL, store.testUrlNow())
                 putExtra(LiteVpnService.EXTRA_KILL_SWITCH, store.killSwitchNow())
+                // An Aether profile's link is not an Xray link: without
+                // this flag the service tried XrayConfig on aether://<uuid>
+                // and every boot auto-start failed with "config failed".
+                if (aether) putExtra(LiteVpnService.EXTRA_AETHER, true)
             }
             context.startForegroundService(svc)
         }
