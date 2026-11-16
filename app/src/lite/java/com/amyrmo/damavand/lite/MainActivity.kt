@@ -33,6 +33,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.toArgb
@@ -326,9 +327,11 @@ private fun LiteRoot(
     onImportFile: () -> Unit,
     onImportGeo: (String) -> Unit
 ) {
-    var tab by remember { mutableIntStateOf(0) } // 0 Home, 1 Servers, 2 Stats, 3 Settings
+    // Saveable: a recreation (language change, theme, process death)
+    // keeps the user on the same tab / sub-screen.
+    var tab by rememberSaveable { mutableIntStateOf(0) } // 0 Home, 1 Servers, 2 Stats, 3 Settings
     // 3.1.0 (PattNG): a sub-screen opened from Settings hides the tabs.
-    var subScreen by remember { mutableStateOf<SubScreen?>(null) }
+    var subScreen by rememberSaveable { mutableStateOf<SubScreen?>(null) }
     val connection by vm.connection.collectAsState()
     val profiles by vm.profiles.collectAsState()
     val selectedId by vm.selectedId.collectAsState()
