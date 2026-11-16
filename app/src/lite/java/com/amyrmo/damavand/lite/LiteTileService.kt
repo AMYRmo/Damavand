@@ -104,37 +104,33 @@ class LiteTileService : TileService() {
         try {
             val store = SettingsStore(applicationContext)
             val repo = ProfileRepository(applicationContext)
-            val profiles = repo.loadProfiles()
-            val (selectedId, testUrl, killSwitch) = runBlocking {
-                Triple(
-                    store.selectedProfileIdNow(),
-                    store.testUrlNow(),
-                    store.killSwitchNow()
-                )
-            }
-            val intent = Intent(this, LiteVpnService::class.java).apply {
-                action = LiteVpnService.ACTION_START
-                val selected = profiles.firstOrNull { it.id == selectedId }
-                if (selected != null) {
-                    putExtra(LiteVpnService.EXTRA_LINK, selected.link)
-                    if (selected.isAether) putExtra(LiteVpnService.EXTRA_AETHER, true)
-                } else {
-                    val candidates = profiles.filter { !it.isAether && it.lastPingMs > 0 }
-                        .sortedBy { it.lastPingMs }.take(5).map { it.link }
-                    if (candidates.isNotEmpty()) {
-                        putStringArrayListExtra(
-                            LiteVpnService.EXTRA_CANDIDATES, ArrayList(candidates)
-                        )
-                    } else {
-                        profiles.firstOrNull()?.let {
-                            putExtra(LiteVpnService.EXTRA_LINK, it.link)
-                            if (it.isAether) putExtra(LiteVpnService.EXTRA_AETHER, true)
-                        } ?: run { openApp(); return }
+            val selectedId = runBlocking { store.selectedProfileIdNow() }
+            // 3.2.16 (#50): a selected chain/Auto entry now connects
+            // as itself instead of falling back to the fastest five.
+            val intent = StartIntent.build(applicationContext, selectedId)
+                ?: run {
+                    val profiles = repo.loadProfiles()
+                    val (testUrl, killSwitch) = runBlocking {
+                        store.testUrlNow() to store.killSwitchNow()
+                    }
+                    Intent(this, LiteVpnService::class.java).apply {
+                        action = LiteVpnService.ACTION_START
+                        val candidates = profiles.filter { !it.isAether && it.lastPingMs > 0 }
+                            .sortedBy { it.lastPingMs }.take(5).map { it.link }
+                        if (candidates.isNotEmpty()) {
+                            putStringArrayListExtra(
+                                LiteVpnService.EXTRA_CANDIDATES, ArrayList(candidates)
+                            )
+                        } else {
+                            profiles.firstOrNull()?.let {
+                                putExtra(LiteVpnService.EXTRA_LINK, it.link)
+                                if (it.isAether) putExtra(LiteVpnService.EXTRA_AETHER, true)
+                            } ?: run { openApp(); return }
+                        }
+                        putExtra(LiteVpnService.EXTRA_TEST_URL, testUrl)
+                        putExtra(LiteVpnService.EXTRA_KILL_SWITCH, killSwitch)
                     }
                 }
-                putExtra(LiteVpnService.EXTRA_TEST_URL, testUrl)
-                putExtra(LiteVpnService.EXTRA_KILL_SWITCH, killSwitch)
-            }
             // QS tile taps are a user interaction, so starting the
             // foreground service from here is allowed; if it ever
             // fails, fall back to opening the app.
