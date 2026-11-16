@@ -415,6 +415,7 @@
 
     <!-- 3.1.0 — PattNG: subscriptions -->
     <string name="subs_title">Subscriptions</string>
+    <string name="subs_update">Update</string>
     <string name="subs_empty">No subscription has been added yet</string>
     <string name="subs_updated_never">Never updated</string>
     <string name="subs_updated_today">Updated today</string>
