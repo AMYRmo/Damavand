@@ -443,11 +443,13 @@ class LiteVpnService : VpnService() {
             try {
                 runConnect(links, candidates, testUrl, gen)
             } catch (e: Exception) {
-                lastDetail = getString(R.string.conn_error_generic, e.message ?: "")
-                lastError = e.message
-                broadcastLog("ERROR: ${e.message}")
-                broadcastStatus()
-                stopTunnel()
+                // A stale worker (its session was stopped or replaced)
+                // must not report an error or stop the newer session.
+                if (sessionLive(gen)) {
+                    lastError = e.message
+                    broadcastLog("ERROR: ${e.message}")
+                }
+                failConnect(gen, getString(R.string.conn_error_generic, e.message ?: ""))
             }
         }, "lite-connect").also { it.start() }
     }
@@ -499,9 +501,7 @@ class LiteVpnService : VpnService() {
         // autoselect group measures them itself and keeps switching.
         if (autoMode) {
             if (links.size < 2) {
-                lastDetail = getString(R.string.auto_no_members)
-                broadcastStatus()
-                stopTunnel()
+                failConnect(gen, getString(R.string.auto_no_members))
                 return
             }
             currentLinks = links
@@ -524,7 +524,7 @@ class LiteVpnService : VpnService() {
                     )
                     broadcastStatus()
                     broadcastLog(lastDetail)
-                    if (realTest(listOf(candidate), testUrl)) {
+                    if (realTest(listOf(candidate), testUrl, gen)) {
                         winner = listOf(candidate)
                         break
                     }
@@ -532,17 +532,16 @@ class LiteVpnService : VpnService() {
                 // One retry of the best candidate: a single transient
                 // failure (flaky test URL) must not kill the connect.
                 if (winner == null && candidates.isNotEmpty()) {
+                    if (!sessionLive(gen)) return
                     lastDetail = getString(R.string.fastest_retry)
                     broadcastStatus()
                     broadcastLog(lastDetail)
-                    if (realTest(listOf(candidates[0]), testUrl)) {
+                    if (realTest(listOf(candidates[0]), testUrl, gen)) {
                         winner = listOf(candidates[0])
                     }
                 }
                 winner ?: run {
-                    lastDetail = getString(R.string.conn_no_server_responded)
-                    broadcastStatus()
-                    stopTunnel()
+                    failConnect(gen, getString(R.string.conn_no_server_responded))
                     return
                 }
             }
@@ -555,9 +554,7 @@ class LiteVpnService : VpnService() {
             }
         }
         if (chosen.isEmpty()) {
-            lastDetail = getString(R.string.conn_no_server)
-            broadcastStatus()
-            stopTunnel()
+            failConnect(gen, getString(R.string.conn_no_server))
             return
         }
         currentLinks = chosen
@@ -569,18 +566,21 @@ class LiteVpnService : VpnService() {
             connectWinner(chosen, gen)
             return
         }
-        if (links.isNotEmpty() && !realTest(chosen, testUrl)) {
-            lastDetail = getString(R.string.conn_server_no_response)
-            broadcastStatus()
-            stopTunnel()
+        if (links.isNotEmpty() && !realTest(chosen, testUrl, gen)) {
+            failConnect(gen, getString(R.string.conn_server_no_response))
             return
         }
         if (!sessionLive(gen)) return
         connectWinner(chosen, gen)
     }
 
-    /** Start Xray with [links] on the resolved test port and fetch the test URL through it. */
-    private fun realTest(links: List<String>, testUrl: String): Boolean {
+    /**
+     * Start Xray with [links] on the resolved test port and fetch the test URL through it.
+     * The core is a global singleton: a test from a stale session ([gen]
+     * no longer current) neither starts it nor stops a newer session's core.
+     */
+    private fun realTest(links: List<String>, testUrl: String, gen: Int): Boolean {
+        if (!sessionLive(gen)) return false
         val geoReady = GeoDownloader(applicationContext).isReady()
         // The fastest-connect probe talks SOCKS to the core, so the
         // local proxy is forced on here whatever the setting says.
@@ -608,7 +608,9 @@ class LiteVpnService : VpnService() {
         } catch (_: Exception) {
             return false
         } finally {
-            XrayController.stop()
+            // Only stop the core this session owns: after a stop+start
+            // the core may already belong to the newer session.
+            if (sessionGen.get() == gen || !running) XrayController.stop()
         }
     }
 
@@ -757,8 +759,8 @@ class LiteVpnService : VpnService() {
             }
             else -> XrayConfig.buildLinks(links, activeSocksPort, geoReady, settings)
         } ?: run {
-            lastDetail = getString(R.string.conn_config_failed)
-            broadcastStatus(); stopTunnel(); return
+            failConnect(gen, getString(R.string.conn_config_failed))
+            return
         }
         val aetherCore = aetherResult?.second
         // 3.2.8 (Auto): the session maps member tags to profile ids —
@@ -849,8 +851,7 @@ class LiteVpnService : VpnService() {
             return
         }
         if (descriptor == null && !proxyOnlyMode && !rootMode) {
-            lastDetail = getString(R.string.conn_vpn_iface_failed)
-            broadcastStatus(); stopTunnel(); return
+            failConnect(gen, getString(R.string.conn_vpn_iface_failed)); return
         }
         if (rootMode) {
             // 3.2.10 (PattNG root mode): no tun — the core starts first,
@@ -859,8 +860,8 @@ class LiteVpnService : VpnService() {
             // is forced on above (effectiveLocalProxy), because the
             // root-run hev forwards into it.
             if (!XrayController.start(cfg, 0)) {
-                lastDetail = getString(R.string.conn_core_failed, XrayController.lastError ?: "")
-                broadcastStatus(); stopTunnel(); return
+                failConnect(gen, getString(R.string.conn_core_failed, XrayController.lastError ?: ""), descriptor)
+                return
             }
             if (!RootProxyManager.start(this)) {
                 lastDetail = getString(R.string.conn_root_failed)
@@ -873,13 +874,13 @@ class LiteVpnService : VpnService() {
             // closes normally in stopTunnel. HEV mode keeps the bridge.
             val tunFd = if (tunMode) descriptor!!.fd else 0
             if (!XrayController.start(cfg, tunFd)) {
-                lastDetail = getString(R.string.conn_core_failed, XrayController.lastError ?: "")
-                broadcastStatus(); stopTunnel(); return
+                failConnect(gen, getString(R.string.conn_core_failed, XrayController.lastError ?: ""), descriptor)
+                return
             }
             // 3.2.10 (Aether): Xray is up — start the core now, before
             // the tun bridge forwards traffic into the SOCKS inbound.
             if (aetherMode && aetherCore != null && !startAether(aetherCore)) {
-                broadcastStatus(); stopTunnel(); return
+                failConnect(gen, null, descriptor); return
             }
             if (!tunMode) {
                 // 3.2.0: hev log level + rw timeout from settings.
@@ -899,18 +900,18 @@ class LiteVpnService : VpnService() {
                         logLevel = hevLog, rwTimeout = hevTimeout
                     )
                 ) {
-                    lastDetail = getString(R.string.conn_tunnel_bridge_failed)
-                    broadcastStatus(); stopTunnel(); return
+                    failConnect(gen, getString(R.string.conn_tunnel_bridge_failed), descriptor)
+                    return
                 }
             }
         } else {
             if (!XrayController.start(cfg)) {
-                lastDetail = getString(R.string.conn_core_failed, XrayController.lastError ?: "")
-                broadcastStatus(); stopTunnel(); return
+                failConnect(gen, getString(R.string.conn_core_failed, XrayController.lastError ?: ""), descriptor)
+                return
             }
             // 3.2.10 (Aether): Xray is up — start the core now.
             if (aetherMode && aetherCore != null && !startAether(aetherCore)) {
-                broadcastStatus(); stopTunnel(); return
+                failConnect(gen, null, descriptor); return
             }
         }
         connected = true
@@ -1258,6 +1259,34 @@ class LiteVpnService : VpnService() {
         stopForeground(STOP_FOREGROUND_REMOVE)
         broadcastStatus()
         stopSelf()
+    }
+
+    /**
+     * Fail the connect of session [gen]: set [detail] (null keeps the one
+     * already set), broadcast and stop the tunnel. A stale worker (its
+     * session was stopped, or replaced by a newer start) only cleans up
+     * after itself: it never shows an error after the user's own
+     * disconnect and never tears down the newer session.
+     */
+    private fun failConnect(gen: Int, detail: String?, descriptor: ParcelFileDescriptor? = null) {
+        if (sessionLive(gen)) {
+            if (detail != null) lastDetail = detail
+            broadcastStatus()
+            stopTunnel()
+            return
+        }
+        if (!running) {
+            if (rootMode) {
+                try { RootProxyManager.stop(this) } catch (_: Exception) {}
+            }
+            try { AetherEngine.stop() } catch (_: Exception) {}
+            try { HevTunCore.stop() } catch (_: Exception) {}
+            try { XrayController.stop() } catch (_: Exception) {}
+        }
+        if (descriptor != null) {
+            if (tun === descriptor) tun = null
+            try { descriptor.close() } catch (_: Exception) {}
+        }
     }
 
     /**
