@@ -50,9 +50,11 @@ class LiteVpnService : VpnService() {
         const val EXTRA_KILL_SWITCH = "kill_switch"
         /** 3.1.0: fastest-connect candidates, in preference order. */
         const val EXTRA_CANDIDATES = "candidates"
-        // 3.2.0 (PattNG): balancer mode — the links are a policy group.
-        const val EXTRA_BALANCER = "balancer"
-        // 3.2.0: the display name for a balancer group (notification title).
+        // 3.2.8 (Auto): the links are an autoselect group, and the id
+        // of the Auto entry that started it ("auto:all" / "auto:sub:…").
+        const val EXTRA_AUTO_SELECT = "auto_select"
+        const val EXTRA_AUTO_ID = "auto_id"
+        // 3.2.0: the display name for a group (notification title).
         const val EXTRA_NAME = "name"
         /** 3.1.0: the URL a real tunnel test fetches. */
         const val EXTRA_TEST_URL = "test_url"
@@ -107,16 +109,22 @@ class LiteVpnService : VpnService() {
     @Volatile private var activeTestPort: Int = TEST_PORT
     // Proxy-only mode (3.2.0): Xray + SOCKS, no tun, no hev bridge.
     @Volatile private var proxyOnlyMode: Boolean = false
-    // Balancer mode (3.2.0, PattNG): the links are a policy group.
-    @Volatile private var balancerMode: Boolean = false
+    // Auto mode (3.2.8, Damavand): the links are an autoselect group.
+    @Volatile private var autoMode: Boolean = false
+    @Volatile private var autoId: String? = null
+    @Volatile private var autoSessionActive: Boolean = false
+    private var networkWatch: android.net.ConnectivityManager.NetworkCallback? = null
     // Show live speeds in the notification (3.2.0 setting, cached per connect).
     @Volatile private var showSpeedNotif: Boolean = true
-    // Display name passed by the caller (balancer group name).
+    // Display name passed by the caller (group name).
     @Volatile private var displayName: String? = null
     // Live per-server usage (3.2.0): bytes already attributed to the exit
     // profile this session, so the Stats tab is never empty mid-session.
     @Volatile private var recordedUsage: Long = 0
     @Volatile private var usageProfileId: String? = null
+    // Auto member names (3.2.8): profile id → display name, resolved
+    // once at connect so the poller never reads the disk per tick.
+    @Volatile private var autoMemberNames: Map<String, String> = emptyMap()
 
     override fun onBind(intent: Intent?): IBinder? = null
 
@@ -144,10 +152,11 @@ class LiteVpnService : VpnService() {
                 val testUrl = intent.getStringExtra(EXTRA_TEST_URL)
                     ?.takeIf { it.isNotBlank() }
                     ?: "https://www.google.com/generate_204"
-                // 3.2.0 (PattNG): balancer mode — a policy group.
-                val balancer = intent.getBooleanExtra(EXTRA_BALANCER, false)
+                // 3.2.8 (Auto): the links are an autoselect group.
+                val autoSelect = intent.getBooleanExtra(EXTRA_AUTO_SELECT, false)
+                val autoId = intent.getStringExtra(EXTRA_AUTO_ID)
                 displayName = intent.getStringExtra(EXTRA_NAME)
-                if (!running) startTunnel(links ?: emptyList(), candidates, testUrl, balancer)
+                if (!running) startTunnel(links ?: emptyList(), candidates, testUrl, autoSelect, autoId)
             }
             ACTION_STOP -> {
                 intentionalStop = true
@@ -197,7 +206,7 @@ class LiteVpnService : VpnService() {
         }
     }
 
-    /** A balancer's displayed ping: the best tested ping of its members. */
+    /** An Auto group's displayed ping: the best tested ping of its members. */
     private fun resolveBalancerPing(links: List<String>): Long {
         return try {
             val repo = ProfileRepository(applicationContext)
@@ -336,12 +345,16 @@ class LiteVpnService : VpnService() {
         links: List<String>,
         candidates: List<String> = emptyList(),
         testUrl: String = "https://www.google.com/generate_204",
-        balancer: Boolean = false,
+        autoSelect: Boolean = false,
+        autoId: String? = null,
     ) {
         running = true
         connected = false
         intentionalStop = false
-        balancerMode = balancer
+        autoMode = autoSelect
+        this.autoId = autoId
+        autoSessionActive = false
+        AutoSelect.end()
         location = ""
         countryCode = ""
         pingMs = -1
@@ -410,6 +423,20 @@ class LiteVpnService : VpnService() {
         activeSocksPort = if (dynamicPort) (20000..39900).random() else settings0.socksPort
         activeTestPort = (activeSocksPort + 100).coerceAtMost(65535)
         proxyOnlyMode = proxyOnly
+        // 3.2.8 (Auto): the members are the config — no pre-test, the
+        // autoselect group measures them itself and keeps switching.
+        if (autoMode) {
+            if (links.size < 2) {
+                lastDetail = getString(R.string.auto_no_members)
+                broadcastStatus()
+                stopTunnel()
+                return
+            }
+            currentLinks = links
+            broadcastLog(getString(R.string.log_connecting_selected))
+            connectWinner(links)
+            return
+        }
         val repo = ProfileRepository(applicationContext)
         val chosen: List<String> = when {
             links.isNotEmpty() -> links
@@ -520,16 +547,54 @@ class LiteVpnService : VpnService() {
     private fun connectWinner(links: List<String>) {
         val geoReady = GeoDownloader(applicationContext).isReady()
         val settings = loadXraySettings()
-        // 3.2.0 (PattNG): a balancer group builds one outbound per
-        // profile + a leastPing balancer; anything else is a chain or a
-        // single profile.
-        val cfg = if (balancerMode) {
-            XrayConfig.buildBalancer(links, activeSocksPort, geoReady, settings)
+        // 3.2.8 (Auto): an autoselect group over the member links —
+        // the group measures and switches by itself. Anything else is
+        // a chain or a single profile.
+        val cfg = if (autoMode) {
+            val tuning = try {
+                kotlinx.coroutines.runBlocking {
+                    SettingsStore(applicationContext).autoTuningNow()
+                }
+            } catch (_: Exception) {
+                AutoSelectTuning()
+            }
+            val initialTag = autoId?.let { id ->
+                try {
+                    val picked = kotlinx.coroutines.runBlocking {
+                        SettingsStore(applicationContext).autoLastPickNow(id)
+                    }
+                    val profiles = ProfileRepository(applicationContext).loadProfiles()
+                    val idx = links.indexOfFirst { link ->
+                        profiles.firstOrNull { it.link == link }?.id == picked
+                    }
+                    if (idx >= 0) "proxy@$idx" else null
+                } catch (_: Exception) {
+                    null
+                }
+            }
+            XrayConfig.buildAutoSelect(links, tuning, initialTag, activeSocksPort, geoReady, settings)
         } else {
             XrayConfig.buildLinks(links, activeSocksPort, geoReady, settings)
         } ?: run {
             lastDetail = getString(R.string.conn_config_failed)
             broadcastStatus(); stopTunnel(); return
+        }
+        // 3.2.8 (Auto): the session maps member tags to profile ids —
+        // the UI reads it to show the live exit, and the service polls
+        // it for switch events. Prepared BEFORE the core starts, so
+        // activate() below attaches to the running group.
+        if (autoMode) {
+            try {
+                val profiles = ProfileRepository(applicationContext).loadProfiles()
+                val memberProfiles = links.mapIndexedNotNull { i, link ->
+                    profiles.firstOrNull { it.link == link }?.id?.let { "proxy@$i" to it }
+                }.toMap()
+                autoMemberNames = memberProfiles.entries.associate { (tag, pid) ->
+                    pid to (profiles.firstOrNull { it.id == pid }?.name ?: pid)
+                }
+                AutoSelect.prepare(autoId ?: AutoSelectIds.ALL, memberProfiles)
+            } catch (_: Exception) {
+            }
         }
         val perApp = try {
             RoutingStore(applicationContext).loadPerApp()
@@ -614,10 +679,24 @@ class LiteVpnService : VpnService() {
         }
         connected = true
         connectedAt = System.currentTimeMillis()
+        // 3.2.8 (Auto): attach the prepared session to the running
+        // group and re-measure every member when the network changes.
+        if (autoMode) {
+            autoSessionActive = AutoSelect.activate()
+            if (autoSessionActive) {
+                broadcastLog(
+                    getString(
+                        R.string.log_auto_started,
+                        AutoSelect.session.value?.memberProfiles?.size ?: 0,
+                    )
+                )
+                watchNetworkChanges()
+            }
+        }
         currentProfileName = displayName?.takeIf { it.isNotBlank() }
             ?: resolveProfileName(links)
-        // A balancer's displayed ping is the best member ping (3.2.0).
-        profilePingMs = if (balancerMode) {
+        // An Auto group's displayed ping is the best member ping (3.2.0).
+        profilePingMs = if (autoMode) {
             resolveBalancerPing(links)
         } else {
             resolveProfilePing(links)
@@ -703,6 +782,11 @@ class LiteVpnService : VpnService() {
                     totalUp += max(0, up - lastUp)
                     lastDown = down; lastUp = up; lastTime = now
                     tick++
+                    // 3.2.8 (Auto): poll the group's live status — the
+                    // notification follows the live exit member.
+                    if (autoMode && autoSessionActive) {
+                        pollAutoSelect()
+                    }
                     // Live per-server usage (3.2.0): attribute the session
                     // volume to the exit profile every 10 s, so the Stats
                     // tab shows usage mid-session — not only on disconnect.
@@ -766,6 +850,92 @@ class LiteVpnService : VpnService() {
         }, "lite-poll").also { it.start() }
     }
 
+    /**
+     * Auto polling (3.2.8, Damavand's pollAutoSelect): read the core's
+     * status, remember the pick (the "initial" member next connect),
+     * and move the notification + displayed ping to the live exit
+     * whenever the group switches members. Switch events go to the
+     * log, like Damavand's "I/Auto-select: failover A -> B".
+     */
+    private fun pollAutoSelect() {
+        val events = try {
+            AutoSelect.poll()
+        } catch (_: Exception) {
+            return
+        }
+        val session = AutoSelect.session.value ?: return
+        val selectedId = session.selectedProfileId ?: return
+        val name = autoMemberNames[selectedId] ?: return
+        val label = getString(R.string.auto_notif_remark, name)
+        if (label != currentProfileName) {
+            currentProfileName = label
+            usageProfileId = selectedId
+            val delay = session.status?.member(session.status?.selected ?: "")?.delayMs
+            if (delay != null && delay > 0) {
+                profilePingMs = delay
+                pingMs = delay
+            }
+            // Remember the pick (the "initial" member next connect).
+            autoId?.let { id ->
+                try {
+                    kotlinx.coroutines.runBlocking {
+                        SettingsStore(applicationContext).setAutoLastPick(id, selectedId)
+                    }
+                } catch (_: Exception) {
+                }
+            }
+            updateNotification()
+        }
+        events.forEach { e ->
+            val from = session.memberProfiles[e.from]?.let { autoMemberNames[it] } ?: e.from
+            val to = session.memberProfiles[e.to]?.let { autoMemberNames[it] } ?: e.to
+            broadcastLog("I/Auto-select: ${e.reason} $from -> $to")
+        }
+    }
+
+    /** Re-measure every Auto member when the device changes network (Damavand's watchNetworkChanges). */
+    private fun watchNetworkChanges() {
+        if (networkWatch != null) return
+        val cm = getSystemService(android.net.ConnectivityManager::class.java) ?: return
+        val callback = object : android.net.ConnectivityManager.NetworkCallback() {
+            private var current: android.net.Network? = null
+            private var pending: Thread? = null
+
+            override fun onAvailable(network: android.net.Network) {
+                val previous = current
+                current = network
+                if (previous == null || previous == network) return
+                pending?.interrupt()
+                pending = Thread({
+                    try {
+                        Thread.sleep(3000)
+                        broadcastLog(getString(R.string.log_auto_network_changed))
+                        AutoSelect.networkChanged()
+                    } catch (_: Exception) {
+                    }
+                }, "lite-netwatch").also { it.start() }
+            }
+        }
+        runCatching { cm.registerDefaultNetworkCallback(callback) }
+            .onSuccess { networkWatch = callback }
+            .onFailure { android.util.Log.w("LiteVpnService", "network watch unavailable", it) }
+    }
+
+    private fun stopAutoSelectSession() {
+        networkWatch?.let { cb ->
+            runCatching {
+                getSystemService(android.net.ConnectivityManager::class.java)
+                    ?.unregisterNetworkCallback(cb)
+            }
+        }
+        networkWatch = null
+        if (autoSessionActive) AutoSelect.end()
+        autoSessionActive = false
+        autoMode = false
+        autoId = null
+        autoMemberNames = emptyMap()
+    }
+
     // ---- tunnel drop / kill switch ----
 
     private fun onTunnelDropped() {
@@ -823,6 +993,7 @@ class LiteVpnService : VpnService() {
         }
         running = false
         connected = false
+        stopAutoSelectSession()
         try { worker?.interrupt() } catch (_: Exception) {}
         try { poller?.interrupt() } catch (_: Exception) {}
         worker = null; poller = null
@@ -836,6 +1007,7 @@ class LiteVpnService : VpnService() {
     }
 
     override fun onDestroy() {
+        stopAutoSelectSession()
         try { HevTunCore.stop() } catch (_: Exception) {}
         try { XrayController.stop() } catch (_: Exception) {}
         try { tun?.close() } catch (_: Exception) {}
