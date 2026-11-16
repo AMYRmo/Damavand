@@ -369,6 +369,11 @@ object AetherIdentityManager {
         val withExit = if (exitPort != null) AetherCore(arguments).through(exitPort).arguments else arguments
         val withInfo = withInfoLines(withExit)
         val timeoutMs = if (reachesWarpThroughCarrier(withInfo)) RENEW_THROUGH_CARRIER_TIMEOUT_MS else RENEW_TIMEOUT_MS
+        // runOneShot returns the matched line (String?) — the keys
+        // renewal succeeded iff a line matched, so the Boolean is
+        // the null check, not the lambda's own result. (The lambda
+        // must return String? — the line when registered, else null —
+        // because that is what runOneShot's match takes.)
         return AetherEngine.runOneShot(
             context = context,
             arguments = withInfo,
@@ -376,7 +381,7 @@ object AetherIdentityManager {
             exitKey = exit.key,
             timeoutMs = timeoutMs,
             onOutput = onOutput,
-        ) { line -> isRegistered(line) }
+        ) { line -> line.takeIf(::isRegistered) } != null
     }
 
     /** Whether the run dials WARP through Tor or Psiphon in reverse, which takes what a scan may take. */
