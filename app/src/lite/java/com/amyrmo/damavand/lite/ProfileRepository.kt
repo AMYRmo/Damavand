@@ -97,6 +97,18 @@ class ProfileRepository(private val context: Context) {
         }
     }
 
+    /**
+     * Load, transform and save the profile list as ONE step under the
+     * process-wide lock (3.2.16, #53): the old load-then-save pairs in
+     * the ViewModel let a subscription refresh or a ping save landing
+     * in between be overwritten. Same shape as updateProfile.
+     */
+    fun updateProfiles(transform: (List<Profile>) -> List<Profile>) {
+        synchronized(fileLock) {
+            saveProfiles(transform(loadProfiles()))
+        }
+    }
+
     fun updatePing(profileId: String, pingMs: Long) {
         synchronized(fileLock) {
             val now = System.currentTimeMillis()
