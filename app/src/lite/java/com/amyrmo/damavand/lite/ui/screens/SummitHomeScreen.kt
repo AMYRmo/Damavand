@@ -167,7 +167,12 @@ fun SummitHomeScreen(
                 live = autoLive,
                 memberName = { id -> profiles.firstOrNull { it.id == id }?.name },
                 onSelect = onGoToServers,
-                onConnect = { vm.connectToAuto(selectedAutoId) },
+                // Select, then go through the activity's VPN-permission /
+                // root-mode gate (vm.connect() connects the selected Auto).
+                onConnect = {
+                    vm.selectAuto(selectedAutoId)
+                    onConnectRequest()
+                },
                 onDetails = { showAutoSheet = true }
             )
         } else {

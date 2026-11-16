@@ -508,6 +508,7 @@
     <string name="conn_server_no_response">Server did not respond — try another server</string>
     <string name="conn_config_failed">Building the config failed</string>
     <string name="conn_vpn_iface_failed">Building the VPN interface failed</string>
+    <string name="vpn_permission_denied">VPN permission was not granted, so nothing was connected</string>
     <string name="conn_core_failed">Starting the core failed: %1$s</string>
     <string name="conn_root_failed">Installing the root rules failed; the phone is not rooted or su was denied</string>
     <string name="conn_aether_failed">Starting the Aether core failed</string>

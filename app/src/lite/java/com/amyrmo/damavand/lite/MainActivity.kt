@@ -99,19 +99,38 @@ class MainActivity : ComponentActivity() {
 
     private val vm: LiteViewModel by viewModels()
 
+    // The connect action waiting on the system VPN consent dialog. Saved
+    // in onSaveInstanceState, so it survives the process being killed
+    // while the dialog is up.
     private var pendingConnect = false
     private var pendingFastest = false
 
     private val vpnPrepareLauncher = registerForActivityResult(
         ActivityResultContracts.StartActivityForResult()
-    ) {
-        if (pendingConnect) {
-            pendingConnect = false
+    ) { result ->
+        val connect = pendingConnect
+        val fastest = pendingFastest
+        pendingConnect = false
+        pendingFastest = false
+        // Cancel on the "Connection request" dialog: don't start a
+        // connection that can only fail with "VPN interface failed".
+        if (result.resultCode != RESULT_OK) {
+            if (connect || fastest) {
+                Toast.makeText(this, getString(R.string.vpn_permission_denied), Toast.LENGTH_SHORT).show()
+            }
+            return@registerForActivityResult
+        }
+        if (connect) {
             vm.connect()
-        } else if (pendingFastest) {
-            pendingFastest = false
+        } else if (fastest) {
             vm.connectFastest()
         }
+    }
+
+    override fun onSaveInstanceState(outState: Bundle) {
+        super.onSaveInstanceState(outState)
+        outState.putBoolean(STATE_PENDING_CONNECT, pendingConnect)
+        outState.putBoolean(STATE_PENDING_FASTEST, pendingFastest)
     }
 
     // 3.2.0 (PattNG): custom geo import file picker.
@@ -175,6 +194,10 @@ class MainActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        if (savedInstanceState != null) {
+            pendingConnect = savedInstanceState.getBoolean(STATE_PENDING_CONNECT)
+            pendingFastest = savedInstanceState.getBoolean(STATE_PENDING_FASTEST)
+        }
         // 2.0.0: if the first Compose frame throws, show a plain error
         // view instead of dying — and the crash handler in LiteApp has
         // already written the full stack trace to crash-<time>.txt.
@@ -296,6 +319,7 @@ class MainActivity : ComponentActivity() {
             vm.connect()
         } else {
             pendingConnect = true
+            pendingFastest = false
             vpnPrepareLauncher.launch(prepare)
         }
     }
@@ -311,8 +335,14 @@ class MainActivity : ComponentActivity() {
             vm.connectFastest()
         } else {
             pendingFastest = true
+            pendingConnect = false
             vpnPrepareLauncher.launch(prepare)
         }
+    }
+
+    private companion object {
+        const val STATE_PENDING_CONNECT = "pending_connect"
+        const val STATE_PENDING_FASTEST = "pending_fastest"
     }
 }
 
@@ -458,6 +488,7 @@ private fun TabContent(
             selectedId = selectedId,
             isConnected = connection.state == ConnState.CONNECTED,
             listState = serversList,
+            onConnectRequest = onConnectRequest,
             onOpenQrScan = onOpenQrScan,
             onImportFile = onImportFile,
             onOpenSubscriptions = { onNavigate(SubScreen.SUBSCRIPTIONS) },
