@@ -325,7 +325,7 @@ object AetherEngine {
      * registrations (3.2.11: the WARP keys renewal). Unlike the session path it is not owned by this process
      * and writes its identity files into [identityDir]. Returns the line [match] picks, or null when the core
      * ends or [timeoutMs] passes first; [onOutput] sees every line. The process is ended on every path out.
-     * Blocking: call it off the main thread.
+     * Blocking: call it off the main thread (AetherIdentityManager runs it on Dispatchers.IO via runInterruptible).
      */
     internal fun runOneShot(
         context: Context,
@@ -338,38 +338,48 @@ object AetherEngine {
     ): String? {
         val process = try {
             startProcess(context, arguments, exitKey, identityDir = identityDir, session = false)
-        } catch (e: IOException) {
+        } catch (e: Exception) {
+            // Not only IOException: a SecurityException or a bad argument must fail the run, not crash the app.
             AppLog.e(TAG, "AetherCore: failed to launch the one-shot core", e)
             return null
         }
-        val result = AtomicReference<String?>(null)
-        val done = CountDownLatch(1)
-        thread(name = "aether-one-shot-output", isDaemon = true) {
-            try {
-                process.inputStream.bufferedReader().forEachLine { line ->
-                    val text = line.trim()
-                    if (text.isNotEmpty()) {
-                        AppLog.i(TAG, "[aether] $text")
-                        onOutput(text)
+        // The process is ended on every path out, including an interrupt of the wait below (a cancelled
+        // renewal interrupts it through runInterruptible), so no core is left running with nobody holding it.
+        try {
+            val result = AtomicReference<String?>(null)
+            val done = CountDownLatch(1)
+            thread(name = "aether-one-shot-output", isDaemon = true) {
+                try {
+                    process.inputStream.bufferedReader().forEachLine { line ->
+                        val text = line.trim()
+                        if (text.isNotEmpty()) {
+                            AppLog.i(TAG, "[aether] $text")
+                            onOutput(text)
+                        }
+                        match(text)?.let { if (result.compareAndSet(null, it)) done.countDown() }
                     }
-                    match(text)?.let { if (result.compareAndSet(null, it)) done.countDown() }
+                } catch (_: IOException) {
+                    // The process ended under the reader; the latch below settles it.
+                } catch (e: Exception) {
+                    // An unexpected error on this thread would kill the app; the run just fails.
+                    AppLog.e(TAG, "AetherCore: reading the one-shot core's output failed", e)
+                } finally {
+                    done.countDown()
                 }
-            } catch (_: IOException) {
-                // The process ended under the reader; the latch below settles it.
-            } finally {
-                done.countDown()
+            }
+            val matched = done.await(timeoutMs, TimeUnit.MILLISECONDS)
+            return if (matched) result.get() else null
+        } finally {
+            try {
+                process.destroy()
+            } catch (_: Exception) {
+            }
+            try {
+                if (!process.waitFor(2, TimeUnit.SECONDS)) process.destroyForcibly()
+            } catch (_: Exception) {
+                runCatching { process.destroyForcibly() }
             }
         }
-        val matched = done.await(timeoutMs, TimeUnit.MILLISECONDS)
-        try {
-            process.destroy()
-        } catch (_: Exception) {
-        }
-        try {
-            if (!process.waitFor(2, TimeUnit.SECONDS)) process.destroyForcibly()
-        } catch (_: Exception) {
-        }
-        return if (matched) result.get() else null
     }
 
     /**
