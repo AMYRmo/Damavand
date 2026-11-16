@@ -269,6 +269,12 @@ class MainActivity : ComponentActivity() {
 
     /** Connect, requesting the system VPN permission first if needed. */
     fun requestConnect() {
+        // 3.2.10 (PattNG root mode): no VpnService at all — no consent
+        // dialog to request.
+        if (vm.isRootModeNow()) {
+            vm.connect()
+            return
+        }
         val prepare = VpnService.prepare(this)
         if (prepare == null) {
             vm.connect()
@@ -280,6 +286,10 @@ class MainActivity : ComponentActivity() {
 
     /** Real fastest-connect (3.2.0), same VPN-permission dance. */
     fun requestFastestConnect() {
+        if (vm.isRootModeNow()) {
+            vm.connectFastest()
+            return
+        }
         val prepare = VpnService.prepare(this)
         if (prepare == null) {
             vm.connectFastest()
