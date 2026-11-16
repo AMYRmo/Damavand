@@ -392,9 +392,18 @@ object XrayConfig {
                     if (p.alpn.isNotEmpty()) {
                         putJsonArray("alpn") { p.alpn.split(",").forEach { add(JsonPrimitive(it.trim())) } }
                     }
+                    // 3.2.21: cipherSuites is a STRING, not an array — the
+                    // fork's TLSConfig splits it on ":" (transport/
+                    // internet/tls/config.go:460) and PattNG carries it
+                    // as a String too (V2rayConfig.kt:227). The array
+                    // this emitted before made the core reject the
+                    // whole config ("cannot unmarshal array into Go
+                    // struct field ... cipherSuites of type string"),
+                    // so any profile, chain or Auto group with a `cs`
+                    // link could not connect at all.
                     val suites = p.cipherSuites.split(",").map { it.trim() }.filter { it.isNotEmpty() }
                     if (suites.isNotEmpty()) {
-                        putJsonArray("cipherSuites") { suites.forEach { add(JsonPrimitive(it)) } }
+                        put("cipherSuites", suites.joinToString(":"))
                     }
                     // 3.2.9 (PattNG FmtBase/CoreOutboundBuilder): ECH +
                     // pinning. echConfigList is the pinned base64 ECH
