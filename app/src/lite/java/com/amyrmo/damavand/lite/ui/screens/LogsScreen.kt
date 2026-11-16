@@ -27,6 +27,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -36,6 +37,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -72,8 +76,19 @@ fun LogsScreen(vm: LiteViewModel, onBack: () -> Unit) {
         val q = filter.trim()
         if (q.isEmpty()) sourceLines else sourceLines.filter { it.contains(q, ignoreCase = true) }
     }
-    LaunchedEffect(shown.size) {
-        if (shown.isNotEmpty()) listState.scrollToItem(shown.size - 1)
+    // Follow the tail only while the user is at the bottom, so reading
+    // older lines isn't interrupted.
+    val atBottom by remember {
+        derivedStateOf {
+            val info = listState.layoutInfo
+            val lastVisible = info.visibleItemsInfo.lastOrNull()?.index ?: -1
+            lastVisible >= info.totalItemsCount - 3
+        }
+    }
+    // Keyed on the newest line, not the size: once the 300-line buffer
+    // is full the size stops changing and the list stopped following.
+    LaunchedEffect(shown.size, shown.lastOrNull()) {
+        if (shown.isNotEmpty() && atBottom) listState.scrollToItem(shown.size - 1)
     }
 
     Column(
@@ -82,6 +97,8 @@ fun LogsScreen(vm: LiteViewModel, onBack: () -> Unit) {
             .padding(horizontal = 20.dp)
     ) {
         Spacer(Modifier.height(24.dp))
+        val clearLabel = stringResource(R.string.logs_clear)
+        val shareLabel = stringResource(R.string.logs_share)
         Row(verticalAlignment = Alignment.CenterVertically) {
             Box(modifier = Modifier.weight(1f)) {
                 SubScreenHeader(titleRes = R.string.logs_title, onBack = onBack)
@@ -91,9 +108,13 @@ fun LogsScreen(vm: LiteViewModel, onBack: () -> Unit) {
                     .size(40.dp)
                     .background(Color.Transparent, CircleShape)
                     .border(1.dp, LiteColors.hairline, CircleShape)
-                    .clickable(onClick = {
-                        if (showCore) vm.clearCoreLog() else vm.clearLogs()
-                    }),
+                    .clickable(
+                        role = Role.Button,
+                        onClick = {
+                            if (showCore) vm.clearCoreLog() else vm.clearLogs()
+                        }
+                    )
+                    .semantics { contentDescription = clearLabel },
                 contentAlignment = Alignment.Center
             ) {
                 TrashLineIcon(size = 18.dp, color = LiteColors.error)
@@ -105,6 +126,7 @@ fun LogsScreen(vm: LiteViewModel, onBack: () -> Unit) {
                     .background(Color.Transparent, CircleShape)
                     .border(1.dp, LiteColors.hairline, CircleShape)
                     .clickable(
+                        role = Role.Button,
                         onClick = {
                             val intent = Intent(Intent.ACTION_SEND).apply {
                                 type = "text/plain"
@@ -112,7 +134,8 @@ fun LogsScreen(vm: LiteViewModel, onBack: () -> Unit) {
                             }
                             context.startActivity(Intent.createChooser(intent, "Damavand Lite"))
                         }
-                    ),
+                    )
+                    .semantics { contentDescription = shareLabel },
                 contentAlignment = Alignment.Center
             ) {
                 ShareLineIcon(size = 18.dp, color = LiteColors.text)
