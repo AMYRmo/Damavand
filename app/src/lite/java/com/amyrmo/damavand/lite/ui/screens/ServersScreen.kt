@@ -122,6 +122,9 @@ fun ServersScreen(
     selectedId: String?,
     isConnected: Boolean,
     listState: LazyListState,
+    // Connect through MainActivity.requestConnect(): VPN consent and
+    // root mode are handled there. vm.connect() connects the selection.
+    onConnectRequest: () -> Unit,
     onOpenQrScan: () -> Unit = {},
     onImportFile: () -> Unit = {},
     onOpenSubscriptions: () -> Unit = {}
@@ -741,7 +744,10 @@ fun ServersScreen(
                             live = autoLive,
                             memberName = { id -> profiles.firstOrNull { it.id == id }?.name },
                             onSelect = { vm.selectAuto(autoId) },
-                            onConnect = { vm.connectToAuto(autoId) },
+                            onConnect = {
+                                vm.selectAuto(autoId)
+                                onConnectRequest()
+                            },
                             onDetails = { showAutoSheet = true }
                         )
                         Spacer(Modifier.height(12.dp))
@@ -1017,7 +1023,11 @@ fun ServersScreen(
                 Column {
                     AddSheetRow(
                         labelRes = R.string.server_menu_connect,
-                        onClick = { vm.connectToChain(chainMenuTarget); menuChain = null }
+                        onClick = {
+                            vm.selectChain(chainMenuTarget.id)
+                            menuChain = null
+                            onConnectRequest()
+                        }
                     )
                     AddSheetRow(
                         labelRes = R.string.server_menu_delete,

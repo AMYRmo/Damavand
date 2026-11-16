@@ -507,6 +507,7 @@
     <string name="conn_server_no_response">سرور پاسخ نداد — سرور دیگری را امتحان کنید</string>
     <string name="conn_config_failed">ساخت کانفیگ ناموفق بود</string>
     <string name="conn_vpn_iface_failed">ساخت اینترفیس VPN ناموفق بود</string>
+    <string name="vpn_permission_denied">اجازهٔ VPN داده نشد؛ اتصال انجام نشد</string>
     <string name="conn_core_failed">شروع هسته ناموفق بود: %1$s</string>
     <string name="conn_root_failed">نصب قوانین روت ناموفق بود؛ گوشی روت نشده یا su رد شد</string>
     <string name="conn_aether_failed">شروع هسته Aether ناموفق بود</string>
