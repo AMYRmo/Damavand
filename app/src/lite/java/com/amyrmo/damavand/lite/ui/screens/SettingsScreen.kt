@@ -962,10 +962,22 @@ fun SettingsScreen(
                 { v: String -> vm.setTestUrl(v) }
             )
         }
+        // Numeric fields: the ranges SettingsStore clamps to, so an
+        // out-of-range value can't be saved and shown while the core
+        // silently runs a different one.
+        val numericRange = when (field) {
+            "socks_port" -> 1..65535
+            "mtu" -> 576..9000
+            "aether_listen_port" -> 1024..65535
+            "mux_concurrency", "mux_xudp_concurrency" -> 1..1024
+            "real_ping_concurrency" -> 1..20
+            else -> null
+        }
         TextEditDialog(
             titleRes = titleRes,
             descRes = descRes,
             initial = initial,
+            numericRange = numericRange,
             onDismiss = { editField = null },
             onSave = { v ->
                 onSave(v)
@@ -1022,10 +1034,13 @@ private fun TextEditDialog(
     titleRes: Int,
     descRes: Int,
     initial: String,
+    numericRange: IntRange? = null,
     onDismiss: () -> Unit,
     onSave: (String) -> Unit
 ) {
     var value by remember { mutableStateOf(initial) }
+    val valid = value.isNotBlank() &&
+        (numericRange == null || value.trim().toIntOrNull()?.let { it in numericRange } == true)
     androidx.compose.material3.AlertDialog(
         onDismissRequest = onDismiss,
         title = {
@@ -1050,6 +1065,28 @@ private fun TextEditDialog(
                     value = value,
                     onValueChange = { value = it },
                     singleLine = true,
+                    keyboardOptions = if (numericRange != null) {
+                        androidx.compose.foundation.text.KeyboardOptions(
+                            keyboardType = androidx.compose.ui.text.input.KeyboardType.Number
+                        )
+                    } else {
+                        androidx.compose.foundation.text.KeyboardOptions.Default
+                    },
+                    isError = value.isNotBlank() && !valid,
+                    supportingText = if (numericRange != null && value.isNotBlank() && !valid) {
+                        {
+                            Text(
+                                text = stringResource(
+                                    R.string.settings_value_range,
+                                    numericRange.first,
+                                    numericRange.last
+                                ),
+                                fontSize = 12.sp,
+                                color = LiteColors.error,
+                                fontFamily = Vazirmatn
+                            )
+                        }
+                    } else null,
                     textStyle = TextStyle(
                         fontFamily = Vazirmatn,
                         fontSize = 14.sp,
@@ -1070,8 +1107,8 @@ private fun TextEditDialog(
         },
         confirmButton = {
             TextButton(
-                onClick = { if (value.isNotBlank()) onSave(value.trim()) },
-                enabled = value.isNotBlank()
+                onClick = { if (valid) onSave(value.trim()) },
+                enabled = valid
             ) {
                 Text(
                     text = stringResource(R.string.server_edit_save),
