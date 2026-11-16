@@ -134,7 +134,10 @@ fun ServersScreen(
     // Home, so fastest-connect tests that group's configs) + the
     // live Auto session for the Auto card/sheet.
     val selectedGroupKey by vm.selectedGroupKey.collectAsState()
-    val autoSession by vm.autoSession.collectAsState()
+    // The no-arg StateFlow collectAsState() overload failed to resolve
+    // for this flow in CI — collect it as a plain Flow with an
+    // explicit initial instead (same values, same recomposition).
+    val autoSession by vm.autoSession.collectAsState(initial = null)
     // 3.2.0 (PattNG): delete confirmation.
     val confirmDelete by vm.confirmDelete.collectAsState(initial = true)
     val doubleColumn by vm.doubleColumn.collectAsState(initial = false)
@@ -1392,6 +1395,7 @@ private fun GroupCard(
     }
 }
 
+@Composable
 private fun ChainPickBanner(
     count: Int,
     onCreate: () -> Unit,
