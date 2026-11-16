@@ -116,6 +116,14 @@ class LiteVpnService : VpnService() {
     // session is gone and must not bring the tunnel up afterwards.
     private val sessionGen = java.util.concurrent.atomic.AtomicInteger(0)
 
+    // 3.2.23: a connect already running — a second runConnect (a new
+    // ACTION_START, or the kill-switch reconnect thread) must never
+    // overlap it: the second Aether start SIGTERMs the first core
+    // mid-startup (exit 143, zero output). Claimed in startTunnel,
+    // released when the connect worker returns, and defensively in
+    // stopTunnel.
+    private val connectInFlight = java.util.concurrent.atomic.AtomicBoolean(false)
+
     private fun sessionLive(gen: Int): Boolean =
         running && !intentionalStop && gen == sessionGen.get()
     private var currentLinks: List<String> = emptyList()
@@ -206,9 +214,15 @@ class LiteVpnService : VpnService() {
         } catch (_: Exception) {
         }
         XrayController.onCoreShutdown = {
-            if (connected) {
-                broadcastLog("core stopped unexpectedly")
-                onTunnelDropped()
+            // 3.2.23: the core reports its shutdown on its own thread;
+            // run the drop handling on the main thread, so stopTunnel's
+            // caller guard (main / current worker / current poller)
+            // lets it through.
+            android.os.Handler(android.os.Looper.getMainLooper()).post {
+                if (connected) {
+                    broadcastLog("core stopped unexpectedly")
+                    onTunnelDropped()
+                }
             }
         }
     }
@@ -467,6 +481,11 @@ class LiteVpnService : VpnService() {
         autoId: String? = null,
         aether: Boolean = false,
     ) {
+        // 3.2.23: never overlap two connects (see the field comment).
+        if (!connectInFlight.compareAndSet(false, true)) {
+            broadcastLog("connect already in progress — ignoring")
+            return
+        }
         running = true
         connected = false
         intentionalStop = false
@@ -506,6 +525,12 @@ class LiteVpnService : VpnService() {
                 broadcastLog("ERROR: ${e.message}")
                 broadcastStatus()
                 stopTunnel()
+            } finally {
+                // 3.2.23: release only once this worker has fully
+                // unwound (its failure path already ran stopTunnel):
+                // a new start claimed earlier could otherwise overlap
+                // this worker's teardown and kill the new core.
+                connectInFlight.set(false)
             }
         }, "lite-connect").also { it.start() }
     }
@@ -839,12 +864,20 @@ class LiteVpnService : VpnService() {
 
     /** The Aether core ended on its own while connected — the tunnel is dead. */
     private fun onAetherExit() {
-        if (!connected || intentionalStop) return
-        val reason = AetherEngine.stoppedMessage()
-        lastDetail = if (reason != null) getString(R.string.conn_aether_stopped, reason)
-        else getString(R.string.conn_core_failed, "")
-        broadcastStatus()
-        stopTunnel()
+        // 3.2.23: the core reports its exit on its own watch thread;
+        // run the teardown on the main thread, so stopTunnel's caller
+        // guard (main / current worker / current poller) lets it
+        // through. A newer session that already started its own core
+        // must not be stopped by this old core's exit.
+        android.os.Handler(android.os.Looper.getMainLooper()).post {
+            if (!connected || intentionalStop) return@post
+            if (AetherEngine.isRunning) return@post
+            val reason = AetherEngine.stoppedMessage()
+            lastDetail = if (reason != null) getString(R.string.conn_aether_stopped, reason)
+            else getString(R.string.conn_core_failed, "")
+            broadcastStatus()
+            stopTunnel()
+        }
     }
 
     private fun connectWinner(links: List<String>, gen: Int) {
@@ -1374,12 +1407,13 @@ class LiteVpnService : VpnService() {
             worker = Thread({
                 try {
                     Thread.sleep(2000)
-                    if (sessionLive(gen)) {
-                        val links = currentLinks
-                        if (links.isNotEmpty()) {
-                            connected = false
-                            runConnect(links, currentCandidates, currentTestUrl, gen)
-                        }
+                    // 3.2.23: go through startTunnel like any other
+                    // connect, so the in-flight guard serialises it
+                    // with the worker: a reconnect that ran runConnect
+                    // directly could overlap a fresh user connect, and
+                    // its Aether start killed the other core (143).
+                    if (sessionLive(gen) && currentLinks.isNotEmpty()) {
+                        startTunnel(currentLinks, currentCandidates, currentTestUrl, autoMode, autoId, aetherMode)
                     }
                 } catch (_: Exception) {
                 }
@@ -1392,6 +1426,17 @@ class LiteVpnService : VpnService() {
     // ---- stop ----
 
     private fun stopTunnel() {
+        // 3.2.23: a stale worker unwinding after a newer connect
+        // started must never tear the new session down: only the main
+        // thread (a user/system stop), the current connect worker, or
+        // the current poller (a tunnel drop) may stop the tunnel. A
+        // stale "lite-connect" worker whose failure path runs after a
+        // newer start would otherwise AetherEngine.stop() the new core
+        // mid-startup. (onCoreShutdown and onAetherExit post to the
+        // main thread, so they pass this guard.)
+        val caller = Thread.currentThread()
+        if (caller !== worker && caller !== poller && android.os.Looper.myLooper() != android.os.Looper.getMainLooper()) return
+        connectInFlight.set(false)
         // Per-server usage (3.1.0): attribute the session volume to
         // the exit profile (the last link) before tearing down.
         // 3.2.0: only the remainder not yet recorded live (see poller).
