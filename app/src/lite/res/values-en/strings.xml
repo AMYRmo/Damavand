@@ -152,7 +152,7 @@
     <string name="sub_import_failed_network">Fetching the subscription failed — check the internet, or try again when connected to open internet</string>
     <string name="sub_import_failed_empty">No usable config was found in this subscription</string>
     <string name="sub_import_failed_unsupported">%1$d configs with unsupported protocols were skipped — Lite currently supports VLESS, VMess, Trojan and Shadowsocks</string>
-    <string name="sub_import_failed_single">This is not a valid config link — it must be VLESS, VMess, Trojan or Shadowsocks</string>
+    <string name="sub_import_failed_single">This is not a valid config link — it must be VLESS, VMess, Trojan, Shadowsocks or Aether</string>
 
     <!-- Misc -->
     <string name="vpn_permission_title">VPN permission is needed to connect</string>
@@ -514,6 +514,7 @@
     <string name="conn_aether_stopped">The Aether core stopped: %1$s</string>
     <string name="conn_aether_no_psiphon">Psiphon mode is not supported in this build — the Psiphon client is not packaged</string>
     <string name="aether_root_unsupported">Aether cannot be combined with root mode — turn root mode off first</string>
+    <string name="chain_two_aether">A chain cannot contain more than one Aether profile — only one Aether per chain</string>
     <string name="aether_add_title">New Aether</string>
     <string name="aether_edit_title">Edit Aether</string>
     <string name="aether_protocol">Protocol</string>
