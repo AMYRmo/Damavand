@@ -526,14 +526,11 @@ class ProfileRepository(private val context: Context) {
         if (trimmed.isEmpty()) return ""
         // Plain text already contains share links.
         if (trimmed.contains("://")) return trimmed
-        // Otherwise try base64 (standard, then URL-safe).
-        for (flags in listOf(Base64.DEFAULT, Base64.URL_SAFE)) {
-            try {
-                val decoded = String(Base64.decode(trimmed, flags), Charsets.UTF_8)
-                if (decoded.contains("://")) return decoded
-            } catch (_: Exception) {
-            }
-        }
+        // Otherwise try base64 (standard or URL-safe: android Base64
+        // silently skips the other alphabet's characters, so one pass
+        // over a normalised string instead of two lossy ones).
+        val decoded = XrayConfig.b64decode(trimmed)
+        if (decoded != null && decoded.contains("://")) return decoded
         return trimmed
     }
 
