@@ -111,6 +111,18 @@
 
     <!-- Geo download -->
     <string name="geo_title">داده موقعیت</string>
+    <!-- 3.2.11 — asset URL download (PattNG UserAssetUrlActivity) -->
+    <string name="asset_url_desc">آدرس دانلود این فایل؛ خالی یعنی آدرس پیش‌فرض. فایل تازه فقط وقتی جایگزین می‌شود که سالم باشد (لیست Psiphon باید امضایش درست باشد).</string>
+    <string name="asset_url_download">دانلود</string>
+    <string name="asset_url_downloaded">فایل دانلود شد</string>
+    <string name="asset_url_failed">دانلود ناموفق بود</string>
+    <!-- 3.2.11 — Tasker plugin (PattNG ui/shortcut) -->
+    <string name="tasker_blurb_start">شروع %1$s</string>
+    <string name="tasker_blurb_stop">توقف %1$s</string>
+    <string name="tasker_start_service">شروع سرویس</string>
+    <!-- 3.2.11 — URL scheme import (PattNG UrlSchemeActivity) -->
+    <string name="import_subscription_success">وارد شد</string>
+    <string name="import_subscription_failure">وارد کردن ناموفق بود</string>
     <string name="geo_desc">برای تشخیص کشور و شهر سرورها لازم است — همراه برنامه نصب شده و به‌روزرسانی آن دانلود می‌شود</string>
     <string name="geo_download">دانلود</string>
     <string name="geo_cancel">لغو</string>
@@ -184,6 +196,13 @@
     <string name="root_lan_share_title">اشتراک‌گذاری با هات‌اسپات</string>
     <string name="root_lan_share_desc">دستگاه‌های متصل به هات‌اسپات هم از تونل رد می‌شوند</string>
     <string name="toast_root_required">دسترسی روت در دسترس نیست</string>
+    <!-- 3.2.11 — IPv6 + Aether listen port (PattNG full parity) -->
+    <string name="ipv6_enabled_title">IPv6</string>
+    <string name="ipv6_enabled_desc">تونل آدرس و مسیر IPv6 هم می‌گیرد؛ وایرگارد آدرس‌های IPv6 را نگه می‌دارد</string>
+    <string name="prefer_ipv6_title">اولویت IPv6</string>
+    <string name="prefer_ipv6_desc">وقتی یک هاست هم IPv4 هم IPv6 دارد، IPv6 انتخاب می‌شود</string>
+    <string name="aether_listen_port_title">پورت اتر</string>
+    <string name="aether_listen_port_desc">پورتی که برنامه برای SOCKS هستهٔ اتر استفاده می‌کند</string>
     <string name="mtu_title">MTU</string>
     <string name="mtu_desc">اندازه بسته تونل؛ پیش‌فرض 1500</string>
     <string name="iface_addr_title">آدرس اینترفیس</string>
@@ -264,6 +283,10 @@
     <string name="geo_import_ok">فایل geo وارد شد</string>
     <string name="geo_import_fail">وارد کردن فایل geo ناموفق بود</string>
     <string name="add_qr_scan">اسکن QR</string>
+    <!-- 3.2.11 — import from a file (PattNG ImportConfigLocal) -->
+    <string name="add_from_file">ایمپورت از فایل</string>
+    <string name="import_file_ok">%1$d کانفیگ اضافه شد</string>
+    <string name="import_file_fail">در این فایل کانفیگ معتبری پیدا نشد</string>
     <string name="qr_scan_title">اسکن QR</string>
     <string name="qr_scan_hint">دوربین را روی کد QR کانفیگ یا اشتراک بگیرید</string>
     <string name="qr_need_permission">برای اسکن، دسترسی دوربین لازم است</string>
@@ -508,10 +531,44 @@
     <string name="aether_ech">ECH</string>
     <string name="aether_tor">Tor</string>
     <string name="aether_psiphon">Psiphon</string>
-    <string name="aether_psiphon_hint">کلاینت Psiphon در این نسخه نیست — این حالت در اتصال رد می‌شود</string>
+    <string name="aether_psiphon_hint">با سرورهای عمومی Psiphon وصل می‌شود؛ لیست سرورها داخل اپ است</string>
     <string name="aether_command">دستور خام</string>
     <string name="aether_command_hint">دستور کامل هسته؛ اگر پر باشد، همه تنظیمات بالا نادیده گرفته می‌شوند</string>
     <string name="aether_default">پیش‌فرض (%1$s)</string>
+
+    <!-- 3.2.11 — WARP keys page (PattNG ServerAetherKeysActivity) -->
+    <string name="aether_keys_get_keys">دریافت کلیدهای WARP</string>
+    <string name="aether_keys_title">کلیدهای WARP</string>
+    <string name="aether_keys_kind">نوع کلید</string>
+    <string name="aether_keys_kind_all">همه</string>
+    <string name="aether_keys_enroll_address">آدرس ثبت‌نام</string>
+    <string name="aether_keys_api_sni">SNI سرور API</string>
+    <string name="aether_keys_api_host">هاست API</string>
+    <string name="aether_keys_fragment_size">اندازه تکه‌ها</string>
+    <string name="aether_keys_fragment_delay">تأخیر تکه‌ها</string>
+    <string name="aether_keys_ech_dns">DNS مربوط به ECH</string>
+    <string name="aether_keys_ech_domain">دامنه ECH</string>
+    <string name="aether_keys_final_mask">ماسک نهایی</string>
+    <string name="aether_keys_dial_mode">حالت شماره‌گیری</string>
+    <string name="aether_keys_built_command">دستور ساخته‌شده</string>
+    <string name="aether_keys_renew">دریافت کلیدهای تازه</string>
+    <string name="aether_keys_log_empty">هنوز لاگی نیست</string>
+    <string name="aether_keys_renewing">در حال دریافت کلیدها…</string>
+    <string name="aether_keys_renewed">کلیدهای تازه دریافت شدند</string>
+    <string name="aether_keys_renew_failed">دریافت کلیدها ناموفق بود</string>
+    <string name="aether_keys_renew_blocked">اول اتصال را قطع کنید، بعد کلید تازه بگیرید</string>
+    <string name="aether_keys_renew_cancelled">دریافت کلیدها لغو شد</string>
+    <string name="aether_keys_no_keys">هنوز کلیدی نیست</string>
+    <string name="aether_keys_invalid_enroll_address">آدرس ثبت‌نام معتبر نیست</string>
+    <string name="aether_keys_invalid_api_sni">SNI سرور API معتبر نیست</string>
+    <string name="aether_keys_invalid_api_host">هاست API معتبر نیست</string>
+    <string name="aether_keys_invalid_fragment">اندازه یا تأخیر تکه‌ها معتبر نیست</string>
+    <string name="aether_keys_invalid_ech_dns">DNS مربوط به ECH معتبر نیست</string>
+    <string name="aether_keys_invalid_ech_domain">دامنه ECH معتبر نیست</string>
+    <string name="aether_keys_invalid_final_mask">ماسک نهایی معتبر نیست</string>
+    <string name="aether_keys_invalid_command">دستور خام کلیدی برای ثبت ندارد</string>
+    <string name="aether_keys_exit_missing">سرور خروجی «%1$s» پیدا نشد</string>
+    <string name="aether_keys_exit_failed">اتصال از راه «%1$s» برقرار نشد</string>
     <string name="conn_tunnel_bridge_failed">شروع پل تونل ناموفق بود</string>
     <string name="conn_dropped_reconnecting">اتصال قطع شد — در حال اتصال دوباره…</string>
     <string name="notif_connecting">در حال اتصال…</string>
