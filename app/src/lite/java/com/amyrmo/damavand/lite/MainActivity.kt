@@ -3,6 +3,7 @@ package com.amyrmo.damavand.lite
 import android.content.Context
 import android.content.Intent
 import android.net.VpnService
+import android.os.Build
 import android.os.Bundle
 import android.widget.Toast
 import kotlinx.coroutines.runBlocking
@@ -21,6 +22,8 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
+import androidx.compose.material3.dynamicDarkColorScheme
+import androidx.compose.material3.dynamicLightColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
@@ -81,6 +84,12 @@ class MainActivity : ComponentActivity() {
         try {
             val themeMode = runBlocking { SettingsStore(newBase).themeModeNow() }
             LiteColors.applyDark(resolveDark(themeMode, isSystemDark(newBase)))
+            // 3.2.9: dynamic color flag (the palette itself resolves
+            // once Compose runs — until then the fixed tokens apply).
+            val dynamicColor = runBlocking { SettingsStore(newBase).dynamicColorNow() }
+            LiteColors.applyDynamic(
+                dynamicColor && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S
+            )
         } catch (_: Exception) {
         }
         super.attachBaseContext(
@@ -161,8 +170,31 @@ class MainActivity : ComponentActivity() {
                 // re-applies it, and the system bars follow the theme.
                 val themeMode by vm.themeMode.collectAsState(initial = "system")
                 val systemDark = isSystemInDarkTheme()
+                val isDark = resolveDark(themeMode, systemDark)
+                // 3.2.9 (PattNG dynamicColor): Android 12+ only — the
+                // wallpaper palette, resolved in composition (the
+                // dynamic*ColorScheme calls are @Composable).
+                val dynamicColor by vm.dynamicColor.collectAsState(initial = false)
+                val useDynamic = dynamicColor &&
+                    Build.VERSION.SDK_INT >= Build.VERSION_CODES.S
+                val dynamicScheme = if (useDynamic) {
+                    if (isDark) dynamicDarkColorScheme(this) else dynamicLightColorScheme(this)
+                } else null
                 SideEffect {
-                    LiteColors.applyDark(resolveDark(themeMode, systemDark))
+                    LiteColors.applyDark(isDark)
+                    LiteColors.applyDynamic(useDynamic)
+                    if (dynamicScheme != null) {
+                        LiteColors.applyDynamicScheme(
+                            accent = dynamicScheme.primary,
+                            bg = dynamicScheme.background,
+                            surface = dynamicScheme.surface,
+                            surface2 = dynamicScheme.surfaceVariant,
+                            text = dynamicScheme.onBackground,
+                            textSecondary = dynamicScheme.onSurfaceVariant,
+                        )
+                    } else {
+                        LiteColors.applyDynamicScheme(null, null, null, null, null, null)
+                    }
                     window.statusBarColor = LiteColors.bg.toArgb()
                     window.navigationBarColor = LiteColors.bg.toArgb()
                     WindowCompat.getInsetsController(window, window.decorView).apply {
