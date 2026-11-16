@@ -65,11 +65,13 @@ import androidx.compose.ui.text.style.TextDirection
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.amyrmo.damavand.lite.AutoSelectIds
 import com.amyrmo.damavand.lite.Chain
 import com.amyrmo.damavand.lite.QrShare
 import com.amyrmo.damavand.lite.R
 import com.amyrmo.damavand.lite.Profile
 import com.amyrmo.damavand.lite.Subscription
+import com.amyrmo.damavand.lite.XrayConfig
 import com.amyrmo.damavand.lite.ui.LiteViewModel
 import com.amyrmo.damavand.lite.ui.components.ChainLineIcon
 import com.amyrmo.damavand.lite.ui.components.CheckLineIcon
@@ -128,11 +130,13 @@ fun ServersScreen(
     val testingIds by vm.testingIds.collectAsState()
     val chains by vm.chains.collectAsState()
     val chainPick by vm.chainPick.collectAsState()
-    // 3.2.0 (PattNG): groups flagged as leastPing balancers.
-    val balancerGroups by vm.balancerGroups.collectAsState()
-    // 3.2.0 (PattNG): delete confirmation + the «همه» group.
+    // 3.2.8: the selected group lives in the VM now (shared with
+    // Home, so fastest-connect tests that group's configs) + the
+    // live Auto session for the Auto card/sheet.
+    val selectedGroupKey by vm.selectedGroupKey.collectAsState()
+    val autoSession by vm.autoSession.collectAsState()
+    // 3.2.0 (PattNG): delete confirmation.
     val confirmDelete by vm.confirmDelete.collectAsState(initial = true)
-    val showAllGroups by vm.showAllGroups.collectAsState(initial = false)
     val doubleColumn by vm.doubleColumn.collectAsState(initial = false)
     val subscriptions by vm.subscriptions.collectAsState()
     val context = LocalContext.current
@@ -150,8 +154,7 @@ fun ServersScreen(
     val scope = rememberCoroutineScope()
     // 3.2.2: sub cards are a horizontal row — one group is
     // selected at a time and its servers show below.
-    var selectedGroupKey by remember { mutableStateOf<String?>(null) }
-    var showAutoInfo by remember { mutableStateOf(false) }
+    var showAutoSheet by remember { mutableStateOf(false) }
     var selectedIds by remember { mutableStateOf<Set<String>>(emptySet()) }
     var menuProfile by remember { mutableStateOf<Profile?>(null) }
     var menuChain by remember { mutableStateOf<Chain?>(null) }
@@ -189,11 +192,12 @@ fun ServersScreen(
             sortProfiles(filtered, sortMode)
         }
     }
-    val groups: List<ServerGroup> = remember(flatList, subscriptions, showAllGroups) {
+    val groups: List<ServerGroup> = remember(flatList, subscriptions) {
         val bySub = flatList.groupBy { it.subscriptionUrl }
         val ordered = ArrayList<ServerGroup>()
-        // 3.2.0 (PattNG): the «همه» group shows every profile first.
-        if (showAllGroups && flatList.isNotEmpty()) {
+        // 3.2.8: the «همه» (All) tab is always first — every config,
+        // no setting gate (Amir: «یه تب all برای کل کانفیگ ها بذار»).
+        if (flatList.isNotEmpty()) {
             ordered.add(ServerGroup("__all__", "", flatList))
         }
         for (sub in subscriptions) {
@@ -217,8 +221,9 @@ fun ServersScreen(
     val allFailed = profiles.isNotEmpty() && !isTesting &&
         profiles.all { it.lastTestedAt > 0 && it.lastPingMs <= 0 }
 
-    // 3.2.2: the selected group — the group of the selected
-    // profile when nothing is chosen yet, else the first group.
+    // 3.2.2: the selected group — the stored group when the user
+    // picked one, else the group of the selected profile, else the
+    // first group (the All tab when it exists).
     val selectedGroup: ServerGroup? = remember(groups, selectedGroupKey, selectedId) {
         val byKey = selectedGroupKey?.let { key -> groups.firstOrNull { it.key == key } }
         byKey
@@ -227,23 +232,9 @@ fun ServersScreen(
             }
             ?: groups.firstOrNull()
     }
-    val selectedIsBalancer = selectedGroup?.let { it.key in balancerGroups } ?: false
-    val selectedBalancerToggle: (() -> Unit)? = selectedGroup
-        ?.let { g -> { vm.setBalancerGroup(g.key, !selectedIsBalancer) } }
-    val selectedBalancerConnect: (() -> Unit)? = selectedGroup
-        ?.takeIf { selectedIsBalancer }
-        ?.let { g ->
-            {
-                vm.connectToBalancerGroup(
-                    g.key,
-                    when {
-                        g.key == "__all__" -> context.getString(R.string.servers_group_all)
-                        g.key.isEmpty() -> context.getString(R.string.servers_group_manual)
-                        else -> g.title
-                    }
-                )
-            }
-        }
+    // 3.2.8 (Auto): this group's Auto entry id + its live session.
+    val autoId = selectedGroup?.let { AutoSelectIds.ofGroup(it.key) }
+    val autoLive = autoSession?.takeIf { it.profileId == autoId }
 
     // 3.2.0 (PattNG): when delete confirmation is off, deletes run
     // immediately instead of showing the confirm dialog.
@@ -291,7 +282,7 @@ fun ServersScreen(
         val group = groups.firstOrNull { g ->
             g.key != "__all__" && g.profiles.any { it.id == targetId }
         } ?: return
-        selectedGroupKey = group.key
+        vm.selectGroup(group.key)
         val posInGroup = group.profiles.indexOfFirst { it.id == targetId }
         // 3.2.7: in double-column mode two profiles share one item.
         val rowPos = if (doubleColumn) posInGroup / 2 else posInGroup
@@ -629,7 +620,7 @@ fun ServersScreen(
                                     subscription = sub,
                                     count = group.profiles.size,
                                     selected = group.key == selectedGroup?.key,
-                                    onSelect = { selectedGroupKey = group.key },
+                                    onSelect = { vm.selectGroup(group.key) },
                                     onRefresh = { vm.updateSubscription(group.key) },
                                     onOpenSubscriptions = onOpenSubscriptions,
                                     modifier = Modifier.width(300.dp)
@@ -643,7 +634,7 @@ fun ServersScreen(
                                     },
                                     count = group.profiles.size,
                                     selected = group.key == selectedGroup?.key,
-                                    onSelect = { selectedGroupKey = group.key },
+                                    onSelect = { vm.selectGroup(group.key) },
                                     modifier = Modifier.width(300.dp)
                                 )
                             }
@@ -651,24 +642,23 @@ fun ServersScreen(
                     }
                     Spacer(Modifier.height(12.dp))
                 }
-                // 3.2.2: the Auto card — the app picks the fastest
-                // server of the selected group itself and fails over
-                // if it drops. 3.2.3: for ALL groups, including
-                // «همه» and single-server groups.
+                // 3.2.8 (Auto, Damavand-faithful): the Auto card is a
+                // SELECTABLE server row for the selected group — tap to
+                // select it, play to connect through it, (i) for the
+                // live members + switch history. The core measures the
+                // members and switches by itself; there is no toggle.
                 val autoGroup = selectedGroup
-                if (autoGroup != null) {
+                if (autoGroup != null && autoId != null) {
                     item(key = "auto-card") {
-                        AutoCard(
-                            title = when {
-                                autoGroup.key == "__all__" -> stringResource(R.string.servers_group_all)
-                                autoGroup.key.isEmpty() -> stringResource(R.string.servers_group_manual)
-                                else -> autoGroup.title
-                            },
-                            count = autoGroup.profiles.size,
-                            isBalancer = selectedIsBalancer,
-                            onToggle = { selectedBalancerToggle?.invoke() },
-                            onConnect = selectedBalancerConnect,
-                            onInfo = { showAutoInfo = true }
+                        AutoSelectCard(
+                            groupLabel = vm.groupLabel(autoGroup.key),
+                            memberCount = autoGroup.profiles.size,
+                            active = selectedId == autoId,
+                            live = autoLive,
+                            memberName = { id -> profiles.firstOrNull { it.id == id }?.name },
+                            onSelect = { vm.selectAuto(autoId) },
+                            onConnect = { vm.connectToAuto(autoId) },
+                            onDetails = { showAutoSheet = true }
                         )
                         Spacer(Modifier.height(12.dp))
                     }
@@ -950,22 +940,42 @@ fun ServersScreen(
         )
     }
 
-    // ---- Edit dialog (3.1.0, PattNG) ----
+    // ---- Edit dialog (3.2.8, PattNG): the structured per-protocol
+    // editor when the link parses (address, port, UUID/password,
+    // security, fingerprint, ALPN… — like ServerVlessActivity); the
+    // raw link box stays as the fallback for unparseable links.
     val editing = editProfile
     if (editing != null) {
-        EditProfileDialog(
-            profile = editing,
-            onDismiss = { editProfile = null },
-            onSave = { name, link, onResult ->
-                vm.updateProfileLink(editing.id, link) { ok ->
-                    if (ok) {
-                        vm.renameProfile(editing.id, name)
-                        editProfile = null
+        val parsed = XrayConfig.parse(editing.link)
+        if (parsed != null && parsed.proto != "custom") {
+            EditConfigDialog(
+                profile = editing,
+                onDismiss = { editProfile = null },
+                onSave = { name, link, onResult ->
+                    vm.updateProfileLink(editing.id, link) { ok ->
+                        if (ok) {
+                            vm.renameProfile(editing.id, name)
+                            editProfile = null
+                        }
+                        onResult(ok)
                     }
-                    onResult(ok)
                 }
-            }
-        )
+            )
+        } else {
+            EditProfileDialog(
+                profile = editing,
+                onDismiss = { editProfile = null },
+                onSave = { name, link, onResult ->
+                    vm.updateProfileLink(editing.id, link) { ok ->
+                        if (ok) {
+                            vm.renameProfile(editing.id, name)
+                            editProfile = null
+                        }
+                        onResult(ok)
+                    }
+                }
+            )
+        }
     }
 
     // ---- Share dialog with QR (3.1.0, PattNG) ----
@@ -1029,40 +1039,16 @@ fun ServersScreen(
         )
     }
 
-    // 3.2.2: Auto card (i) — what automatic selection does.
-    if (showAutoInfo) {
-        AlertDialog(
-            onDismissRequest = { showAutoInfo = false },
-            title = {
-                Text(
-                    text = stringResource(R.string.auto_info_title),
-                    fontSize = 16.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = LiteColors.text,
-                    fontFamily = Vazirmatn
-                )
-            },
-            text = {
-                Text(
-                    text = stringResource(R.string.auto_info_body),
-                    fontSize = 14.sp,
-                    color = LiteColors.textSecondary,
-                    fontFamily = Vazirmatn
-                )
-            },
-            confirmButton = {},
-            dismissButton = {
-                TextButton(onClick = { showAutoInfo = false }) {
-                    Text(
-                        text = stringResource(R.string.dialog_ok),
-                        fontSize = 14.sp,
-                        color = LiteColors.textSecondary,
-                        fontFamily = Vazirmatn
-                    )
-                }
-            },
-            containerColor = LiteColors.surface,
-            shape = RoundedCornerShape(20.dp)
+    // 3.2.8 (Auto): the details sheet — live exit, switch history,
+    // per-member health, pinning.
+    if (showAutoSheet && selectedGroup != null && autoId != null) {
+        AutoSelectSheet(
+            groupLabel = vm.groupLabel(selectedGroup.key),
+            members = selectedGroup.profiles,
+            live = autoLive,
+            onDismiss = { showAutoSheet = false },
+            onPin = { tag -> vm.pinAutoMember(tag) },
+            onUnpin = { vm.unpinAutoMember() }
         )
     }
 }
@@ -1406,104 +1392,6 @@ private fun GroupCard(
     }
 }
 
-// 3.2.2: the Auto card — the app picks the fastest server of the
-// selected subscription itself (leastPing balancer) and fails over
-// to the next one if it drops. Checkmark toggles auto mode, the
-// play button connects through it, (i) explains it.
-@Composable
-private fun AutoCard(
-    title: String,
-    count: Int,
-    isBalancer: Boolean,
-    onToggle: () -> Unit,
-    onConnect: (() -> Unit)?,
-    onInfo: () -> Unit
-) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clip(RoundedCornerShape(20.dp))
-            .background(LiteColors.surface)
-            .border(
-                1.dp,
-                if (isBalancer) LiteColors.accent else LiteColors.hairline,
-                RoundedCornerShape(20.dp)
-            )
-            .clickable(onClick = onToggle)
-            .padding(16.dp),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        Box(
-            modifier = Modifier
-                .size(40.dp)
-                .clip(CircleShape)
-                .background(if (isBalancer) LiteColors.accent else LiteColors.surface2),
-            contentAlignment = Alignment.Center
-        ) {
-            Icon(
-                imageVector = BoltVector,
-                contentDescription = null,
-                tint = if (isBalancer) Color.White else LiteColors.textSecondary,
-                modifier = Modifier.size(20.dp)
-            )
-        }
-        Spacer(Modifier.width(12.dp))
-        Column(modifier = Modifier.weight(1f)) {
-            Text(
-                text = stringResource(R.string.auto_card_title, title),
-                fontSize = 15.sp,
-                fontWeight = FontWeight.Bold,
-                color = LiteColors.text,
-                fontFamily = Vazirmatn,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis
-            )
-            Spacer(Modifier.height(2.dp))
-            Text(
-                text = stringResource(
-                    R.string.auto_card_desc,
-                    LiteFormat.toPersian(count.toString())
-                ),
-                fontSize = 12.sp,
-                color = LiteColors.textSecondary,
-                fontFamily = Vazirmatn
-            )
-        }
-        if (onConnect != null) {
-            Spacer(Modifier.width(8.dp))
-            CircleIconButton(
-                buttonSize = 32.dp,
-                glyphSize = 15.dp,
-                filled = false,
-                onClick = onConnect,
-                glyphColor = LiteColors.accent,
-                icon = PlayVector
-            )
-        }
-        Spacer(Modifier.width(8.dp))
-        CircleIconButton(
-            buttonSize = 32.dp,
-            glyphSize = 15.dp,
-            filled = isBalancer,
-            onClick = onToggle,
-            glyphColor = if (isBalancer) LiteColors.accent else LiteColors.textSecondary,
-            icon = CheckVector
-        )
-        Spacer(Modifier.width(8.dp))
-        CircleIconButton(
-            buttonSize = 32.dp,
-            glyphSize = 15.dp,
-            filled = false,
-            onClick = onInfo,
-            glyphColor = LiteColors.textSecondary,
-            icon = InfoVector
-        )
-    }
-}
-
-// ---- Chain pick banner (3.0.0, PattNG chain) ----
-
-@Composable
 private fun ChainPickBanner(
     count: Int,
     onCreate: () -> Unit,
