@@ -259,6 +259,11 @@ object AetherEngine {
 
     private fun open(target: Session, context: Context, arguments: List<String>, exitKey: String) {
         if (session !== target) return
+        // 3.2.21: the exact command the session runs with, so a core
+        // that dies before printing anything can still be diagnosed
+        // from the log. No secrets ride in the arguments (identities
+        // reach the core through its environment, not its flags).
+        AppLog.i(TAG, "AetherCore: starting: ${AetherCore.COMMAND_NAME} ${arguments.joinToString(" ")}")
         reapStale(context, AetherArgs.listenerAddressOf(arguments))
         val process = try {
             startProcess(context, arguments, exitKey = exitKey)
