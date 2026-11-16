@@ -111,6 +111,18 @@
 
     <!-- Geo download -->
     <string name="geo_title">Location data</string>
+    <!-- 3.2.11 — asset URL download (PattNG UserAssetUrlActivity) -->
+    <string name="asset_url_desc">The URL this file downloads from; empty means the built-in one. A new file replaces the old one only when it checks out (the Psiphon list must verify).</string>
+    <string name="asset_url_download">Download</string>
+    <string name="asset_url_downloaded">File downloaded</string>
+    <string name="asset_url_failed">Download failed</string>
+    <!-- 3.2.11 — Tasker plugin (PattNG ui/shortcut) -->
+    <string name="tasker_blurb_start">Start %1$s</string>
+    <string name="tasker_blurb_stop">Stop %1$s</string>
+    <string name="tasker_start_service">Start service</string>
+    <!-- 3.2.11 — URL scheme import (PattNG UrlSchemeActivity) -->
+    <string name="import_subscription_success">Imported</string>
+    <string name="import_subscription_failure">Import failed</string>
     <string name="geo_desc">Needed to detect server countries and cities — bundled with the app, updates are downloaded</string>
     <string name="geo_download">Download</string>
     <string name="geo_cancel">Cancel</string>
@@ -184,6 +196,13 @@
     <string name="root_lan_share_title">Hotspot sharing</string>
     <string name="root_lan_share_desc">Devices on your hotspot go through the tunnel too</string>
     <string name="toast_root_required">Root access is not available</string>
+    <!-- 3.2.11 — IPv6 + Aether listen port (PattNG full parity) -->
+    <string name="ipv6_enabled_title">IPv6</string>
+    <string name="ipv6_enabled_desc">The tunnel also takes an IPv6 address and route; WireGuard keeps its IPv6 addresses</string>
+    <string name="prefer_ipv6_title">Prefer IPv6</string>
+    <string name="prefer_ipv6_desc">When a host has both IPv4 and IPv6, pick IPv6</string>
+    <string name="aether_listen_port_title">Aether port</string>
+    <string name="aether_listen_port_desc">The port the app dials for the Aether core SOCKS listener</string>
     <string name="mtu_title">MTU</string>
     <string name="mtu_desc">Tunnel packet size; default 1500</string>
     <string name="iface_addr_title">Interface address</string>
@@ -264,6 +283,10 @@
     <string name="geo_import_ok">Geo file imported</string>
     <string name="geo_import_fail">Importing the geo file failed</string>
     <string name="add_qr_scan">Scan QR</string>
+    <!-- 3.2.11 — import from a file (PattNG ImportConfigLocal) -->
+    <string name="add_from_file">Import from file</string>
+    <string name="import_file_ok">%1$d configs added</string>
+    <string name="import_file_fail">No usable config found in this file</string>
     <string name="qr_scan_title">Scan QR</string>
     <string name="qr_scan_hint">Point the camera at the QR code of a config or subscription</string>
     <string name="qr_need_permission">Camera access is needed to scan</string>
@@ -509,10 +532,44 @@
     <string name="aether_ech">ECH</string>
     <string name="aether_tor">Tor</string>
     <string name="aether_psiphon">Psiphon</string>
-    <string name="aether_psiphon_hint">The Psiphon client is not in this build — this mode is refused at connect time</string>
+    <string name="aether_psiphon_hint">Connects through Psiphon public servers; the server list ships in the app</string>
     <string name="aether_command">Raw command</string>
     <string name="aether_command_hint">The full core command; when set, all settings above are ignored</string>
     <string name="aether_default">Default (%1$s)</string>
+
+    <!-- 3.2.11 — WARP keys page (PattNG ServerAetherKeysActivity) -->
+    <string name="aether_keys_get_keys">Get WARP keys</string>
+    <string name="aether_keys_title">WARP keys</string>
+    <string name="aether_keys_kind">Key kind</string>
+    <string name="aether_keys_kind_all">All</string>
+    <string name="aether_keys_enroll_address">Enroll address</string>
+    <string name="aether_keys_api_sni">API SNI</string>
+    <string name="aether_keys_api_host">API host</string>
+    <string name="aether_keys_fragment_size">Fragment size</string>
+    <string name="aether_keys_fragment_delay">Fragment delay</string>
+    <string name="aether_keys_ech_dns">ECH DNS</string>
+    <string name="aether_keys_ech_domain">ECH domain</string>
+    <string name="aether_keys_final_mask">Final mask</string>
+    <string name="aether_keys_dial_mode">Dial mode</string>
+    <string name="aether_keys_built_command">Built command</string>
+    <string name="aether_keys_renew">Get new keys</string>
+    <string name="aether_keys_log_empty">No log yet</string>
+    <string name="aether_keys_renewing">Getting new keys…</string>
+    <string name="aether_keys_renewed">New keys received</string>
+    <string name="aether_keys_renew_failed">Getting new keys failed</string>
+    <string name="aether_keys_renew_blocked">Disconnect first, then get new keys</string>
+    <string name="aether_keys_renew_cancelled">Getting new keys cancelled</string>
+    <string name="aether_keys_no_keys">No keys yet</string>
+    <string name="aether_keys_invalid_enroll_address">Enroll address is not valid</string>
+    <string name="aether_keys_invalid_api_sni">API SNI is not valid</string>
+    <string name="aether_keys_invalid_api_host">API host is not valid</string>
+    <string name="aether_keys_invalid_fragment">Fragment size or delay is not valid</string>
+    <string name="aether_keys_invalid_ech_dns">ECH DNS is not valid</string>
+    <string name="aether_keys_invalid_ech_domain">ECH domain is not valid</string>
+    <string name="aether_keys_invalid_final_mask">Final mask is not valid</string>
+    <string name="aether_keys_invalid_command">The raw command registers no keys</string>
+    <string name="aether_keys_exit_missing">Exit node “%1$s” not found</string>
+    <string name="aether_keys_exit_failed">Could not dial out through “%1$s”</string>
     <string name="conn_tunnel_bridge_failed">Starting the tunnel bridge failed</string>
     <string name="conn_dropped_reconnecting">Connection dropped — reconnecting…</string>
     <string name="notif_connecting">Connecting…</string>
