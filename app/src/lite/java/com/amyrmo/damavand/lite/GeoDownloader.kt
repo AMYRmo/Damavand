@@ -82,9 +82,85 @@ class GeoDownloader(private val context: Context) {
         }
     }
 
+    /**
+     * Download one asset file from a URL the user gave (3.2.11, PattNG UserAssetUrlActivity):
+     * geoip.dat / geosite.dat go over the files in the geo dir, psiphon_servers.dat over the copy in
+     * the asset dir — but only once the download reads as the asset it claims to be: a geo file must
+     * be non-empty, a Psiphon list must unpack and verify (PsiphonServerList.unpack). The previous
+     * good file stays until the new one verifies. Returns true on success.
+     */
+    fun downloadFromUrl(url: String, kind: String): Boolean {
+        cancelRequested = false
+        return try {
+            val tmpDir = File(context.cacheDir, "geo-tmp").apply { mkdirs() }
+            val tmp = File(tmpDir, "asset-url.tmp")
+            downloadFrom(url, tmp, null) {}
+            when (kind) {
+                "geoip", "geosite" -> {
+                    val target = if (kind == "geoip") geoipFile else geositeFile
+                    geoDir.mkdirs()
+                    tmp.copyTo(target, overwrite = true)
+                    writeMeta(Meta(version = "custom", downloadedAt = System.currentTimeMillis()))
+                    refreshState()
+                }
+                "psiphon" -> {
+                    // The list must unpack and verify before it replaces the copy in use.
+                    com.amyrmo.damavand.lite.aether.PsiphonServerList.unpack(
+                        tmp.readBytes(),
+                        com.amyrmo.damavand.lite.aether.PsiphonServerList.SIGNING_KEY,
+                    )
+                    geoDir.mkdirs()
+                    val copy = File(geoDir, com.amyrmo.damavand.lite.aether.PsiphonServerList.SERVERS_DAT)
+                    tmp.copyTo(copy, overwrite = true)
+                    // A download from now beats the bundled list until a bundle published after it ships.
+                    copy.setLastModified(System.currentTimeMillis())
+                }
+                else -> return false
+            }
+            true
+        } catch (_: Exception) {
+            false
+        } finally {
+            cleanupPartial()
+        }
+    }
+
     fun refreshState() {
         ensureBundled()
         _state.value = currentState()
+    }
+
+    /**
+     * Copy the Psiphon server list bundled in the APK (3.2.11, PattNG
+     * PsiphonServerList) into the asset dir when the bundled list goes
+     * over the copy there: no copy yet, or the bundled list was
+     * published after the copy was made (and the copy is not one the
+     * user picked). The copy's time is set to the list's publication
+     * time, so a later bundle is newer and an earlier one is not. A
+     * no-op when the copy is already current.
+     */
+    fun ensurePsiphonList(): Boolean {
+        return try {
+            val copy = File(geoDir, com.amyrmo.damavand.lite.aether.PsiphonServerList.SERVERS_DAT)
+            val stamp = try {
+                context.assets.open(com.amyrmo.damavand.lite.aether.PsiphonServerList.SERVERS_STAMP)
+                    .bufferedReader().readText().trim()
+            } catch (_: Exception) {
+                null
+            }
+            val publishedAt = com.amyrmo.damavand.lite.aether.PsiphonServerList.publishedAt(stamp)
+            if (!com.amyrmo.damavand.lite.aether.PsiphonServerList.bundledListGoesOver(copy, publishedAt, keptByUser = false)) {
+                return copy.isFile
+            }
+            geoDir.mkdirs()
+            context.assets.open(com.amyrmo.damavand.lite.aether.PsiphonServerList.SERVERS_DAT).use { input ->
+                FileOutputStream(copy).use { input.copyTo(it) }
+            }
+            if (publishedAt > 0) copy.setLastModified(publishedAt)
+            copy.isFile
+        } catch (_: Exception) {
+            false
+        }
     }
 
     /**
@@ -151,6 +227,10 @@ class GeoDownloader(private val context: Context) {
 
     /** True when both geo files are present (the core may use geo rules). */
     fun isReady(): Boolean {
+        // 3.2.11: the Psiphon list rides along — the Aether core needs
+        // it unpacked before the first Psiphon connect, and isReady()
+        // is asked on every connect.
+        ensurePsiphonList()
         if (filesPresent()) return true
         // First run after install: the APK bundles the files, so copy
         // them over before answering (the service asks this at connect).
@@ -302,6 +382,10 @@ class GeoDownloader(private val context: Context) {
     }
 
     companion object {
+        /** The URL each asset downloads from unless the user set another (3.2.11, PattNG UserAssetUrlActivity). */
+        const val DEFAULT_GEOIP_URL = "https://cdn.jsdelivr.net/gh/Loyalsoldier/v2ray-rules-dat@release/geoip.dat"
+        const val DEFAULT_GEOSITE_URL = "https://cdn.jsdelivr.net/gh/Loyalsoldier/v2ray-rules-dat@release/geosite.dat"
+
         /**
          * Per file: (download URL, checksum URL or null). First entry is
          * the jsDelivr mirror of the v2fly release (Loyalsoldier's
