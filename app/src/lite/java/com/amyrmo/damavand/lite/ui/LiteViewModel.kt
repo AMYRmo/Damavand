@@ -19,6 +19,8 @@ import androidx.work.WorkManager
 import com.amyrmo.damavand.lite.AppLog
 import com.amyrmo.damavand.lite.AutoSelect
 import com.amyrmo.damavand.lite.AutoSelectIds
+import com.amyrmo.damavand.lite.aether.AetherArgs
+import com.amyrmo.damavand.lite.aether.AetherDelayTester
 import com.amyrmo.damavand.lite.aether.AetherIdentityManager
 import com.amyrmo.damavand.lite.aether.AetherKey
 import com.amyrmo.damavand.lite.aether.AetherKeys
@@ -820,6 +822,19 @@ class LiteViewModel(app: Application) : AndroidViewModel(app) {
             } catch (_: Exception) {
                 false
             }
+            // 3.2.13 (PattNG AetherDelayTester): the Aether listen port
+            // and the delay-test URL, once per run, for the Aether
+            // profiles the sweep now measures through a test tunnel.
+            val aetherPort = try {
+                settings.aetherListenPortNow()
+            } catch (_: Exception) {
+                AetherArgs.SOCKS_PORT
+            }
+            val testUrl = try {
+                settings.testUrlNow()
+            } catch (_: Exception) {
+                "https://www.google.com/generate_204"
+            }
             // 3.1.1 — ping in parallel, but collect the results and
             // save ONCE at the end: per-profile updatePing from parallel
             // coroutines raced on profiles.json and wiped every config
@@ -829,7 +844,22 @@ class LiteViewModel(app: Application) : AndroidViewModel(app) {
             val jobs = list.map { profile ->
                 launch {
                     semaphore.withPermit {
-                        val ping = PingTester.ping(profile, preferIpv6)
+                        val ping = if (profile.isAether) {
+                            // 3.2.13 (PattNG AetherDelayTester): measured
+                            // through a test tunnel, not the server ping
+                            // — the core has no server to ping. Refused
+                            // beside a live Aether session; the tester
+                            // serialises the Aether profiles itself.
+                            if (aetherSessionLive()) -1L
+                            else AetherDelayTester.measure(
+                                context,
+                                AetherSettings.fromJson(profile.aetherJson),
+                                aetherPort,
+                                testUrl,
+                            )
+                        } else {
+                            PingTester.ping(profile, preferIpv6)
+                        }
                         results[profile.id] = ping
                         withContext(Dispatchers.Main) {
                             _testingIds.update { it - profile.id }
@@ -1014,21 +1044,46 @@ class LiteViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
+    /**
+     * True while the live session runs on an Aether core (3.2.13): an
+     * Aether delay test must not start then — AetherEngine.start stops
+     * any running session first and would kill the tunnel.
+     */
+    private fun aetherSessionLive(): Boolean {
+        val state = _connection.value.state
+        if (state != ConnState.CONNECTED && state != ConnState.CONNECTING) return false
+        if (selectedProfile?.isAether == true) return true
+        val chain = selectedChain ?: return false
+        return chain.memberIds.any { id ->
+            _profiles.value.firstOrNull { it.id == id }?.isAether == true
+        }
+    }
+
     /** Ping one profile (3.0.0, PattNG per-config test). */
     fun testOne(profile: Profile) {
-        // 3.2.10 (Aether): an Aether profile has no server to ping —
-        // its ping stays untouched.
-        if (profile.isAether) return
         if (profile.id in _testingIds.value) return
         _testingIds.update { it + profile.id }
         viewModelScope.launch(Dispatchers.IO) {
-            // 3.2.11 (PattNG prefer-IPv6).
-            val preferIpv6 = try {
-                settings.preferIpv6Now()
-            } catch (_: Exception) {
-                false
+            val ping = if (profile.isAether) {
+                // 3.2.13 (PattNG AetherDelayTester): a test tunnel on
+                // the Aether listen port; refused beside a live Aether
+                // session, whose core holds that port.
+                if (aetherSessionLive()) -1L
+                else AetherDelayTester.measure(
+                    context,
+                    AetherSettings.fromJson(profile.aetherJson),
+                    try { settings.aetherListenPortNow() } catch (_: Exception) { AetherArgs.SOCKS_PORT },
+                    try { settings.testUrlNow() } catch (_: Exception) { "https://www.google.com/generate_204" },
+                )
+            } else {
+                // 3.2.11 (PattNG prefer-IPv6).
+                val preferIpv6 = try {
+                    settings.preferIpv6Now()
+                } catch (_: Exception) {
+                    false
+                }
+                PingTester.ping(profile, preferIpv6)
             }
-            val ping = PingTester.ping(profile, preferIpv6)
             repo.updatePing(profile.id, ping)
             withContext(Dispatchers.Main) {
                 refreshProfiles()
