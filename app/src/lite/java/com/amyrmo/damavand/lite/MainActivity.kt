@@ -266,15 +266,17 @@ class MainActivity : ComponentActivity() {
         }
         // One auto-connect attempt on launch (spec §7.1) — unless a
         // shortcut/widget action already decided what to do (3.2.0).
-        // Only on a fresh start: a recreation (language change, dark
-        // mode, font scale, multi-window, process death) must not
-        // reconnect a VPN the user turned off, nor replay the intent.
-        if (savedInstanceState == null) {
-            when (consumeLiteAction(intent)) {
-                "connect" -> requestConnect()
-                "disconnect" -> vm.disconnect()
-                else -> runCatching { vm.autoConnectOnce() }
-            }
+        // The shortcut/widget action runs only on a fresh start: a
+        // recreation (language change, dark mode, font scale,
+        // multi-window, process death) must not replay the intent.
+        // Auto-connect is guarded by the ViewModel itself (once per
+        // ViewModel), so it still runs after a relaunch from recents
+        // following process death.
+        val liteAction = if (savedInstanceState == null) consumeLiteAction(intent) else null
+        when (liteAction) {
+            "connect" -> requestConnect()
+            "disconnect" -> vm.disconnect()
+            else -> runCatching { vm.autoConnectOnce() }
         }
     }
 
