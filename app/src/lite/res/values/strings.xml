@@ -56,6 +56,7 @@
     <!-- Servers -->
     <string name="btn_test_all">تست همه سرورها</string>
     <string name="btn_testing">در حال تست…</string>
+    <string name="cancel_test">لغو تست</string>
     <string name="test_note">تست فقط هنگام باز بودن این صفحه اجرا می‌شود</string>
     <string name="servers_chain_hint">برای ساخت زنجیره، روی یک سرور نگه دارید و سرورها را به‌ترتیب انتخاب کنید</string>
     <string name="server_delete_title">حذف سرور</string>
