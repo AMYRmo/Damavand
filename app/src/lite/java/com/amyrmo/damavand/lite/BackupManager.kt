@@ -83,6 +83,18 @@ object BackupManager {
             // a restore used to lose both.
             settings.put("theme_mode", store.themeMode.first())
             settings.put("balancer_groups", JSONArray(store.balancerGroups.first().toList()))
+            settings.put("double_column", store.doubleColumn.first())
+            // 3.2.8: the Auto group + tuning were missing too.
+            store.selectedGroup.first()?.let { settings.put("selected_group", it) }
+            settings.put("auto_probe_url", store.autoProbeUrl.first())
+            settings.put("auto_check_seconds", store.autoCheckSeconds.first())
+            settings.put("auto_sweep_minutes", store.autoSweepMinutes.first())
+            settings.put("auto_switch_margin", store.autoSwitchMargin.first())
+            settings.put("auto_retry", store.autoRetry.first())
+            // 3.2.9: dynamic color, local proxy, HEV tun.
+            settings.put("dynamic_color", store.dynamicColor.first())
+            settings.put("local_proxy", store.localProxy.first())
+            settings.put("use_hev_tun", store.useHev.first())
         }
         return JSONObject()
             .put("version", VERSION)
@@ -171,6 +183,18 @@ object BackupManager {
                             .mapNotNull { arr?.optString(it) }.toSet()
                         store.setBalancerGroups(keys)
                     }
+                    if (settings.has("double_column")) store.setDoubleColumn(settings.getBoolean("double_column"))
+                    // 3.2.8 (Auto).
+                    if (settings.has("selected_group")) store.setSelectedGroup(settings.optString("selected_group").takeIf { it.isNotEmpty() })
+                    if (settings.has("auto_probe_url")) store.setAutoProbeUrl(settings.getString("auto_probe_url"))
+                    if (settings.has("auto_check_seconds")) store.setAutoCheckSeconds(settings.getString("auto_check_seconds"))
+                    if (settings.has("auto_sweep_minutes")) store.setAutoSweepMinutes(settings.getString("auto_sweep_minutes"))
+                    if (settings.has("auto_switch_margin")) store.setAutoSwitchMargin(settings.getString("auto_switch_margin"))
+                    if (settings.has("auto_retry")) store.setAutoRetry(settings.getBoolean("auto_retry"))
+                    // 3.2.9.
+                    if (settings.has("dynamic_color")) store.setDynamicColor(settings.getBoolean("dynamic_color"))
+                    if (settings.has("local_proxy")) store.setLocalProxy(settings.getBoolean("local_proxy"))
+                    if (settings.has("use_hev_tun")) store.setUseHev(settings.getBoolean("use_hev_tun"))
                 }
             }
             true
