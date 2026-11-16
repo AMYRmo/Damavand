@@ -1056,10 +1056,11 @@ class LiteViewModel(app: Application) : AndroidViewModel(app) {
     /** Persist the stored order fastest-first (PattNG auto-sort after test). */
     fun sortProfilesByPing() {
         viewModelScope.launch(Dispatchers.IO) {
-            val sorted = repo.loadProfiles().sortedWith(
+            // One locked read-modify-write: a subscription refresh or a
+            // ping save landing in between is no longer overwritten.
+            repo.sortProfiles(
                 compareBy<Profile> { it.lastPingMs <= 0 }.thenBy { it.lastPingMs }
             )
-            repo.saveProfiles(sorted)
             withContext(Dispatchers.Main) { refreshProfiles() }
         }
     }
@@ -1216,7 +1217,7 @@ class LiteViewModel(app: Application) : AndroidViewModel(app) {
                 name.trim().ifEmpty { "Aether" },
                 AetherSettings.toJson(settings),
             )
-            repo.saveProfiles(repo.loadProfiles() + profile)
+            repo.addProfile(profile)
             withContext(Dispatchers.Main) {
                 refreshProfiles()
                 onResult(profile)
