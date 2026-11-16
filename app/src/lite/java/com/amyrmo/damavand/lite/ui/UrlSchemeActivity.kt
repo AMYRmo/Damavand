@@ -75,7 +75,12 @@ class UrlSchemeActivity : ComponentActivity() {
         }
         AppLog.i("UrlScheme", uriString)
 
-        var decodedUrl = URLDecoder.decode(uriString, "UTF-8")
+        // getQueryParameter() has already decoded a deep link's url, and
+        // shared text is not URL-encoded. Decoding again turned every '+'
+        // of a base64 link (vmess://, ss://) into a space and threw on a
+        // literal '%' — so only decode text that is still fully encoded
+        // ("vless%3A%2F%2F…").
+        var decodedUrl = if ("://" in uriString) uriString else URLDecoder.decode(uriString, "UTF-8")
         val uri = Uri.parse(decodedUrl)
         if (uri != null) {
             if (uri.fragment.isNullOrEmpty() && !fragment.isNullOrEmpty()) {
@@ -93,7 +98,7 @@ class UrlSchemeActivity : ComponentActivity() {
                         else -> {
                             // A shared subscription URL arrives as plain text too.
                             val trimmed = decodedUrl.trim()
-                            trimmed.startsWith("http://") || trimmed.startsWith("https://") &&
+                            (trimmed.startsWith("http://") || trimmed.startsWith("https://")) &&
                                 repo.addSubscription(trimmed) is ProfileRepository.FetchResult.Ok
                         }
                     }
