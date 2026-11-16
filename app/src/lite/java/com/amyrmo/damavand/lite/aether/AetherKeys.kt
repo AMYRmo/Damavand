@@ -374,14 +374,21 @@ object AetherIdentityManager {
         // the null check, not the lambda's own result. (The lambda
         // must return String? — the line when registered, else null —
         // because that is what runOneShot's match takes.)
-        return AetherEngine.runOneShot(
-            context = context,
-            arguments = withInfo,
-            identityDir = renewalDir,
-            exitKey = exit.key,
-            timeoutMs = timeoutMs,
-            onOutput = onOutput,
-        ) { line -> line.takeIf(::isRegistered) } != null
+        // 3.2.17 (#60): the renewal runs on the main thread (the
+        // ViewModel launches it there) and the run blocks for up to
+        // 4 minutes (10 through a carrier) — so the whole call moves
+        // to IO. The wait itself is cancellable (see runOneShot), so
+        // Cancel ends the core at once instead of waiting it out.
+        return withContext(Dispatchers.IO) {
+            AetherEngine.runOneShot(
+                context = context,
+                arguments = withInfo,
+                identityDir = renewalDir,
+                exitKey = exit.key,
+                timeoutMs = timeoutMs,
+                onOutput = onOutput,
+            ) { line -> line.takeIf(::isRegistered) } != null
+        }
     }
 
     /** Whether the run dials WARP through Tor or Psiphon in reverse, which takes what a scan may take. */
