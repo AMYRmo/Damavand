@@ -1,6 +1,9 @@
 package com.amyrmo.damavand.lite
 
 import android.util.Base64
+import com.amyrmo.damavand.lite.aether.AetherArgs
+import com.amyrmo.damavand.lite.aether.AetherCore
+import com.amyrmo.damavand.lite.aether.AetherSettings
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonObjectBuilder
@@ -370,8 +373,10 @@ object XrayConfig {
      * the rest "proxy-<main>-<i>"). [dialerProxy] names the outbound
      * this hop's connection to its server goes through — the next hop
      * toward the entry; null for the entry hop, which dials directly.
+     * Internal (not private) so the Aether exit-node outbound can be
+     * built the same way a chain hop is (3.2.10).
      */
-    private fun outbound(
+    internal fun outbound(
         p: Parsed,
         tag: String,
         dialerProxy: String? = null,
@@ -682,6 +687,86 @@ object XrayConfig {
         return assemble(listOf(group) + memberOutbounds, socksPort, geoAvailable, settings)
     }
 
+    /**
+     * Aether config (3.2.10) — a port of PattNG's AetherDependency.of /
+     * routeThroughXray, adapted to Lite's [assemble] skeleton:
+     *
+     * - the "proxy" outbound is a SOCKS outbound dialling the Aether
+     *   core on 127.0.0.1:[aetherPort] (the core's listener);
+     * - the "exit-node" outbound is [exitOutbound] when the profile
+     *   names an exit-node profile, else a plain freedom outbound;
+     * - a "secondary-socks" mixed inbound on aetherPort+3 (the port
+     *   the core dials out through, via `--upstream
+     *   socks5://127.0.0.1:<aetherPort+3>`);
+     * - a rule PREPENDED ahead of all other rules: inboundTag
+     *   secondary-socks → exit-node.
+     *
+     * Returns the config JSON plus the core routed through Xray, or
+     * null when the core's listeners cannot be read / reached (an
+     * invalid or unreachable listener, an out-of-range port, or the
+     * secondary port colliding with the local SOCKS/HTTP inbounds).
+     * The caller starts Xray first, then the core with the returned
+     * core's arguments.
+     */
+    fun buildAether(
+        settings: AetherSettings,
+        aetherPort: Int = AetherArgs.SOCKS_PORT,
+        socksPort: Int,
+        geoAvailable: Boolean = false,
+        xraySettings: XraySettings = XraySettings(),
+        exitOutbound: JsonObject? = null,
+        // The exit-node profile's link digest, which fills the
+        // node content of the core's exit key (PattNG's AetherExit).
+        exitNodeContent: String? = null,
+    ): Pair<String, AetherCore>? {
+        val base = AetherCore.of(settings, aetherPort)
+        val core = if (exitNodeContent != null) {
+            base.copy(exit = base.exit.copy(nodeContent = exitNodeContent))
+        } else {
+            base
+        }
+        if (core.invalidListener != null || core.unreachableListener != null) return null
+        if (AetherArgs.invalidPort(core) != null) return null
+        val secondaryPort = aetherPort + SECONDARY_SOCKS_OFFSET
+        if (secondaryPort == socksPort || secondaryPort == socksPort + 1) return null
+        val proxy = buildJsonObject {
+            put("tag", "proxy")
+            put("protocol", "socks")
+            putJsonObject("settings") {
+                putJsonArray("servers") {
+                    add(buildJsonObject {
+                        put("address", AetherArgs.LOOPBACK)
+                        put("port", aetherPort)
+                    })
+                }
+            }
+        }
+        val exit = exitOutbound ?: buildJsonObject {
+            put("tag", "exit-node")
+            put("protocol", "freedom")
+        }
+        val secondarySocks = buildJsonObject {
+            put("tag", AetherArgs.TAG_SECONDARY_SOCKS)
+            put("port", secondaryPort)
+            put("listen", AetherArgs.LOOPBACK)
+            put("protocol", "mixed")
+            putJsonObject("settings") { put("udp", true) }
+        }
+        val exitRule = buildJsonObject {
+            putJsonArray("inboundTag") { add(JsonPrimitive(AetherArgs.TAG_SECONDARY_SOCKS)) }
+            put("outboundTag", AetherArgs.TAG_EXIT_NODE)
+        }
+        val config = assemble(
+            listOf(proxy, exit),
+            socksPort,
+            geoAvailable,
+            xraySettings,
+            extraInbounds = listOf(secondarySocks),
+            extraRulesFirst = listOf(exitRule),
+        ) ?: return null
+        return config to core.through(secondaryPort)
+    }
+
     /** One custom rule → its Xray routing rule object. */
     private fun customRuleJson(rule: RoutingRule): JsonObject {
         val pattern = rule.pattern.trim()
@@ -709,6 +794,11 @@ object XrayConfig {
         socksPort: Int,
         geoAvailable: Boolean,
         settings: XraySettings = XraySettings(),
+        // 3.2.10 (Aether): extra inbounds (the secondary-socks the
+        // core dials out through) and rules PREPENDED ahead of the
+        // custom rules (the exit-node rule).
+        extraInbounds: List<JsonObject> = emptyList(),
+        extraRulesFirst: List<JsonObject> = emptyList(),
     ): String? {
         val json = buildJsonObject {
             val logLevel = settings.coreLogLevel.takeIf {
@@ -814,6 +904,9 @@ object XrayConfig {
                         })
                     }
                 }
+                // 3.2.10 (Aether): the secondary-socks inbound the core
+                // dials out through — independent of the local proxy.
+                extraInbounds.forEach { add(it) }
             }
             putJsonArray("outbounds") {
                 proxyOutbounds.forEach { add(it) }
@@ -826,6 +919,9 @@ object XrayConfig {
                 } ?: "IPIfNonMatch"
                 put("domainStrategy", strategy)
                 putJsonArray("rules") {
+                    // 3.2.10 (Aether): the exit-node rule first — it
+                    // wins over every rule below it.
+                    extraRulesFirst.forEach { add(it) }
                     // Custom rules first — they win over the defaults.
                     if (settings.routingMode == "custom") {
                         settings.customRules.filter { it.enabled }.forEach {
