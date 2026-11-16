@@ -554,7 +554,16 @@ class LiteVpnService : VpnService() {
             connectWinner(chosen)
             return
         }
-        if (links.isNotEmpty() && !realTest(chosen, testUrl)) {
+        // 3.2.13 (PattNG chain + Aether): a chain with an Aether hop
+        // cannot pre-test — its config needs the core, which only
+        // starts beside Xray in connectWinner — so it skips the real
+        // test, as a standalone Aether profile does. (Two Aether hops
+        // are refused there, with their own message.)
+        val chainHasAether = chosen.size > 1 && runCatching {
+            val profiles = repo.loadProfiles()
+            chosen.any { link -> profiles.firstOrNull { it.link == link }?.isAether == true }
+        }.getOrDefault(false)
+        if (links.isNotEmpty() && !chainHasAether && !realTest(chosen, testUrl)) {
             lastDetail = getString(R.string.conn_server_no_response)
             broadcastStatus()
             stopTunnel()
@@ -653,6 +662,76 @@ class LiteVpnService : VpnService() {
     }
 
     /**
+     * What a chain's Aether hop resolved to (3.2.13, PattNG's
+     * AetherDependency): [None] when the links hold no Aether profile
+     * at all (an ordinary chain — buildLinks handles it),
+     * [TwoAetherHops] when they hold more than one (one core runs, so
+     * the connect is refused with its own message), [Ok] with the
+     * chain config plus the one core beside it.
+     */
+    private sealed interface ChainAetherResult {
+        data object None : ChainAetherResult
+        data class Ok(val config: String, val core: AetherCore) : ChainAetherResult
+        data object TwoAetherHops : ChainAetherResult
+    }
+
+    /**
+     * The chain config + routed core for [links] when they hold an
+     * Aether hop, or [ChainAetherResult.None] when they hold none (or
+     * the chain cannot be built — the caller falls back to buildLinks,
+     * which fails the same way). The exit-node outbound is resolved
+     * only when the Aether hop IS the entry hop: then the core's own
+     * exit is the named profile, as in a standalone Aether connect;
+     * with an entry side the exit is the digest of that side instead
+     * (XrayConfig.buildChainWithAether).
+     */
+    private fun buildChainAetherConfig(
+        links: List<String>,
+        settings: XrayConfig.XraySettings,
+        geoReady: Boolean,
+    ): ChainAetherResult {
+        if (links.size < 2) return ChainAetherResult.None
+        val repo = ProfileRepository(applicationContext)
+        val profiles = repo.loadProfiles()
+        val members = links.mapNotNull { link -> profiles.firstOrNull { it.link == link } }
+        if (members.size != links.size) return ChainAetherResult.None
+        val aetherCount = members.count { it.isAether }
+        if (aetherCount == 0) return ChainAetherResult.None
+        if (aetherCount > 1) return ChainAetherResult.TwoAetherHops
+        if (!AetherEngine.isSupported(this)) return ChainAetherResult.None
+        val aetherProfile = members.first { it.isAether }
+        val aetherSettings = AetherSettings.fromJson(aetherProfile.aetherJson)
+        var exitOutbound: kotlinx.serialization.json.JsonObject? = null
+        var exitNodeContent: String? = null
+        if (members.indexOf(aetherProfile) == 0) {
+            val exitName = aetherSettings.exitNode?.trim()?.takeIf { it.isNotEmpty() }
+            if (exitName != null) {
+                val exitProfile = profiles.firstOrNull { it.name == exitName && !it.isAether }
+                    ?: return ChainAetherResult.None
+                val parsed = XrayConfig.parse(exitProfile.link) ?: return ChainAetherResult.None
+                exitOutbound = XrayConfig.outbound(parsed, AetherArgs.TAG_EXIT_NODE, null, settings)
+                    ?: return ChainAetherResult.None
+                exitNodeContent = AetherExit.digest(exitProfile.link)
+            }
+        }
+        val aetherPort = try {
+            kotlinx.coroutines.runBlocking { SettingsStore(applicationContext).aetherListenPortNow() }
+        } catch (_: Exception) {
+            AetherArgs.SOCKS_PORT
+        }
+        val built = XrayConfig.buildChainWithAether(
+            members,
+            aetherPort = aetherPort,
+            socksPort = activeSocksPort,
+            geoAvailable = geoReady,
+            xraySettings = settings,
+            exitOutbound = exitOutbound,
+            exitNodeContent = exitNodeContent,
+        ) ?: return ChainAetherResult.None
+        return ChainAetherResult.Ok(built.first, built.second)
+    }
+
+    /**
      * Starts the Aether core process after Xray is up and waits for its
      * listener to answer a SOCKS greeting; false when it never comes up.
      * Runs on the connect worker thread (awaitListening blocks up to 30 s).
@@ -712,8 +791,21 @@ class LiteVpnService : VpnService() {
         // 3.2.10 (Aether): the config is buildAether and the core
         // process runs beside Xray — it starts after Xray below.
         val aetherResult = if (aetherMode) buildAetherConfig(links, settings, geoReady) else null
+        // 3.2.13 (PattNG chain + Aether): a chain with exactly one
+        // Aether hop runs on one core beside Xray, like a standalone
+        // Aether profile; two Aether hops need two cores and one runs.
+        val chainAether = if (!aetherMode && !autoMode) buildChainAetherConfig(links, settings, geoReady) else ChainAetherResult.None
+        if (chainAether is ChainAetherResult.TwoAetherHops) {
+            lastDetail = getString(R.string.chain_two_aether)
+            broadcastStatus(); stopTunnel(); return
+        }
+        if (chainAether is ChainAetherResult.Ok && rootMode) {
+            lastDetail = getString(R.string.aether_root_unsupported)
+            broadcastStatus(); stopTunnel(); return
+        }
         val cfg = when {
             aetherMode -> aetherResult?.first
+            chainAether is ChainAetherResult.Ok -> chainAether.config
             autoMode -> {
                 val tuning = try {
                     kotlinx.coroutines.runBlocking {
@@ -744,6 +836,7 @@ class LiteVpnService : VpnService() {
             broadcastStatus(); stopTunnel(); return
         }
         val aetherCore = aetherResult?.second
+            ?: (chainAether as? ChainAetherResult.Ok)?.core
         // 3.2.8 (Auto): the session maps member tags to profile ids —
         // the UI reads it to show the live exit, and the service polls
         // it for switch events. Prepared BEFORE the core starts, so
@@ -855,7 +948,7 @@ class LiteVpnService : VpnService() {
             }
             // 3.2.10 (Aether): Xray is up — start the core now, before
             // the tun bridge forwards traffic into the SOCKS inbound.
-            if (aetherMode && aetherCore != null && !startAether(aetherCore)) {
+            if (aetherCore != null && !startAether(aetherCore)) {
                 broadcastStatus(); stopTunnel(); return
             }
             if (!tunMode) {
@@ -886,7 +979,7 @@ class LiteVpnService : VpnService() {
                 broadcastStatus(); stopTunnel(); return
             }
             // 3.2.10 (Aether): Xray is up — start the core now.
-            if (aetherMode && aetherCore != null && !startAether(aetherCore)) {
+            if (aetherCore != null && !startAether(aetherCore)) {
                 broadcastStatus(); stopTunnel(); return
             }
         }
