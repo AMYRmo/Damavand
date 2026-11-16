@@ -34,19 +34,35 @@ class ProfileRepository(private val context: Context) {
      * never sees a torn file. synchronized() is reentrant, so nested
      * calls (deleteProfile → markDeleted → pruneChains) are safe.
      */
-    private val fileLock = Any()
+    private val fileLock: Any get() = FILE_LOCK
+
+    companion object {
+        /**
+         * ONE lock for the whole process. It used to be a per-instance
+         * field, but the ViewModel, SubRefreshWorker, the share/deep-link
+         * activity, the tile, Tasker and the service each create their
+         * own ProfileRepository — so a background subscription refresh
+         * and a test-all ping save did not exclude each other, and both
+         * wrote the SAME "<file>.tmp" at once (torn JSON -> load() == []
+         * -> the next save wipes every profile).
+         */
+        private val FILE_LOCK = Any()
+    }
 
     /** Write [text] to [file] atomically via temp + rename. */
     private fun atomicWrite(file: File, text: String) {
-        try {
-            val tmp = File(file.parent, file.name + ".tmp")
-            tmp.writeText(text)
-            if (!tmp.renameTo(file)) file.writeText(text)
-        } catch (_: Exception) {
+        synchronized(fileLock) {
             try {
-                file.writeText(text)
+                val tmp = File(file.parent, file.name + ".tmp")
+                tmp.writeText(text)
+                if (!tmp.renameTo(file)) file.writeText(text)
             } catch (_: Exception) {
+                try {
+                    file.writeText(text)
+                } catch (_: Exception) {
+                }
             }
+            Unit
         }
     }
 
@@ -695,11 +711,15 @@ class ProfileRepository(private val context: Context) {
                 }
             }
             if (added > 0) saveProfiles(merged)
-            if (subs.isNotEmpty()) {
+            // Re-read under the lock: a subscription added, renamed or
+            // deleted while the fetches ran must not be undone by writing
+            // back the stale list read before them.
+            val currentSubs = loadSubscriptions()
+            if (currentSubs.isNotEmpty()) {
                 val infoByUrl = fetched.mapNotNull { (sub, result) ->
                     (result as? FetchResult.Ok)?.userInfo?.let { sub.url to it }
                 }.toMap()
-                saveSubscriptions(subs.map { sub ->
+                saveSubscriptions(currentSubs.map { sub ->
                     val info = infoByUrl[sub.url]
                     sub.copy(
                         lastUpdated = System.currentTimeMillis(),
