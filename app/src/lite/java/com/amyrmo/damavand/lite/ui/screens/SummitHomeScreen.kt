@@ -55,10 +55,11 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.amyrmo.damavand.lite.R
-import com.amyrmo.damavand.lite.Profile
-import com.amyrmo.damavand.lite.ui.ConnState
+import com.amyrmo.damavand.lite.AutoSelectIds
 import com.amyrmo.damavand.lite.Chain
+import com.amyrmo.damavand.lite.Profile
+import com.amyrmo.damavand.lite.R
+import com.amyrmo.damavand.lite.ui.ConnState
 import com.amyrmo.damavand.lite.ui.ConnectionUiState
 import com.amyrmo.damavand.lite.ui.LiteViewModel
 import com.amyrmo.damavand.lite.ui.components.BoltIcon
@@ -97,13 +98,24 @@ fun SummitHomeScreen(
     val chainMembers = selectedChain?.memberIds?.mapNotNull { id ->
         profiles.firstOrNull { it.id == id }
     } ?: emptyList()
+    // 3.2.8 (Auto): when an Auto is selected, the ring and the card
+    // show the LIVE member the core picked — the real exit.
+    val selectedAutoId by vm.selectedAutoId.collectAsState()
+    val autoSession by vm.autoSession.collectAsState()
+    val autoGroupKey = selectedAutoId?.let { AutoSelectIds.groupKeyOf(it) }
+    val autoMembers = autoGroupKey?.let { vm.profilesForGroup(it) } ?: emptyList()
+    val autoLive = autoSession?.takeIf { it.profileId == selectedAutoId }
     val profile = if (selectedChain != null) {
         chainMembers.lastOrNull()
+    } else if (selectedAutoId != null) {
+        autoLive?.selectedProfileId?.let { id -> profiles.firstOrNull { it.id == id } }
+            ?: autoMembers.firstOrNull()
     } else {
         profiles.firstOrNull { it.id == selectedId } ?: profiles.firstOrNull()
     }
     val fastest = vm.fastestProfile
     var showAddSub by remember { mutableStateOf(false) }
+    var showAutoSheet by remember { mutableStateOf(false) }
 
     // One entrance on load: short fade + rise (≤ 8px), no stagger.
     var entered by remember { mutableStateOf(false) }
@@ -140,14 +152,39 @@ fun SummitHomeScreen(
         Spacer(Modifier.height(24.dp))
         StatsRow(connection = connection)
         Spacer(Modifier.height(24.dp))
-        ServerCard(
-            profile = profile,
-            chain = selectedChain,
-            chainMembers = chainMembers,
-            isFastest = selectedChain == null && profile != null && fastest?.id == profile.id,
-            onClick = onGoToServers,
-            onAddSubscription = { showAddSub = true }
-        )
+        // 3.2.8 (Auto): the Auto card replaces the server card when
+        // an Auto is selected — live exit + pinning in the sheet.
+        if (selectedAutoId != null && autoGroupKey != null) {
+            AutoSelectCard(
+                groupLabel = vm.groupLabel(autoGroupKey),
+                memberCount = autoMembers.size,
+                active = true,
+                live = autoLive,
+                memberName = { id -> profiles.firstOrNull { it.id == id }?.name },
+                onSelect = onGoToServers,
+                onConnect = { vm.connectToAuto(selectedAutoId) },
+                onDetails = { showAutoSheet = true }
+            )
+        } else {
+            ServerCard(
+                profile = profile,
+                chain = selectedChain,
+                chainMembers = chainMembers,
+                isFastest = selectedChain == null && profile != null && fastest?.id == profile.id,
+                onClick = onGoToServers,
+                onAddSubscription = { showAddSub = true }
+            )
+        }
+        if (showAutoSheet && selectedAutoId != null && autoGroupKey != null) {
+            AutoSelectSheet(
+                groupLabel = vm.groupLabel(autoGroupKey),
+                members = autoMembers,
+                live = autoLive,
+                onDismiss = { showAutoSheet = false },
+                onPin = { tag -> vm.pinAutoMember(tag) },
+                onUnpin = { vm.unpinAutoMember() }
+            )
+        }
         Spacer(Modifier.height(16.dp))
         FastestButton(
             connection = connection,
