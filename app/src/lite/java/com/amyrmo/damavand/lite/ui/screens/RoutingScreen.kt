@@ -31,11 +31,15 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -58,7 +62,7 @@ import com.amyrmo.damavand.lite.ui.theme.Vazirmatn
 fun RoutingScreen(vm: LiteViewModel, onBack: () -> Unit) {
     val mode by vm.routingMode.collectAsState(initial = "bypass_lan")
     val rules by vm.routingRules.collectAsState()
-    var showAddRule by remember { mutableStateOf(false) }
+    var showAddRule by rememberSaveable { mutableStateOf(false) }
     var ruleToDelete by remember { mutableStateOf<RoutingRule?>(null) }
 
     Column(
@@ -95,6 +99,7 @@ fun RoutingScreen(vm: LiteViewModel, onBack: () -> Unit) {
             }
             if (mode == "custom") {
                 item {
+                    val addRuleLabel = stringResource(R.string.routing_add_rule)
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Text(
                             text = stringResource(R.string.routing_rules_title),
@@ -108,7 +113,8 @@ fun RoutingScreen(vm: LiteViewModel, onBack: () -> Unit) {
                             modifier = Modifier
                                 .size(40.dp)
                                 .background(LiteColors.accent, CircleShape)
-                                .clickable(onClick = { showAddRule = true }),
+                                .clickable(role = Role.Button, onClick = { showAddRule = true })
+                                .semantics { contentDescription = addRuleLabel },
                             contentAlignment = Alignment.Center
                         ) {
                             PlusLineIcon(size = 18.dp, color = Color.White)
@@ -425,9 +431,9 @@ private fun AddRuleDialog(
     onDismiss: () -> Unit,
     onAdd: (String, String, String) -> Unit
 ) {
-    var name by remember { mutableStateOf("") }
-    var pattern by remember { mutableStateOf("") }
-    var action by remember { mutableStateOf("proxy") }
+    var name by rememberSaveable { mutableStateOf("") }
+    var pattern by rememberSaveable { mutableStateOf("") }
+    var action by rememberSaveable { mutableStateOf("proxy") }
 
     AlertDialog(
         onDismissRequest = onDismiss,
