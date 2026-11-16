@@ -357,7 +357,8 @@ private fun SubscriptionRow(
             filled = false,
             onClick = onRefresh,
             glyphColor = LiteColors.text,
-            icon = RefreshVector
+            icon = RefreshVector,
+            contentDescription = stringResource(R.string.cd_refresh)
         )
         Spacer(Modifier.width(8.dp))
         CircleIconButton(
@@ -366,7 +367,8 @@ private fun SubscriptionRow(
             filled = false,
             onClick = onMenu,
             glyphColor = LiteColors.text,
-            icon = DotsVerticalVector
+            icon = DotsVerticalVector,
+            contentDescription = stringResource(R.string.cd_more_options)
         )
     }
 }
