@@ -56,6 +56,9 @@ object XrayConfig {
         val dnsHosts: Map<String, String> = emptyMap(),
         val mtu: Int = 1500,
         val ifaceAddr: String = "10.8.0.2",
+        // 3.2.11 (PattNG full parity): IPv6 on by default — gates the
+        // WireGuard IPv6 addresses/allowed-IPs and the tun's IPv6 side.
+        val ipv6Enabled: Boolean = true,
         // 3.2.9 (PattNG, the rest): Xray-tun mode (no HEV — the core
         // reads the VPN fd itself) and the local-proxy switch. The
         // SOCKS/HTTP inbounds exist only when localProxyEnabled.
@@ -528,27 +531,36 @@ object XrayConfig {
                 }
             }
             // 3.2.0 (PattNG): WireGuard (no streamSettings, no mux).
+            // 3.2.11 (PattNG CoreOutboundBuilder:426-436): with IPv6
+            // off, IPv6 addresses and ::/0 are dropped from the
+            // WireGuard addresses + allowed IPs.
             "wg" -> buildJsonObject {
                 put("tag", tag)
                 put("protocol", "wireguard")
                 putJsonObject("settings") {
                     put("secretKey", p.id)
                     putJsonArray("address") {
-                        p.wgAddress.split(",")
+                        val addrs = p.wgAddress.split(",")
                             .map { it.trim() }
                             .filter { it.isNotEmpty() }
-                            .forEach { add(JsonPrimitive(it)) }
+                        // With IPv6 off and an IPv6-only address list,
+                        // keep the original list: an empty array is an
+                        // invalid config, the connect itself then fails
+                        // instead of the build.
+                        val kept = addrs.filter { settings.ipv6Enabled || !it.contains(":") }
+                        (kept.ifEmpty { addrs }).forEach { add(JsonPrimitive(it)) }
                     }
                     putJsonArray("peers") {
                         add(buildJsonObject {
                             put("publicKey", p.wgPublicKey)
                             put("endpoint", "${p.addr}:${p.port}")
                             putJsonArray("allowedIPs") {
-                                p.wgAllowedIps.ifEmpty { "0.0.0.0/0,::/0" }
+                                val allowed = p.wgAllowedIps.ifEmpty { "0.0.0.0/0,::/0" }
                                     .split(",")
                                     .map { it.trim() }
                                     .filter { it.isNotEmpty() }
-                                    .forEach { add(JsonPrimitive(it)) }
+                                val kept = allowed.filter { settings.ipv6Enabled || !it.contains(":") }
+                                (kept.ifEmpty { allowed }).forEach { add(JsonPrimitive(it)) }
                             }
                             if (p.wgPresharedKey.isNotEmpty()) {
                                 put("preSharedKey", p.wgPresharedKey)
@@ -727,7 +739,7 @@ object XrayConfig {
         }
         if (core.invalidListener != null || core.unreachableListener != null) return null
         if (AetherArgs.invalidPort(core) != null) return null
-        val secondaryPort = aetherPort + SECONDARY_SOCKS_OFFSET
+        val secondaryPort = aetherPort + AetherArgs.SECONDARY_SOCKS_OFFSET
         if (secondaryPort == socksPort || secondaryPort == socksPort + 1) return null
         val proxy = buildJsonObject {
             put("tag", "proxy")
