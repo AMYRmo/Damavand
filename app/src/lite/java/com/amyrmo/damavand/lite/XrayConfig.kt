@@ -343,11 +343,23 @@ object XrayConfig {
                 }
             }
             // Fragment (3.1.0): split the TLS hello so DPI sees noise.
-            if (settings.fragmentEnabled) {
-                putJsonObject("fragment") {
-                    put("packets", "tlshello")
-                    put("length", "100-200")
-                    put("interval", "10-20")
+            // The pinned core (CluvexStudio/Xray-core) has no
+            // streamSettings.fragment key (an unknown key is silently
+            // ignored); fragmentation is a TCP finalmask there
+            // (infra/conf/transport_finalmask.go FragmentMask: packets,
+            // length, delay). UDP transports (kcp, quic) take no TCP mask.
+            if (settings.fragmentEnabled && net !in setOf("kcp", "mkcp", "quic")) {
+                putJsonObject("finalmask") {
+                    putJsonArray("tcp") {
+                        add(buildJsonObject {
+                            put("type", "fragment")
+                            putJsonObject("settings") {
+                                put("packets", "tlshello")
+                                put("length", "100-200")
+                                put("delay", "10-20")
+                            }
+                        })
+                    }
                 }
             }
             when (net) {
@@ -631,7 +643,10 @@ object XrayConfig {
             // Hop i dials its server through hop i+1 (toward the entry);
             // the entry hop (last) dials directly.
             val dialerProxy = if (i < resolved.size - 1) "proxy-chain-${i + 1}" else null
-            outbound(p, tag, dialerProxy, settings) ?: return null
+            // Fragment only the entry hop: it is the one whose TLS hello
+            // goes over the network; inner hops run inside the tunnel.
+            val hopSettings = if (dialerProxy != null) settings.copy(fragmentEnabled = false) else settings
+            outbound(p, tag, dialerProxy, hopSettings) ?: return null
         }
         return assemble(outbounds, socksPort, geoAvailable, settings)
     }
