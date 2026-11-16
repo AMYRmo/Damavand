@@ -839,7 +839,10 @@ class LiteVpnService : VpnService() {
                 lastDetail = getString(R.string.conn_core_failed, XrayController.lastError ?: "")
                 broadcastStatus(); stopTunnel(); return
             }
-            if (!RootProxyManager.start(this)) {
+            // hev must dial the SOCKS inbound this core really has: the
+            // per-session port (random with dynamic port on) and the
+            // same credentials the inbound was built with.
+            if (!RootProxyManager.start(this, activeSocksPort, settings.socksUser, settings.socksPass)) {
                 lastDetail = getString(R.string.conn_root_failed)
                 broadcastStatus(); stopTunnel(); return
             }

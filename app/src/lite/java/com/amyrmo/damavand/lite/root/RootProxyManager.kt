@@ -61,9 +61,19 @@ object RootProxyManager {
         "::1/128", "fe80::/10", "fc00::/7", "ff00::/8"
     )
 
-    fun start(context: Context): Boolean {
+    /**
+     * @param socksPort the port the core's SOCKS inbound ACTUALLY listens on for this
+     *   session (the service may pick a random one when dynamic port is on).
+     * @param socksUser / [socksPass] the credentials that inbound was built with: the
+     *   inbound requires auth whenever the user is non-empty (the password may be empty).
+     */
+    fun start(context: Context, socksPort: Int, socksUser: String, socksPass: String): Boolean {
         teardown(context)
-        val script = buildTun2socksSetup(context) ?: return false
+        val user = socksUser.ifEmpty { null }
+        val script = buildTun2socksSetup(
+            context,
+            socksOverride = SocksEndpoint(socksPort, user, if (user != null) socksPass else null),
+        ) ?: return false
         val result = RootShell.runScript(context, "setup_rules.sh", script)
         if (!result.success) {
             AppLog.e(TAG, "RootProxyManager: setup failed, rolling back:\n${result.output}")
@@ -116,6 +126,7 @@ object RootProxyManager {
         context: Context,
         captureDeviceTraffic: Boolean = true,
         forceLanShare: Boolean = false,
+        socksOverride: SocksEndpoint? = null,
     ): String? {
         val bin = File(context.applicationInfo.nativeLibraryDir, RootConfig.TUN2SOCKS_BIN)
         if (!bin.exists()) {
@@ -124,7 +135,7 @@ object RootProxyManager {
         }
         val appUid = context.applicationInfo.uid
         val store = SettingsStore(context)
-        val (socksUsername, socksPassword, port, mtu, dnsServers, lanSharePref) = runBlocking {
+        val (storedUsername, storedPassword, storedPort, mtu, dnsServers, lanSharePref) = runBlocking {
             val user = store.socksUser.first().trim().ifEmpty { null }
             val pass = store.socksPass.first().trim().ifEmpty { null }
             // A username without a password (or the reverse) is not a credential pair:
@@ -136,6 +147,11 @@ object RootProxyManager {
             val lan = store.rootLanShareNow()
             Sextuple(pair.first, pair.second, p, m, dns, lan)
         }
+        // The session's real SOCKS endpoint wins over the stored settings: with
+        // dynamic port on, the core listens on a random port, not the stored one.
+        val port = socksOverride?.port ?: storedPort
+        val socksUsername = if (socksOverride != null) socksOverride.username else storedUsername
+        val socksPassword = if (socksOverride != null) socksOverride.password else storedPassword
         val runDir = File(context.filesDir, RootConfig.RUNTIME_DIR)
         if (!runDir.isDirectory && !runDir.mkdirs()) {
             AppLog.e(TAG, "RootProxyManager: failed to create runtime directory at ${runDir.absolutePath}")
@@ -270,6 +286,9 @@ object RootProxyManager {
             false
         }
     }
+
+    /** The SOCKS inbound hev must forward to, as the running core was configured. */
+    private data class SocksEndpoint(val port: Int, val username: String?, val password: String?)
 
     /** Six values read from SettingsStore in one runBlocking block (see buildTun2socksSetup). */
     private data class Sextuple(
