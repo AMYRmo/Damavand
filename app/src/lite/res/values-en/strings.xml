@@ -1,0 +1,474 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Damavand Lite</string>
+
+    <!-- Header -->
+
+    <!-- Status pill -->
+    <string name="status_disconnected">Disconnected</string>
+    <string name="status_connecting">Connecting…</string>
+    <string name="status_connected">Connected</string>
+    <string name="status_error">Connection error</string>
+
+    <!-- Tabs -->
+    <string name="tab_home">Home</string>
+    <string name="tab_servers">Servers</string>
+    <string name="tab_stats">Stats</string>
+    <string name="tab_settings">Settings</string>
+
+    <!-- Ring -->
+    <string name="ring_tap_to_connect">Tap to connect</string>
+    <string name="ring_auto_fastest">The fastest server is picked automatically</string>
+    <string name="ring_step_keys">Negotiating keys</string>
+    <string name="ring_step_route">Checking route</string>
+    <string name="ring_step_finish">Finishing connection</string>
+
+    <!-- Under-ring caption -->
+    <string name="caption_idle_title">You are not connected</string>
+    <string name="caption_idle_body">Your traffic is currently going without a tunnel</string>
+    <string name="caption_connecting_title">Connecting…</string>
+    <string name="caption_connecting_body">Please wait</string>
+    <string name="caption_connected_title">You reached the summit</string>
+    <string name="caption_connected_body">Tap the ring again to disconnect</string>
+    <string name="caption_error_title">Connection failed</string>
+
+    <!-- Stats row -->
+    <string name="stat_ping">Ping</string>
+    <string name="stat_download">Download</string>
+    <string name="stat_upload">Upload</string>
+    <string name="stat_session">Session volume</string>
+
+    <!-- Fastest button -->
+    <string name="btn_fastest">Connect to the fastest server</string>
+    <string name="fastest_sweep">Testing servers… %1$d of %2$d</string>
+    <string name="fastest_none">No server answered — check your internet connection</string>
+    <string name="fastest_testing">Testing server %1$d of %2$d…</string>
+    <string name="fastest_retry">Retrying the fastest server…</string>
+    <string name="btn_disconnect">Disconnect</string>
+    <string name="btn_connecting">Connecting…</string>
+
+    <!-- Connect errors -->
+    <string name="err_no_profiles">No server to connect to — pick a server first</string>
+    <string name="err_no_network">No network access — check your internet connection</string>
+    <string name="err_server_timeout">Server did not answer — try another server</string>
+    <string name="err_generic">Connection failed — try again</string>
+
+    <!-- Servers -->
+    <string name="btn_test_all">Test all servers</string>
+    <string name="btn_testing">Testing…</string>
+    <string name="test_note">Testing only runs while this page is open</string>
+    <string name="servers_chain_hint">To build a chain, long-press a server and pick servers in order</string>
+    <string name="server_delete_title">Delete server</string>
+    <string name="server_delete_body">Delete “%1$s”?</string>
+    <string name="server_delete_confirm">Delete</string>
+    <string name="server_ping">Ping</string>
+    <string name="chain_pick_title">Chaining — %1$s servers selected</string>
+    <string name="chain_pick_body">Servers are picked in connection order — the first is the entry, the last is the exit</string>
+    <string name="chain_create">Create chain</string>
+    <string name="chain_cancel">Cancel</string>
+    <string name="chain_name_format">Chain %1$d</string>
+    <string name="chain_members">%1$s servers</string>
+    <string name="badge_fastest">Fastest</string>
+    <string name="ping_untested">Untested</string>
+    <string name="ping_failed">Failed</string>
+    <string name="servers_empty_title">No servers</string>
+    <string name="servers_empty_body">No subscription or server has been added yet — servers will show here after you add one</string>
+    <string name="servers_test_all_failed">No server test succeeded — check your internet connection and try again</string>
+    <string name="servers_add_subscription">Add subscription</string>
+    <string name="servers_unavailable">This server is unavailable</string>
+    <string name="home_empty_title">No server selected yet</string>
+    <string name="home_empty_body">Pick a server from the Servers tab or enter a subscription</string>
+
+    <!-- Stats -->
+    <string name="stats_live_label">Download speed — live</string>
+    <string name="stats_axis_60">60 seconds ago</string>
+    <string name="stats_axis_30">30 seconds ago</string>
+    <string name="stats_axis_now">Now</string>
+    <string name="stats_empty">Connect from the Home page to see the live chart</string>
+    <string name="stats_best_ping">Best session ping</string>
+    <string name="stats_best_ping_sub">Lowest ping recorded in this connection</string>
+    <string name="stats_session_volume">Session volume</string>
+    <string name="stats_session_volume_sub">Total download and upload of this connection</string>
+
+    <!-- Settings groups -->
+    <string name="settings_group_connection">Connection</string>
+    <string name="settings_group_battery">Battery &amp; volume</string>
+    <string name="settings_group_core">Connection core</string>
+    <string name="settings_group_about">About</string>
+
+    <!-- Kill switch / auto-connect -->
+    <string name="kill_switch">Kill switch</string>
+    <string name="kill_switch_desc">If the VPN connection drops, the device internet is cut too, so traffic never goes without a tunnel</string>
+    <string name="auto_connect">Auto-connect</string>
+    <string name="auto_connect_desc">Connect to the fastest server when the app opens</string>
+
+    <!-- Battery / volume -->
+    <string name="battery_saver">Battery saver</string>
+    <string name="battery_saver_desc">Stats updates stop when the screen is off; the ring speed only spins while it has a listener</string>
+    <string name="battery_saver_off_note">Uses more battery</string>
+    <string name="sub_auto_update">Auto-update subscriptions</string>
+    <string name="sub_auto_update_desc">Subscriptions are updated periodically in the background</string>
+
+    <!-- Geo download -->
+    <string name="geo_title">Location data</string>
+    <string name="geo_desc">Needed to detect server countries and cities — bundled with the app, updates are downloaded</string>
+    <string name="geo_download">Download</string>
+    <string name="geo_cancel">Cancel</string>
+    <string name="geo_ready">Ready</string>
+    <string name="geo_update">Update</string>
+    <string name="geo_retry">Retry</string>
+    <string name="geo_update_available">A new version of the location data is available</string>
+    <string name="geo_err_network">Download failed — check your internet connection</string>
+    <string name="geo_err_corrupt">The downloaded file is corrupt — try again</string>
+
+    <!-- About -->
+    <string name="about_version">Version</string>
+    <string name="about_version_code">Version code %1$s</string>
+    <string name="geo_version">Version: %1$s</string>
+    <string name="about_package">App package</string>
+    <string name="about_core">Core</string>
+    <string name="about_repo">Repository</string>
+    <string name="about_repo_value">AMYRmo/Damavand — lite branch</string>
+    <string name="about_copy">Damavand Lite — the light version of Damavand. Built for fast, low-usage connections.</string>
+
+    <!-- Subscription import -->
+    <string name="sub_import_title">Add subscription</string>
+    <string name="sub_import_hint">Enter a subscription link or a single config</string>
+    <string name="sub_import_fetching">Fetching…</string>
+    <string name="sub_import_add">Add</string>
+    <string name="sub_import_cancel">Cancel</string>
+    <string name="sub_import_failed_network">Fetching the subscription failed — check the internet, or try again when connected to open internet</string>
+    <string name="sub_import_failed_empty">No usable config was found in this subscription</string>
+    <string name="sub_import_failed_unsupported">%1$d configs with unsupported protocols were skipped — Lite currently supports VLESS, VMess, Trojan and Shadowsocks</string>
+    <string name="sub_import_failed_single">This is not a valid config link — it must be VLESS, VMess, Trojan or Shadowsocks</string>
+
+    <!-- Misc -->
+    <string name="vpn_permission_title">VPN permission is needed to connect</string>
+    <string name="notif_disconnect">Disconnect</string>
+
+    <!-- 3.1.0 — PattNG: servers -->
+    <string name="servers_search_hint">Search servers…</string>
+    <string name="servers_sort_fastest">Fastest first</string>
+    <string name="servers_sort_name">Name (A–Z)</string>
+    <string name="servers_sort_newest">Newest first</string>
+    <string name="server_menu_share_full">Share full</string>
+    <string name="servers_menu_real_ping_all">Real-test all</string>
+    <string name="servers_menu_restart">Restart service</string>
+    <string name="servers_menu_locate">Find connected server</string>
+    <string name="servers_menu_update_subs">Update all subscriptions</string>
+    <string name="servers_menu_export_all">Export all</string>
+    <string name="servers_menu_delete_dupes">Delete duplicates</string>
+    <string name="servers_menu_delete_invalid">Delete broken ones</string>
+    <string name="servers_menu_delete_all">Delete all</string>
+    <string name="settings_group_vpn">VPN</string>
+    <string name="settings_group_socks">SOCKS</string>
+    <string name="settings_group_misc">Misc</string>
+    <string name="proxy_only_title">Proxy only</string>
+    <string name="proxy_only_desc">No system tunnel; only Xray and SOCKS run</string>
+    <string name="route_only_title">Only specified routes</string>
+    <string name="route_only_desc">Traffic with no rule goes direct, not through the proxy</string>
+    <string name="local_dns_title">Local DNS</string>
+    <string name="local_dns_desc">The tunnel uses the configured DNS</string>
+    <string name="fake_dns_title">Fake DNS</string>
+    <string name="fake_dns_desc">Xray gives every domain a fake IP and routes by domain</string>
+    <string name="http_proxy_title">HTTP proxy</string>
+    <string name="http_proxy_desc">An HTTP proxy opens on SOCKS port + 1</string>
+    <string name="mtu_title">MTU</string>
+    <string name="mtu_desc">Tunnel packet size; default 1500</string>
+    <string name="iface_addr_title">Interface address</string>
+    <string name="iface_addr_desc">Tunnel IP address; default 10.8.0.2</string>
+    <string name="auto_start_boot_title">Start on boot</string>
+    <string name="auto_start_boot_desc">Connect the last server after the phone boots</string>
+    <string name="socks_port_title">SOCKS port</string>
+    <string name="socks_port_desc">The port Xray serves SOCKS on; default 1080</string>
+    <string name="socks_user_title">SOCKS username</string>
+    <string name="socks_user_desc">Empty means no authentication</string>
+    <string name="socks_pass_title">SOCKS password</string>
+    <string name="socks_pass_desc">SOCKS proxy password</string>
+    <string name="socks_udp_title">UDP in SOCKS</string>
+    <string name="socks_udp_desc">UDP traffic also goes through the SOCKS proxy</string>
+    <string name="socks_share_lan_title">Share on local network</string>
+    <string name="socks_share_lan_desc">The SOCKS proxy listens on all interfaces (LAN)</string>
+    <string name="socks_dynamic_port_title">Random port</string>
+    <string name="socks_dynamic_port_desc">Pick a random SOCKS port on every connection</string>
+    <string name="sub_auto_test_title">Auto-test after update</string>
+    <string name="sub_auto_test_desc">Test all servers after a subscription update</string>
+    <string name="sub_auto_sort_title">Auto-sort after test</string>
+    <string name="sub_auto_sort_desc">After testing, sort servers from fast to slow</string>
+    <string name="sub_auto_remove_invalid_title">Remove broken ones after test</string>
+    <string name="sub_auto_remove_invalid_desc">After testing, delete broken servers</string>
+    <string name="core_loglevel_title">Core log level</string>
+    <string name="core_loglevel_desc">How much of the Xray log is recorded; tap to change</string>
+    <string name="domain_strategy_title">Domain strategy</string>
+    <string name="domain_strategy_desc">How domains are resolved in routing; tap to change</string>
+    <string name="domestic_dns_title">Domestic DNS</string>
+    <string name="domestic_dns_desc">An extra DNS server for domestic domains</string>
+    <string name="dns_hosts_title">DNS hosts</string>
+    <string name="dns_hosts_desc">Static domain-to-IP mapping; as domain=IP, comma-separated</string>
+    <string name="mux_concurrency_title">Mux concurrency</string>
+    <string name="mux_concurrency_desc">Streams on one connection; default 8</string>
+    <string name="mux_xudp_concurrency_title">XUDP concurrency</string>
+    <string name="mux_xudp_concurrency_desc">UDP streams on Mux; default 8</string>
+    <string name="mux_xudp_quic_title">XUDP with QUIC</string>
+    <string name="mux_xudp_quic_desc">UDP packets on Mux are carried with QUIC</string>
+    <string name="hev_loglevel_title">Tunnel log level</string>
+    <string name="hev_loglevel_desc">How much of the tunnel bridge log is recorded; tap to change</string>
+    <string name="hev_rw_timeout_title">Tunnel read/write timeout</string>
+    <string name="hev_rw_timeout_desc">In seconds; 0 means the system default</string>
+    <string name="real_ping_concurrency_title">Real-test concurrency</string>
+    <string name="real_ping_concurrency_desc">How many tests run at once; default 5</string>
+    <string name="ip_api_url_title">Location service URL</string>
+    <string name="ip_api_url_desc">The service that reports the connected server’s country and city</string>
+    <string name="show_speed_notif_title">Speed in notification</string>
+    <string name="show_speed_notif_desc">Show download and upload speed in the notification</string>
+    <string name="confirm_delete_title">Confirm before deleting</string>
+    <string name="confirm_delete_desc">Open a confirmation dialog before deleting a server</string>
+    <string name="show_all_groups_title">Show all groups</string>
+    <string name="show_all_groups_desc">A combined view of all groups in the Servers tab</string>
+    <string name="language_title">Language</string>
+    <string name="language_desc">App language; Auto means the phone language — the app restarts after a change</string>
+    <string name="language_auto">Auto</string>
+    <string name="language_fa">فارسی</string>
+    <string name="language_en">English</string>
+    <string name="system_vpn_settings_title">System VPN settings</string>
+    <string name="system_vpn_settings_desc">Open the VPN page in Android settings</string>
+    <string name="routing_preset_bypass_ir">Iran direct</string>
+    <string name="routing_preset_block_ads">Block ads</string>
+    <string name="routing_builtin_title">Built-in rules (locked)</string>
+    <string name="routing_builtin_private">Private networks (10/8, 172.16/12, 192.168/16)</string>
+    <string name="routing_builtin_torrent">Torrent traffic</string>
+    <string name="routing_builtin_ads">Ad domains (with the geo file)</string>
+    <string name="logs_source_app">App log</string>
+    <string name="logs_source_core">Core log</string>
+    <string name="shortcut_connect">Quick connect</string>
+    <string name="shortcut_disconnect">Disconnect</string>
+    <string name="update_check_title">Check for updates</string>
+    <string name="update_check_desc">Check GitHub for a new version</string>
+    <string name="update_check_checking">Checking…</string>
+    <string name="update_check_available">Version %1$s is available — tap to download</string>
+    <string name="update_check_latest">The latest version is installed</string>
+    <string name="update_check_failed">Check failed — try again</string>
+    <string name="geo_import_geoip">Import geoip.dat</string>
+    <string name="geo_import_geosite">Import geosite.dat</string>
+    <string name="geo_import_ok">Geo file imported</string>
+    <string name="geo_import_fail">Importing the geo file failed</string>
+    <string name="add_qr_scan">Scan QR</string>
+    <string name="qr_scan_title">Scan QR</string>
+    <string name="qr_scan_hint">Point the camera at the QR code of a config or subscription</string>
+    <string name="qr_need_permission">Camera access is needed to scan</string>
+    <string name="qr_added">Config added</string>
+    <string name="add_manual_build">Build config manually</string>
+    <string name="manual_title">Build config manually</string>
+    <string name="manual_name">Name</string>
+    <string name="manual_address">Server address</string>
+    <string name="manual_port">Port</string>
+    <string name="manual_uuid">UUID</string>
+    <string name="manual_password">Password</string>
+    <string name="manual_method">Encryption method</string>
+    <string name="manual_username">Username</string>
+    <string name="manual_security">Security</string>
+    <string name="manual_network">Network</string>
+    <string name="manual_sni">SNI</string>
+    <string name="manual_path">Path</string>
+    <string name="manual_host">Host</string>
+    <string name="manual_insecure">Skip certificate (Insecure)</string>
+    <string name="manual_private_key">Private key</string>
+    <string name="manual_public_key">Peer public key</string>
+    <string name="manual_allowed_ips">Allowed IPs</string>
+    <string name="manual_local_address">Local address (e.g. 10.0.0.2/32)</string>
+    <string name="manual_mtu">MTU</string>
+    <string name="manual_json">Xray config (full JSON)</string>
+    <string name="manual_json_hint">A full Xray config — it must have an outbound tagged “proxy” and a SOCKS inbound on the SOCKS port from Settings.</string>
+    <string name="manual_invalid">Fill in the required fields</string>
+    <string name="manual_added">Config added</string>
+    <string name="manual_add">Add</string>
+    <string name="servers_group_all">All</string>
+    <string name="servers_group_manual">Manual</string>
+    <string name="servers_group_count">%1$s servers</string>
+    <string name="sub_card_updated_now">Updated just now</string>
+    <string name="sub_card_updated_minutes">Updated %1$s minutes ago</string>
+    <string name="sub_card_updated_hours">Updated %1$s hours ago</string>
+    <string name="sub_card_updated_days">Updated %1$s days ago</string>
+    <string name="sub_card_updated_never">Never updated</string>
+    <string name="sub_card_used">%1$s used</string>
+    <string name="sub_card_remaining">%1$s remaining</string>
+    <string name="sub_card_expires">Expires: %1$s</string>
+    <string name="sub_card_unlimited">Unlimited</string>
+    <string name="sub_card_support">Support</string>
+    <string name="sub_card_website">Website</string>
+    <string name="sub_card_subscriptions">Subscriptions</string>
+    <string name="auto_card_title">Auto · %1$s</string>
+    <string name="auto_card_desc">Fastest of %1$s servers. If one fails, connections move on in a moment.</string>
+    <string name="auto_info_title">Automatic server selection</string>
+    <string name="auto_info_body">Lite always picks the fastest server of this subscription and moves to the next one in a moment if it drops. Tap the checkmark to turn automatic selection off.</string>
+    <string name="dialog_ok">OK</string>
+
+    <string name="server_menu_edit">Edit</string>
+    <string name="server_menu_duplicate">Duplicate</string>
+    <string name="server_menu_share">Share</string>
+    <string name="server_menu_test">Test</string>
+    <string name="server_menu_move">Move to group…</string>
+    <string name="server_menu_delete">Delete</string>
+    <string name="server_menu_connect">Connect</string>
+    <string name="server_edit_title">Edit server</string>
+    <string name="server_edit_name">Name</string>
+    <string name="server_edit_link">Config link</string>
+    <string name="server_edit_invalid">Config link is not valid</string>
+    <string name="server_edit_save">Save</string>
+    <string name="server_share_title">Share server</string>
+    <string name="server_share_copy">Copy link</string>
+    <string name="server_share_send">Send…</string>
+    <string name="server_move_title">Move to group</string>
+    <string name="server_delete_multi_title">Delete servers</string>
+    <string name="server_delete_multi_body">Delete %1$d servers?</string>
+    <string name="multiselect_test">Test</string>
+    <string name="multiselect_delete">Delete</string>
+    <string name="multiselect_cancel">Cancel</string>
+    <string name="multiselect_count">%1$s selected</string>
+    <string name="add_sheet_title">Add server</string>
+    <string name="add_from_clipboard">From clipboard</string>
+    <string name="add_manual">Manual (config link)</string>
+    <string name="add_subscription">Subscription (URL link)</string>
+    <string name="add_clipboard_empty">The clipboard has no config link</string>
+
+    <!-- 3.1.0 — PattNG: subscriptions -->
+    <string name="subs_title">Subscriptions</string>
+    <string name="subs_empty">No subscription has been added yet</string>
+    <string name="subs_updated_never">Never updated</string>
+    <string name="subs_updated_today">Updated today</string>
+    <string name="subs_profiles_count">%1$s servers</string>
+    <string name="sub_menu_update">Update</string>
+    <string name="sub_menu_rename">Rename</string>
+    <string name="sub_menu_delete">Delete subscription</string>
+    <string name="sub_delete_title">Delete subscription</string>
+    <string name="sub_delete_body">Delete the “%1$s” subscription and all its servers?</string>
+    <string name="sub_rename_title">Rename subscription</string>
+    <string name="sub_rename_hint">Subscription name</string>
+    <string name="sub_auto_update_label">Auto-update</string>
+
+    <!-- 3.1.0 — PattNG: routing -->
+    <string name="routing_title">Routing</string>
+    <string name="routing_mode_global">Everything through the tunnel</string>
+    <string name="routing_mode_global_desc">All traffic goes through the tunnel</string>
+    <string name="routing_mode_bypass_lan">Bypass local network</string>
+    <string name="routing_mode_bypass_lan_desc">Local network addresses go direct, the rest through the tunnel</string>
+    <string name="routing_mode_custom">Custom rules</string>
+    <string name="routing_mode_custom_desc">Add your own rules — custom rules apply first</string>
+    <string name="routing_rules_title">Custom rules</string>
+    <string name="routing_add_rule">Add rule</string>
+    <string name="routing_rule_name">Rule name</string>
+    <string name="routing_rule_pattern">Domain, IP or CIDR (e.g. example.com or 10.0.0.0/8)</string>
+    <string name="routing_action_proxy">Through tunnel</string>
+    <string name="routing_action_direct">Direct</string>
+    <string name="routing_action_block">Blocked</string>
+    <string name="routing_empty">No rules — add one with the button below</string>
+    <string name="routing_delete_title">Delete rule</string>
+    <string name="routing_delete_body">Delete the “%1$s” rule?</string>
+
+    <!-- 3.1.0 — PattNG: per-app proxy -->
+    <string name="perapp_title">Proxy for apps</string>
+    <string name="perapp_mode_bypass">Bypass VPN for selected apps</string>
+    <string name="perapp_mode_bypass_desc">All apps use the VPN except the selected ones</string>
+    <string name="perapp_mode_allow">Only selected apps</string>
+    <string name="perapp_mode_allow_desc">Only the selected apps use the VPN</string>
+    <string name="perapp_search_hint">Search apps…</string>
+    <string name="perapp_empty">No app found</string>
+    <string name="perapp_applies_next">Applies from the next connection</string>
+
+    <!-- 3.1.0 — PattNG: connection settings -->
+    <string name="settings_group_subscriptions">Subscriptions</string>
+    <string name="settings_group_routing_apps">Routing &amp; apps</string>
+    <string name="settings_group_backup">Backup</string>
+    <string name="settings_group_logs">Logs</string>
+    <string name="settings_subscriptions">Manage subscriptions</string>
+    <string name="settings_subscriptions_desc">Update, rename and delete subscriptions</string>
+    <string name="settings_routing">Routing</string>
+    <string name="settings_routing_desc">Which traffic goes through the tunnel and which goes direct</string>
+    <string name="settings_perapp">Proxy for apps</string>
+    <string name="settings_perapp_desc">Which apps use the VPN</string>
+    <string name="settings_logs">View logs</string>
+    <string name="settings_logs_desc">Connection events and errors</string>
+    <string name="settings_backup_export">Export backup</string>
+    <string name="settings_backup_export_desc">Save servers, chains and settings in one file</string>
+    <string name="settings_backup_import">Restore backup</string>
+    <string name="settings_backup_import_desc">Restore from a backup file</string>
+    <string name="backup_export_ok">Backup saved</string>
+    <string name="backup_export_fail">Saving the backup failed</string>
+    <string name="backup_import_ok">Backup restored</string>
+    <string name="backup_import_fail">The backup file is not valid</string>
+    <string name="test_url_title">Connection test URL</string>
+    <string name="test_url_desc">The address fetched to really check the tunnel</string>
+    <string name="mux_title">MUX</string>
+    <string name="mux_desc">Several streams on one connection — faster on some networks</string>
+    <string name="sniffing_title">Destination detection (Sniffing)</string>
+    <string name="sniffing_desc">The real destination of traffic is read for accurate routing</string>
+    <string name="fragment_title">Fragment</string>
+    <string name="fragment_desc">Fragments the TLS message to pass filters — helps on some networks</string>
+    <string name="dns_title">DNS servers</string>
+    <string name="dns_desc">Comma-separated — e.g. 8.8.8.8,1.1.1.1</string>
+
+    <!-- 3.1.0 — PattNG: logs -->
+    <string name="logs_title">Logs</string>
+    <string name="logs_empty">No events recorded yet</string>
+    <string name="logs_clear">Clear</string>
+    <string name="logs_share">Send</string>
+
+    <!-- 3.1.0 — PattNG: stats -->
+    <string name="stats_usage_title">Usage per server</string>
+    <string name="stats_usage_empty">No usage recorded yet</string>
+    <string name="stats_usage_total">Total: %1$s</string>
+
+    <!-- 3.2.2 — connection details + notification (were hardcoded Persian) -->
+    <string name="conn_error_generic">Error: %1$s</string>
+    <string name="conn_no_server_responded">No server responded — try another server</string>
+    <string name="conn_no_server">No server to connect to — pick a server first</string>
+    <string name="conn_server_no_response">Server did not respond — try another server</string>
+    <string name="conn_config_failed">Building the config failed</string>
+    <string name="conn_vpn_iface_failed">Building the VPN interface failed</string>
+    <string name="conn_core_failed">Starting the core failed: %1$s</string>
+    <string name="conn_tunnel_bridge_failed">Starting the tunnel bridge failed</string>
+    <string name="conn_dropped_reconnecting">Connection dropped — reconnecting…</string>
+    <string name="notif_connecting">Connecting…</string>
+    <string name="notif_totals">Download: %1$s · Upload: %2$s</string>
+    <string name="log_connecting_selected">Connecting to the selected server…</string>
+    <string name="geo_file_corrupt">The downloaded file is corrupt — try again</string>
+    <string name="geo_download_failed">Download failed — check your internet connection</string>
+    <string name="widget_connected">Connected</string>
+    <string name="widget_connecting">Connecting…</string>
+    <string name="widget_disconnected">Disconnected</string>
+    <string name="update_not_found">Not found</string>
+    <string name="update_error">Error</string>
+    <string name="routing_preset_iran_domains">Iranian domains</string>
+    <string name="routing_preset_iran_ips">Iranian IPs</string>
+    <string name="routing_preset_ads">Ads</string>
+    <string name="profile_copy_suffix"> (copy)</string>
+    <string name="chain_default_name">Chain %1$d</string>
+
+    <!-- 3.2.5 — day & night theme -->
+    <string name="theme_title">Day &amp; night theme</string>
+    <string name="theme_desc">Day, night, or follow the system</string>
+    <string name="theme_system">Auto</string>
+    <string name="theme_night">Night</string>
+    <string name="theme_day">Day</string>
+
+    <!-- 3.2.6 — quick settings tile -->
+    <string name="quick_settings_tile_title">Quick settings tile</string>
+    <string name="quick_settings_tile_desc">Add a connect button to the phone\'s quick settings</string>
+    <string name="quick_settings_tile_added">Added to quick settings</string>
+    <string name="quick_settings_tile_already">This tile is already added</string>
+    <string name="quick_settings_tile_not_added">Not added</string>
+    <string name="quick_settings_tile_old_android">This needs Android 13 or newer</string>
+
+    <!-- 3.2.7 — stream security (PattNG) -->
+    <string name="manual_fingerprint">Fingerprint</string>
+    <string name="manual_fingerprint_default">Default (chrome)</string>
+    <string name="manual_allow_insecure">Allow insecure certificate</string>
+    <string name="manual_alpn">ALPN</string>
+    <string name="manual_cipher_suites">Cipher suites</string>
+    <string name="manual_reality_pbk">Reality public key</string>
+    <string name="manual_reality_sid">Reality short ID</string>
+
+    <!-- 3.2.7 — two-column server list (PattNG) -->
+    <string name="settings_double_column_title">Two-column display</string>
+    <string name="settings_double_column_desc">Show servers two side by side</string>
+</resources>
