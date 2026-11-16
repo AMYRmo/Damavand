@@ -112,6 +112,20 @@ class LiteTileService : TileService() {
                     store.killSwitchNow()
                 )
             }
+            // A selected chain or Auto entry connects as it does in the
+            // app; one that no longer resolves opens the app instead of
+            // silently connecting some other single server.
+            if (SelectedEntry.isGroup(selectedId)) {
+                val extras = SelectedEntry.startExtras(this, selectedId) ?: run { openApp(); return }
+                startForegroundService(
+                    Intent(this, LiteVpnService::class.java)
+                        .setAction(LiteVpnService.ACTION_START)
+                        .putExtras(extras)
+                        .putExtra(LiteVpnService.EXTRA_TEST_URL, testUrl)
+                        .putExtra(LiteVpnService.EXTRA_KILL_SWITCH, killSwitch)
+                )
+                return
+            }
             val intent = Intent(this, LiteVpnService::class.java).apply {
                 action = LiteVpnService.ACTION_START
                 val selected = profiles.firstOrNull { it.id == selectedId }
