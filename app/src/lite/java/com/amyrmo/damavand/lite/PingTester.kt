@@ -1,5 +1,7 @@
 package com.amyrmo.damavand.lite
 
+import java.net.Inet6Address
+import java.net.InetAddress
 import java.net.InetSocketAddress
 import java.net.Socket
 import javax.net.ssl.SNIHostName
@@ -17,12 +19,21 @@ object PingTester {
 
     private const val TIMEOUT_MS = 5000
 
-    fun ping(profile: Profile): Long {
+    // 3.2.11 (PattNG PREF_PREFER_IPV6): when the profile's address is a
+    // hostname, pick the resolved address of the preferred family.
+    private fun resolveTarget(host: String, preferIpv6: Boolean): InetAddress {
+        val all = runCatching { InetAddress.getAllByName(host) }.getOrNull()
+            ?: return InetAddress.getByName(host)
+        return all.firstOrNull { (it is Inet6Address) == preferIpv6 } ?: all.first()
+    }
+
+    fun ping(profile: Profile, preferIpv6: Boolean = false): Long {
         val parsed = XrayConfig.parse(profile.link) ?: return -1
         val t0 = System.currentTimeMillis()
         return try {
+            val target = resolveTarget(parsed.addr, preferIpv6)
             Socket().use { socket ->
-                socket.connect(InetSocketAddress(parsed.addr, parsed.port), TIMEOUT_MS)
+                socket.connect(InetSocketAddress(target, parsed.port), TIMEOUT_MS)
                 if (parsed.tls == "tls") {
                     val factory = SSLSocketFactory.getDefault() as SSLSocketFactory
                     val ssl = factory.createSocket(socket, parsed.addr, parsed.port, true) as javax.net.ssl.SSLSocket
