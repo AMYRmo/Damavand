@@ -205,6 +205,7 @@
     <string name="aether_listen_port_desc">پورتی که برنامه برای SOCKS هستهٔ اتر استفاده می‌کند</string>
     <string name="mtu_title">MTU</string>
     <string name="mtu_desc">اندازه بسته تونل؛ پیش‌فرض 1500</string>
+    <string name="settings_value_range">یک عدد بین %1$d و %2$d وارد کنید</string>
     <string name="iface_addr_title">آدرس اینترفیس</string>
     <string name="iface_addr_desc">آدرس IP تونل؛ پیش‌فرض 10.8.0.2</string>
     <string name="auto_start_boot_title">شروع با بوت</string>
@@ -494,6 +495,13 @@
     <string name="logs_empty">هنوز رویدادی ثبت نشده است</string>
     <string name="logs_clear">پاک کردن</string>
     <string name="logs_share">ارسال</string>
+    <string name="cd_back">بازگشت</string>
+    <string name="cd_more_options">گزینه‌های بیشتر</string>
+    <string name="cd_refresh">به‌روزرسانی</string>
+    <string name="cd_add">افزودن</string>
+    <string name="cd_details">جزئیات</string>
+    <string name="cd_search">جستجو</string>
+    <string name="cd_sort">مرتب‌سازی</string>
 
     <!-- 3.1.0 — PattNG: stats -->
     <string name="stats_usage_title">مصرف هر سرور</string>
@@ -507,6 +515,7 @@
     <string name="conn_server_no_response">سرور پاسخ نداد — سرور دیگری را امتحان کنید</string>
     <string name="conn_config_failed">ساخت کانفیگ ناموفق بود</string>
     <string name="conn_vpn_iface_failed">ساخت اینترفیس VPN ناموفق بود</string>
+    <string name="vpn_permission_denied">اجازهٔ VPN داده نشد؛ اتصال انجام نشد</string>
     <string name="conn_core_failed">شروع هسته ناموفق بود: %1$s</string>
     <string name="conn_root_failed">نصب قوانین روت ناموفق بود؛ گوشی روت نشده یا su رد شد</string>
     <string name="conn_aether_failed">شروع هسته Aether ناموفق بود</string>
