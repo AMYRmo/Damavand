@@ -334,6 +334,21 @@
     <string name="sub_card_support">پشتیبانی</string>
     <string name="sub_card_website">وب‌سایت</string>
     <string name="sub_card_subscriptions">سابسکریپشن‌ها</string>
+    <!-- 3.2.21: usage/expiry row, Damavand BentoProviderCard -->
+    <string name="subs_usage">%1$s از %2$s مصرف شده</string>
+    <string name="subs_usage_unlimited">%1$s مصرف شده</string>
+    <string name="subs_expired">منقضی شده</string>
+    <string name="subs_quota_exhausted">حجم تمام شده</string>
+    <string name="subs_expires_today">امروز منقضی می‌شود</string>
+    <string name="subs_one_day_left">۱ روز مانده</string>
+    <string name="subs_days_left">%1$s روز مانده</string>
+    <!-- 3.2.21: connection info pill, Damavand ConnectionInfoPill -->
+    <string name="info_unknown_location">مکان نامشخص</string>
+    <string name="info_no_ip">آی‌پی مشخص نیست</string>
+    <string name="info_ipv4">IPv4</string>
+    <string name="info_isp">ISP</string>
+    <string name="info_location">موقعیت</string>
+    <string name="info_refresh">تازه کردن</string>
     <string name="auto_card_title">خودکار · %1$s</string>
     <string name="auto_card_desc">سریع‌ترین از %1$s سرور. اگر یکی قطع شود، اتصال در یک لحظه جابه‌جا می‌شود.</string>
     <string name="auto_info_title">انتخاب خودکار سرور</string>
