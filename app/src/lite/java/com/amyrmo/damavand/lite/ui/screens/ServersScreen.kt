@@ -123,6 +123,7 @@ fun ServersScreen(
     isConnected: Boolean,
     listState: LazyListState,
     onOpenQrScan: () -> Unit = {},
+    onImportFile: () -> Unit = {},
     onOpenSubscriptions: () -> Unit = {}
 ) {
     val isTesting by vm.isTesting.collectAsState()
@@ -844,6 +845,14 @@ fun ServersScreen(
                         onClick = {
                             showAddSheet = false
                             onOpenQrScan()
+                        }
+                    )
+                    // 3.2.11 (PattNG ImportConfigLocal): import from a file.
+                    AddSheetRow(
+                        labelRes = R.string.add_from_file,
+                        onClick = {
+                            showAddSheet = false
+                            onImportFile()
                         }
                     )
                     // 3.2.0 (PattNG): manual per-protocol editor.
