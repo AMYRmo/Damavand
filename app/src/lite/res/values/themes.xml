@@ -5,4 +5,10 @@
         <item name="android:statusBarColor">@color/ic_launcher_background</item>
         <item name="android:navigationBarColor">@color/ic_launcher_background</item>
     </style>
+    <!-- 3.2.11 (PattNG): the start/stop/switch shortcut activities show nothing. -->
+    <style name="Theme.DamavandLite.Translucent" parent="Theme.DamavandLite">
+        <item name="android:windowIsTranslucent">true</item>
+        <item name="android:windowBackground">@android:color/transparent</item>
+        <item name="android:windowNoTitle">true</item>
+    </style>
 </resources>
