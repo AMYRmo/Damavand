@@ -376,7 +376,7 @@ object AetherIdentityManager {
             exitKey = exit.key,
             timeoutMs = timeoutMs,
             onOutput = onOutput,
-        ) { line -> line.takeIf(::isRegistered) }
+        ) { line -> isRegistered(line) }
     }
 
     /** Whether the run dials WARP through Tor or Psiphon in reverse, which takes what a scan may take. */
