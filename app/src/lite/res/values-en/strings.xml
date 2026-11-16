@@ -334,6 +334,21 @@
     <string name="sub_card_support">Support</string>
     <string name="sub_card_website">Website</string>
     <string name="sub_card_subscriptions">Subscriptions</string>
+    <!-- 3.2.21: usage/expiry row, Damavand BentoProviderCard -->
+    <string name="subs_usage">%1$s of %2$s used</string>
+    <string name="subs_usage_unlimited">%1$s used</string>
+    <string name="subs_expired">Expired</string>
+    <string name="subs_quota_exhausted">Data used up</string>
+    <string name="subs_expires_today">Expires today</string>
+    <string name="subs_one_day_left">1 day left</string>
+    <string name="subs_days_left">%1$s days left</string>
+    <!-- 3.2.21: connection info pill, Damavand ConnectionInfoPill -->
+    <string name="info_unknown_location">Unknown location</string>
+    <string name="info_no_ip">No IP yet</string>
+    <string name="info_ipv4">IPv4</string>
+    <string name="info_isp">ISP</string>
+    <string name="info_location">Location</string>
+    <string name="info_refresh">Refresh</string>
     <string name="auto_card_title">Auto · %1$s</string>
     <string name="auto_card_desc">Fastest of %1$s servers. If one fails, connections move on in a moment.</string>
     <string name="auto_info_title">Automatic server selection</string>
