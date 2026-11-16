@@ -66,6 +66,20 @@ class ProfileRepository(private val context: Context) {
         }
     }
 
+    /** Re-order the stored profiles in one locked load → sort → save. */
+    fun sortProfiles(comparator: Comparator<Profile>) {
+        synchronized(fileLock) {
+            saveProfiles(loadProfiles().sortedWith(comparator))
+        }
+    }
+
+    /** Append [profile] in one locked load → add → save. */
+    fun addProfile(profile: Profile) {
+        synchronized(fileLock) {
+            saveProfiles(loadProfiles() + profile)
+        }
+    }
+
     fun selectedProfile(selectedId: String?): Profile? {
         val profiles = loadProfiles()
         if (profiles.isEmpty()) return null
