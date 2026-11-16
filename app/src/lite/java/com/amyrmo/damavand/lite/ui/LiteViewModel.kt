@@ -1592,7 +1592,12 @@ class LiteViewModel(app: Application) : AndroidViewModel(app) {
                 if (pkg == context.packageName) return@mapNotNull null
                 val label = info.loadLabel(pm)?.toString() ?: pkg
                 label to pkg
-            }.sortedBy { it.first.lowercase() }
+            }
+                // One row per package: queryIntentActivities returns one
+                // entry per launcher ACTIVITY (Phone + Contacts, OEM
+                // suites), and the picker's LazyColumn keys on the package.
+                .distinctBy { it.second }
+                .sortedBy { it.first.lowercase() }
         } catch (_: Exception) {
             emptyList()
         }
