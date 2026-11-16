@@ -2,6 +2,7 @@ package com.amyrmo.damavand.lite.ui.screens
 
 import android.Manifest
 import android.content.pm.PackageManager
+import android.os.SystemClock
 import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -20,6 +21,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -49,6 +51,8 @@ import com.google.mlkit.vision.common.InputImage
  * add-subscription path as a pasted link, so single links and sub URLs
  * both work. One scan at a time — after a scan the screen closes.
  */
+private const val FAILED_QR_COOLDOWN_MS = 4_000L
+
 @Composable
 fun ScannerScreen(vm: LiteViewModel, onBack: () -> Unit) {
     val context = LocalContext.current
@@ -65,6 +69,26 @@ fun ScannerScreen(vm: LiteViewModel, onBack: () -> Unit) {
     // The analyzer closure reads this State object (stable reference),
     // so the one-scan guard stays correct across recompositions.
     val scanned = remember { mutableStateOf<String?>(null) }
+    // The last code that failed to import, and when: ignored for a few
+    // seconds, so a bad QR held in view doesn't loop (a toast, and for a
+    // sub URL a new fetch, on every frame).
+    val lastFailed = remember { mutableStateOf<String?>(null) }
+    val lastFailedAt = remember { longArrayOf(0L) }
+    // Camera + ML Kit live only as long as this screen: the provider is
+    // bound to the Activity's lifecycle, so release it on dispose
+    // (otherwise the camera stays on until the activity stops).
+    val providerFuture = remember { ProcessCameraProvider.getInstance(context) }
+    val scanner = remember { BarcodeScanning.getClient() }
+    val disposed = remember { booleanArrayOf(false) }
+    DisposableEffect(Unit) {
+        onDispose {
+            disposed[0] = true
+            providerFuture.addListener({
+                runCatching { providerFuture.get().unbindAll() }
+            }, ContextCompat.getMainExecutor(context))
+            scanner.close()
+        }
+    }
     val subImport by vm.subImport.collectAsState()
 
     LaunchedEffect(Unit) {
@@ -84,6 +108,8 @@ fun ScannerScreen(vm: LiteViewModel, onBack: () -> Unit) {
                 Toast.makeText(
                     context, context.getString(st.resId), Toast.LENGTH_SHORT
                 ).show()
+                lastFailed.value = scanned.value
+                lastFailedAt[0] = SystemClock.elapsedRealtime()
                 scanned.value = null
             }
             else -> Unit
@@ -124,8 +150,9 @@ fun ScannerScreen(vm: LiteViewModel, onBack: () -> Unit) {
             AndroidView(
                 factory = { ctx ->
                     val previewView = PreviewView(ctx)
-                    val providerFuture = ProcessCameraProvider.getInstance(ctx)
                     providerFuture.addListener({
+                        // Left the screen before the provider was ready.
+                        if (disposed[0]) return@addListener
                         val provider = providerFuture.get()
                         val preview = Preview.Builder().build().also {
                             it.setSurfaceProvider(previewView.surfaceProvider)
@@ -135,10 +162,13 @@ fun ScannerScreen(vm: LiteViewModel, onBack: () -> Unit) {
                                 ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST
                             )
                             .build()
-                        val scanner = BarcodeScanning.getClient()
                         analyzer.setAnalyzer(
                             ContextCompat.getMainExecutor(ctx)
                         ) { imageProxy ->
+                            if (disposed[0]) {
+                                imageProxy.close()
+                                return@setAnalyzer
+                            }
                             val mediaImage = imageProxy.image
                             if (mediaImage == null) {
                                 imageProxy.close()
@@ -151,7 +181,9 @@ fun ScannerScreen(vm: LiteViewModel, onBack: () -> Unit) {
                                 .addOnSuccessListener { barcodes ->
                                     val value = barcodes
                                         .firstOrNull()?.rawValue?.trim()
-                                    if (!value.isNullOrEmpty() && scanned.value == null) {
+                                    val coolingDown = value == lastFailed.value &&
+                                        SystemClock.elapsedRealtime() - lastFailedAt[0] < FAILED_QR_COOLDOWN_MS
+                                    if (!value.isNullOrEmpty() && scanned.value == null && !coolingDown) {
                                         scanned.value = value
                                         vm.addSubscription(value)
                                     }
