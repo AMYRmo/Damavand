@@ -2,9 +2,11 @@ package com.amyrmo.damavand.lite.aether
 
 import android.content.Context
 import com.amyrmo.damavand.lite.AppLog
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.NonCancellable
+import kotlinx.coroutines.runInterruptible
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
@@ -374,14 +376,28 @@ object AetherIdentityManager {
         // the null check, not the lambda's own result. (The lambda
         // must return String? — the line when registered, else null —
         // because that is what runOneShot's match takes.)
-        return AetherEngine.runOneShot(
-            context = context,
-            arguments = withInfo,
-            identityDir = renewalDir,
-            exitKey = exit.key,
-            timeoutMs = timeoutMs,
-            onOutput = onOutput,
-        ) { line -> line.takeIf(::isRegistered) } != null
+        // runOneShot blocks for as long as the core runs (up to minutes), and the renewal is launched from the
+        // main thread (viewModelScope): it must run on IO, or the UI freezes and Android kills the app (ANR).
+        // runInterruptible lets the Cancel button interrupt the wait; runOneShot then ends the core.
+        // (PattNG's runUntil likewise spawns and waits on Dispatchers.IO, with a suspending timeout.)
+        return try {
+            runInterruptible(Dispatchers.IO) {
+                AetherEngine.runOneShot(
+                    context = context,
+                    arguments = withInfo,
+                    identityDir = renewalDir,
+                    exitKey = exit.key,
+                    timeoutMs = timeoutMs,
+                    onOutput = onOutput,
+                ) { line -> line.takeIf(::isRegistered) }
+            } != null
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            // A failed run leaves the keys in use and shows as a failed renewal instead of crashing the app.
+            AppLog.e("AetherIdentity", "the keys renewal run failed", e)
+            false
+        }
     }
 
     /** Whether the run dials WARP through Tor or Psiphon in reverse, which takes what a scan may take. */
