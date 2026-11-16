@@ -206,13 +206,17 @@ fun ServersScreen(
         if (flatList.isNotEmpty()) {
             ordered.add(ServerGroup("__all__", "", flatList))
         }
+        // 3.2.12 (Amir: «یه بخش manual هم بذار»): the Manual section
+        // is always there, right after All — even with no manual
+        // configs yet — so the configs added apart from the subs have
+        // a visible home instead of hiding at the end of the row.
+        // (Only when the app holds any config at all.)
+        if (flatList.isNotEmpty()) {
+            ordered.add(ServerGroup("", "", bySub[""].orEmpty()))
+        }
         for (sub in subscriptions) {
             val list = bySub[sub.url].orEmpty()
             if (list.isNotEmpty()) ordered.add(ServerGroup(sub.url, sub.displayName, list))
-        }
-        val manual = bySub[""].orEmpty()
-        if (manual.isNotEmpty()) {
-            ordered.add(ServerGroup("", "", manual))
         }
         // Profiles from a subscription that no longer exists (or an
         // unknown group key) still show, under their raw URL host.
@@ -222,6 +226,20 @@ fun ServersScreen(
             }
         }
         ordered
+    }
+    // 3.2.12 (Damavand/ZedSecure-faithful): the group selector is a
+    // row of small pills — All, Manual, the Subscriptions action,
+    // then one pill per subscription — exactly like Damavand's
+    // ServersScreen GroupTab row (BentoProviderCard below it shows
+    // the selected subscription's detail).
+    val chipEntries: List<GroupChipEntry> = remember(groups) {
+        val entries = ArrayList<GroupChipEntry>()
+        for (group in groups) {
+            entries.add(GroupChipEntry.Group(group))
+            // The Subscriptions chip sits right after Manual.
+            if (group.key.isEmpty()) entries.add(GroupChipEntry.Subscriptions)
+        }
+        entries
     }
     val fastestId = vm.fastestProfile?.id
     val allFailed = profiles.isNotEmpty() && !isTesting &&
@@ -610,43 +628,103 @@ fun ServersScreen(
                     }
                 }
             } else {
-                // 3.2.2: sub cards are HORIZONTAL — a scrollable row
-                // of cards, side by side, not stacked. Tap a card to
-                // select it; its servers show below.
-                item(key = "sub-cards") {
+                // 3.2.12 (Damavand/ZedSecure-faithful): the group
+                // selector is a row of SMALL pills — All, Manual,
+                // Subscriptions, one per subscription — exactly like
+                // Damavand's GroupTab row. Tap a pill to select it;
+                // long-press a subscription pill for its menu
+                // (Update / Subscriptions). The selected
+                // subscription's detail card shows right below.
+                item(key = "group-chips") {
                     LazyRow(
                         modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(12.dp),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
                         contentPadding = PaddingValues(vertical = 4.dp)
                     ) {
-                        items(groups, key = { "card:${it.key}" }) { group ->
-                            val sub = subscriptions.firstOrNull { it.url == group.key }
-                            if (sub != null) {
-                                SubscriptionCard(
-                                    subscription = sub,
-                                    count = group.profiles.size,
-                                    selected = group.key == selectedGroup?.key,
-                                    onSelect = { vm.selectGroup(group.key) },
-                                    onRefresh = { vm.updateSubscription(group.key) },
-                                    onOpenSubscriptions = onOpenSubscriptions,
-                                    modifier = Modifier.width(300.dp)
-                                )
-                            } else {
-                                GroupCard(
-                                    title = when {
-                                        group.key == "__all__" -> stringResource(R.string.servers_group_all)
-                                        group.key.isEmpty() -> stringResource(R.string.servers_group_manual)
-                                        else -> group.title
-                                    },
-                                    count = group.profiles.size,
-                                    selected = group.key == selectedGroup?.key,
-                                    onSelect = { vm.selectGroup(group.key) },
-                                    modifier = Modifier.width(300.dp)
-                                )
+                        items(chipEntries, key = {
+                            when (it) {
+                                is GroupChipEntry.Group -> "chip:${it.group.key}"
+                                GroupChipEntry.Subscriptions -> "chip:subs"
+                            }
+                        }) { entry ->
+                            when (entry) {
+                                is GroupChipEntry.Group -> {
+                                    val group = entry.group
+                                    val isSub = subscriptions.any { it.url == group.key }
+                                    var chipMenuOpen by remember { mutableStateOf(false) }
+                                    Box {
+                                        GroupChip(
+                                            label = when {
+                                                group.key == "__all__" -> stringResource(R.string.servers_group_all)
+                                                group.key.isEmpty() -> stringResource(R.string.servers_group_manual)
+                                                else -> group.title
+                                            },
+                                            count = group.profiles.size,
+                                            selected = group.key == selectedGroup?.key,
+                                            onClick = { vm.selectGroup(group.key) },
+                                            onMenu = if (isSub) {
+                                                { chipMenuOpen = true }
+                                            } else {
+                                                null
+                                            }
+                                        )
+                                        if (isSub) {
+                                            DropdownMenu(
+                                                expanded = chipMenuOpen,
+                                                onDismissRequest = { chipMenuOpen = false }
+                                            ) {
+                                                MenuActionItem(
+                                                    labelRes = R.string.subs_update,
+                                                    enabled = true,
+                                                    onClick = {
+                                                        chipMenuOpen = false
+                                                        vm.updateSubscription(group.key)
+                                                    }
+                                                )
+                                                MenuActionItem(
+                                                    labelRes = R.string.subs_title,
+                                                    enabled = true,
+                                                    onClick = {
+                                                        chipMenuOpen = false
+                                                        onOpenSubscriptions()
+                                                    }
+                                                )
+                                            }
+                                        }
+                                    }
+                                }
+                                GroupChipEntry.Subscriptions -> {
+                                    GroupChip(
+                                        label = stringResource(R.string.subs_title),
+                                        count = null,
+                                        selected = false,
+                                        onClick = onOpenSubscriptions
+                                    )
+                                }
                             }
                         }
                     }
                     Spacer(Modifier.height(12.dp))
+                }
+                // 3.2.12 (Damavand/ZedSecure-faithful): when a
+                // subscription group is selected, its provider card
+                // shows here — Damavand's BentoProviderCard, violet
+                // with the sync button, usage bar and Support /
+                // Website / Subscriptions links.
+                val openSub = selectedGroup?.let { g ->
+                    subscriptions.firstOrNull { it.url == g.key }
+                }
+                if (openSub != null) {
+                    item(key = "provider-${openSub.url}") {
+                        SubscriptionCard(
+                            subscription = openSub,
+                            count = selectedGroup!!.profiles.size,
+                            onRefresh = { vm.updateSubscription(openSub.url) },
+                            onOpenSubscriptions = onOpenSubscriptions,
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                        Spacer(Modifier.height(12.dp))
+                    }
                 }
                 // 3.2.8 (Auto, Damavand-faithful): the Auto card is a
                 // SELECTABLE server row for the selected group — tap to
@@ -1183,11 +1261,52 @@ private fun AddSheetRow(labelRes: Int, onClick: () -> Unit) {
  * the refresh / balancer actions live on the card itself.
  */
 @Composable
+// 3.2.12 (Damavand ServersScreen GroupTab): one entry of the group
+// pill row — a group, or the Subscriptions action chip.
+private sealed interface GroupChipEntry {
+    data class Group(val group: ServerGroup) : GroupChipEntry
+    data object Subscriptions : GroupChipEntry
+}
+
+@Composable
+private fun GroupChip(
+    label: String,
+    count: Int?,
+    selected: Boolean,
+    onClick: () -> Unit,
+    onMenu: (() -> Unit)? = null,
+) {
+    Box(
+        modifier = Modifier
+            .clip(RoundedCornerShape(50))
+            .background(if (selected) LiteColors.accent else LiteColors.surface)
+            .combinedClickable(onClick = onClick, onLongClick = onMenu)
+            .padding(horizontal = 14.dp, vertical = 8.dp),
+        contentAlignment = Alignment.Center
+    ) {
+        Text(
+            text = if (count != null) "$label  ${LiteFormat.toPersian(count.toString())}" else label,
+            fontSize = 13.sp,
+            fontWeight = FontWeight.SemiBold,
+            color = if (selected) Color.White else LiteColors.textSecondary,
+            fontFamily = Vazirmatn,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis
+        )
+    }
+}
+
+// 3.2.12 (Damavand/ZedSecure-faithful): the selected subscription's
+// provider card — Damavand's BentoProviderCard layout and behaviour
+// (title, "N servers · updated X ago", sync button, usage bar,
+// usage + expiry, Support / Website / Subscriptions link chips;
+// tap the card body to manage the subscription). Its colours are
+// Lite's own (surface card, Damavand Red accent), NOT Damavand's
+// violet Bento tone — Amir: «رنگش باید هماهنگ با رنگ خود اپ باشه».
+@Composable
 private fun SubscriptionCard(
     subscription: Subscription,
     count: Int,
-    selected: Boolean,
-    onSelect: () -> Unit,
     onRefresh: () -> Unit,
     onOpenSubscriptions: () -> Unit,
     modifier: Modifier = Modifier,
@@ -1196,52 +1315,82 @@ private fun SubscriptionCard(
     val used = subscription.usedBytes
     val total = subscription.total
     val hasUsage = used > 0 || total > 0
+    val fraction = if (total > 0) (used.toFloat() / total.toFloat()).coerceIn(0f, 1f) else null
+    val exhausted = fraction != null && fraction >= 1f
     Column(
         modifier = modifier
-            .clip(RoundedCornerShape(20.dp))
+            .clip(RoundedCornerShape(28.dp))
             .background(LiteColors.surface)
-            .border(
-                1.dp,
-                if (selected) LiteColors.accent else LiteColors.hairline,
-                RoundedCornerShape(20.dp)
-            )
-            .clickable(onClick = onSelect)
-            .padding(16.dp)
+            .border(1.dp, LiteColors.hairline, RoundedCornerShape(28.dp))
+            .clickable(onClick = onOpenSubscriptions)
+            .padding(horizontal = 18.dp, vertical = 16.dp)
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
-            Text(
-                text = subscription.displayName,
-                fontSize = 17.sp,
-                fontWeight = FontWeight.Bold,
-                color = LiteColors.text,
-                fontFamily = Vazirmatn,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-                modifier = Modifier.weight(1f, fill = false)
-            )
+            Column(Modifier.weight(1f)) {
+                Text(
+                    text = subscription.displayName,
+                    fontSize = 21.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = LiteColors.text,
+                    fontFamily = Vazirmatn,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+                Spacer(Modifier.height(2.dp))
+                Text(
+                    text = stringResource(
+                        R.string.servers_group_count,
+                        LiteFormat.toPersian(count.toString())
+                    ) + " · " + updatedAgoText(subscription.lastUpdated),
+                    fontSize = 12.sp,
+                    color = LiteColors.textSecondary,
+                    fontFamily = Vazirmatn,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+            }
             Spacer(Modifier.width(8.dp))
-            CircleIconButton(
-                buttonSize = 32.dp,
-                glyphSize = 15.dp,
-                filled = false,
-                onClick = onRefresh,
-                glyphColor = LiteColors.textSecondary,
-                icon = RefreshVector
-            )
+            Box(
+                modifier = Modifier
+                    .size(44.dp)
+                    .clip(CircleShape)
+                    .background(LiteColors.accent)
+                    .clickable(onClick = onRefresh),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    imageVector = RefreshVector,
+                    contentDescription = stringResource(R.string.subs_update),
+                    tint = Color.White,
+                    modifier = Modifier.size(22.dp)
+                )
+            }
         }
-        Spacer(Modifier.height(6.dp))
-        Text(
-            text = stringResource(
-                R.string.servers_group_count,
-                LiteFormat.toPersian(count.toString())
-            ) + " · " + updatedAgoText(subscription.lastUpdated),
-            fontSize = 12.sp,
-            color = LiteColors.textSecondary,
-            fontFamily = Vazirmatn
-        )
+        if (fraction != null) {
+            Spacer(Modifier.height(10.dp))
+            Box(
+                Modifier
+                    .fillMaxWidth()
+                    .height(8.dp)
+                    .clip(RoundedCornerShape(4.dp))
+                    .background(LiteColors.hairline)
+            ) {
+                Box(
+                    Modifier
+                        .fillMaxWidth(fraction.coerceAtLeast(0.02f))
+                        .height(8.dp)
+                        .clip(RoundedCornerShape(4.dp))
+                        .background(if (exhausted) LiteColors.error else LiteColors.accent)
+                )
+            }
+        }
         if (hasUsage) {
-            Spacer(Modifier.height(12.dp))
-            Row(verticalAlignment = Alignment.CenterVertically) {
+            Spacer(Modifier.height(10.dp))
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
                 Text(
                     text = stringResource(
                         R.string.sub_card_used,
@@ -1250,9 +1399,11 @@ private fun SubscriptionCard(
                     fontSize = 12.sp,
                     fontWeight = FontWeight.SemiBold,
                     color = LiteColors.text,
-                    fontFamily = Vazirmatn
+                    fontFamily = Vazirmatn,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.weight(1f, fill = false)
                 )
-                Spacer(Modifier.weight(1f))
                 Text(
                     text = if (total > 0) {
                         stringResource(
@@ -1264,19 +1415,8 @@ private fun SubscriptionCard(
                     },
                     fontSize = 12.sp,
                     color = LiteColors.textMuted,
-                    fontFamily = Vazirmatn
-                )
-            }
-            if (total > 0) {
-                Spacer(Modifier.height(6.dp))
-                LinearProgressIndicator(
-                    progress = { (used.toFloat() / total.toFloat()).coerceIn(0f, 1f) },
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(6.dp)
-                        .clip(RoundedCornerShape(3.dp)),
-                    color = LiteColors.accent,
-                    trackColor = LiteColors.hairline,
+                    fontFamily = Vazirmatn,
+                    maxLines = 1
                 )
             }
         }
@@ -1302,45 +1442,41 @@ private fun SubscriptionCard(
         // origin. Subscriptions always shows — it opens the in-app
         // subscriptions screen, not a URL.
         Spacer(Modifier.height(14.dp))
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(8.dp)
-        ) {
+        Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
             if (subscription.supportUrl.isNotBlank()) {
                 SubCardButton(
                     label = stringResource(R.string.sub_card_support),
-                    modifier = Modifier.weight(1f),
                     onClick = { openUrl(context, subscription.supportUrl) }
                 )
             }
             if (subscription.websiteUrl.isNotBlank()) {
                 SubCardButton(
                     label = stringResource(R.string.sub_card_website),
-                    modifier = Modifier.weight(1f),
                     onClick = { openUrl(context, subscription.websiteUrl) }
                 )
             }
             SubCardButton(
                 label = stringResource(R.string.sub_card_subscriptions),
-                modifier = Modifier.weight(1f),
                 onClick = onOpenSubscriptions
             )
         }
     }
 }
 
+// 3.2.12: the link chips on the provider card — Lite's own pill
+// style (surface2, muted text), matching the rest of the app.
 @Composable
 private fun SubCardButton(
     label: String,
-    modifier: Modifier = Modifier,
     onClick: () -> Unit
 ) {
     Box(
-        modifier = modifier
-            .clip(RoundedCornerShape(24.dp))
+        modifier = Modifier
+            .height(34.dp)
+            .clip(RoundedCornerShape(17.dp))
             .background(LiteColors.surface2)
             .clickable(onClick = onClick)
-            .padding(vertical = 10.dp),
+            .padding(horizontal = 14.dp),
         contentAlignment = Alignment.Center
     ) {
         Text(
@@ -1349,8 +1485,7 @@ private fun SubCardButton(
             fontWeight = FontWeight.SemiBold,
             color = LiteColors.textSecondary,
             fontFamily = Vazirmatn,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis
+            maxLines = 1
         )
     }
 }
@@ -1387,48 +1522,6 @@ private fun updatedAgoText(lastUpdated: Long): String {
 
 // 3.2.2: compact card for the manual / «همه» groups in the
 // horizontal card row — same shape as SubscriptionCard.
-@Composable
-private fun GroupCard(
-    title: String,
-    count: Int,
-    selected: Boolean,
-    onSelect: () -> Unit,
-    modifier: Modifier = Modifier
-) {
-    Column(
-        modifier = modifier
-            .clip(RoundedCornerShape(20.dp))
-            .background(LiteColors.surface)
-            .border(
-                1.dp,
-                if (selected) LiteColors.accent else LiteColors.hairline,
-                RoundedCornerShape(20.dp)
-            )
-            .clickable(onClick = onSelect)
-            .padding(16.dp)
-    ) {
-        Text(
-            text = title,
-            fontSize = 17.sp,
-            fontWeight = FontWeight.Bold,
-            color = LiteColors.text,
-            fontFamily = Vazirmatn,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis
-        )
-        Spacer(Modifier.height(6.dp))
-        Text(
-            text = stringResource(
-                R.string.servers_group_count,
-                LiteFormat.toPersian(count.toString())
-            ),
-            fontSize = 12.sp,
-            color = LiteColors.textSecondary,
-            fontFamily = Vazirmatn
-        )
-    }
-}
-
 @Composable
 private fun ChainPickBanner(
     count: Int,
