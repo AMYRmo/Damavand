@@ -738,7 +738,12 @@ class LiteViewModel(app: Application) : AndroidViewModel(app) {
         } catch (_: IllegalArgumentException) {
             return
         }
-        val members = profilesForGroup(groupKey)
+        // Only profiles that can be an autoselect member outbound: an
+        // Aether profile (aether://) or a full custom JSON config has no
+        // single outbound, and buildAutoSelect refuses the WHOLE group
+        // when one member does not build — so one Aether/custom profile
+        // in "All" (or a sub) made every Auto connect fail.
+        val members = profilesForGroup(groupKey).filter { !it.isAether && it.proto != "custom" }
         if (members.isEmpty()) {
             _connection.update {
                 it.copy(state = ConnState.ERROR, detail = context.getString(R.string.fastest_none))
