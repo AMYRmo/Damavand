@@ -26,3 +26,12 @@ replace github.com/wlynxg/anet => ./third_party/anet
 // blank-imports proxy/autoselect, so no code change is needed to
 // register the protocol.
 replace github.com/xtls/xray-core => github.com/CluvexStudio/Xray-core v0.0.0-20261102141629-7b4c3ceb1534
+
+// The fork's go.mod pins amneziawg-go to a placeholder version
+// (v3.0.0-00010101000000-000000000000) plus a RELATIVE replace
+// (../../reference/amneziawg-go) that only exists inside ZedSecure's
+// monorepo checkout — as a fetched module both are unusable, and Go
+// refuses the zero revision. ZedSecure's pins.txt shows the reference
+// is plain upstream amneziawg-go @ b5928efb (2026-08-28), so this
+// replace points at the same-day upstream tag instead.
+replace github.com/amnezia-vpn/amneziawg-go/v3 => github.com/amnezia-vpn/amneziawg-go/v3 v3.1.20260828
