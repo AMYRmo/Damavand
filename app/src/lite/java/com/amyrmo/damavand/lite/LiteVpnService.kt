@@ -61,6 +61,9 @@ class LiteVpnService : VpnService() {
         const val ACTION_START = "com.amyrmo.damavand.lite.START"
         const val ACTION_STOP = "com.amyrmo.damavand.lite.STOP"
         const val ACTION_QUERY = "com.amyrmo.damavand.lite.QUERY"
+        // 3.2.21: re-fetch the exit location/IP/ISP (the pill's
+        // refresh button) — only while connected.
+        const val ACTION_REFRESH_LOCATION = "com.amyrmo.damavand.lite.REFRESH_LOCATION"
         const val ACTION_STATUS = "com.amyrmo.damavand.lite.STATUS"
         const val ACTION_LOG = "com.amyrmo.damavand.lite.LOG"
 
@@ -121,6 +124,10 @@ class LiteVpnService : VpnService() {
 
     @Volatile private var location = ""
     @Volatile private var countryCode = ""
+    // 3.2.21 (Damavand ConnectionInfoPill): the exit IP and ISP of
+    // the connected tunnel, fetched with the location above.
+    @Volatile private var ip = ""
+    @Volatile private var isp = ""
     @Volatile private var pingMs: Long = -1
     @Volatile private var downSpeed: Long = 0
     @Volatile private var upSpeed: Long = 0
@@ -238,6 +245,7 @@ class LiteVpnService : VpnService() {
                 stopTunnel()
             }
             ACTION_QUERY -> broadcastStatus()
+            ACTION_REFRESH_LOCATION -> if (connected) fetchLocation()
         }
         return START_NOT_STICKY
     }
@@ -411,6 +419,8 @@ class LiteVpnService : VpnService() {
                 .putExtra("detail", lastDetail)
                 .putExtra("location", location)
                 .putExtra("countryCode", countryCode)
+                .putExtra("ip", ip)
+                .putExtra("isp", isp)
                 .putExtra("ping", pingMs)
                 .putExtra("downSpeed", downSpeed)
                 .putExtra("upSpeed", upSpeed)
@@ -467,6 +477,8 @@ class LiteVpnService : VpnService() {
         AutoSelect.end()
         location = ""
         countryCode = ""
+        ip = ""
+        isp = ""
         pingMs = -1
         downSpeed = 0; upSpeed = 0; totalDown = 0; totalUp = 0
         lastDetail = ""
@@ -1137,6 +1149,14 @@ class LiteVpnService : VpnService() {
                 val j = JSONObject(body)
                 val country = j.optString("country")
                 val city = j.optString("city")
+                // 3.2.21: the exit IP + ISP ride in the same payload
+                // (ipinfo: "ip" / "org"; ipwho.is: "ip" /
+                // connection.org). Any endpoint without them just
+                // leaves the pill's rows blank.
+                ip = j.optString("ip")
+                isp = j.optString("org").ifBlank {
+                    j.optJSONObject("connection")?.optString("org") ?: ""
+                }
                 countryCode = country
                 location = listOf(city, country).filter { it.isNotBlank() }
                     .joinToString(if (LiteFormat.persianDigits) "، " else ", ")
