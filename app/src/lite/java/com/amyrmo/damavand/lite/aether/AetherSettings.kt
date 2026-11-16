@@ -41,6 +41,10 @@ data class AetherSettings(
     val exitLoc: String? = null,
     /** The name of the profile the core dials out through; null means freedom. */
     val exitNode: String? = null,
+    /** The final mask the core's exit-node outbound carries, as the link of an ordinary profile gives its own outbound's; null means none (3.2.13, PattNG AetherFmt.parse). */
+    val finalMask: String? = null,
+    /** The dial mode the core's exit-node outbound uses; null means the default (3.2.13, PattNG AetherFmt.parse). */
+    val dialMode: String? = null,
     /** Where Psiphon stands in the tunnel, an AetherPsiphon type; null means it is not used. */
     val psiphon: String? = null,
     val psiphonMode: String? = null,
