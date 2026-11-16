@@ -17,6 +17,8 @@ import androidx.work.NetworkType
 import androidx.work.PeriodicWorkRequestBuilder
 import androidx.work.WorkManager
 import com.amyrmo.damavand.lite.AppLog
+import com.amyrmo.damavand.lite.AutoSelect
+import com.amyrmo.damavand.lite.AutoSelectIds
 import com.amyrmo.damavand.lite.BackupManager
 import com.amyrmo.damavand.lite.GeoDownloader
 import com.amyrmo.damavand.lite.LiteVpnService
@@ -230,7 +232,7 @@ class LiteViewModel(app: Application) : AndroidViewModel(app) {
      * subscription, else every config ("__all__").
      */
     fun effectiveGroupKey(): String {
-        _selectedGroupKey.value?.let { return it }
+        selectedGroupKey.value?.let { return it }
         val id = _selectedId.value
         val profile = _profiles.value.firstOrNull { it.id == id }
         if (profile != null) return profile.subscriptionUrl
