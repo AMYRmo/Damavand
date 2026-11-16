@@ -83,6 +83,8 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
+          # gradlew loses its +x bit when pushed via the Contents API.
+          chmod +x gradlew
           ./gradlew :app:assembleRelease --no-daemon -x lint
           VER=$(grep '^damavand.versionName=' gradle.properties | cut -d= -f2)
           BT=$(ls -d "$ANDROID_HOME"/build-tools/* | sort -V | tail -1)
