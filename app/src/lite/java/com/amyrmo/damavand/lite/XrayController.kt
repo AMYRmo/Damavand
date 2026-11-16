@@ -67,7 +67,8 @@ object XrayController {
         if (c.isRunning) stopQuietly(c)
         lastError = null
         return try {
-            c.startLoop(configJson, tunFd)
+            // gomobile: Go int is a Java long — pass the fd as Long.
+            c.startLoop(configJson, tunFd.toLong())
             c.isRunning
         } catch (e: Exception) {
             AppLog.e(TAG, "startLoop failed", e)
