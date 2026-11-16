@@ -145,6 +145,21 @@ class LiteVpnService : VpnService() {
 
     override fun onBind(intent: Intent?): IBinder? = null
 
+    /**
+     * The system revoked the VPN (another VPN app was started, or the
+     * user turned it off in Settings > VPN). The interface is already
+     * gone; the default implementation only calls stopSelf(), which
+     * skipped stopTunnel: no final status broadcast (the app, tile and
+     * widget kept showing "connected"), no usage record, and the poller
+     * kept running and could treat the dead tunnel as an unexpected drop
+     * (kill-switch reconnect). Stop like a user disconnect.
+     */
+    override fun onRevoke() {
+        broadcastLog("VPN permission revoked by the system")
+        intentionalStop = true
+        stopTunnel()
+    }
+
     override fun onCreate() {
         super.onCreate()
         createChannel()
