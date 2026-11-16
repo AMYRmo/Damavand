@@ -56,6 +56,8 @@
     <!-- Servers -->
     <string name="btn_test_all">Test all servers</string>
     <string name="btn_testing">Testing…</string>
+    <string name="btn_cancel_test">Cancel test</string>
+    <string name="btn_cancelling_test">Cancelling…</string>
     <string name="test_note">Testing only runs while this page is open</string>
     <string name="servers_chain_hint">To build a chain, long-press a server and pick servers in order</string>
     <string name="server_delete_title">Delete server</string>
@@ -165,6 +167,7 @@
     <string name="servers_sort_newest">Newest first</string>
     <string name="server_menu_share_full">Share full</string>
     <string name="servers_menu_real_ping_all">Real-test all</string>
+    <string name="servers_menu_cancel_test">Cancel test</string>
     <string name="servers_menu_restart">Restart service</string>
     <string name="servers_menu_locate">Find connected server</string>
     <string name="servers_menu_update_subs">Update all subscriptions</string>

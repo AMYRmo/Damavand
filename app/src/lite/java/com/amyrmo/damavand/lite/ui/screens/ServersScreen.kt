@@ -129,6 +129,9 @@ fun ServersScreen(
     val isTesting by vm.isTesting.collectAsState()
     val testProgress by vm.testProgress.collectAsState()
     val testingIds by vm.testingIds.collectAsState()
+    // #62: a running Test all / Real-test all can be cancelled.
+    val canCancelTest by vm.canCancelTest.collectAsState()
+    val isCancellingTest by vm.isCancellingTest.collectAsState()
     val chains by vm.chains.collectAsState()
     val chainPick by vm.chainPick.collectAsState()
     // 3.2.8: the selected group lives in the VM now (shared with
@@ -388,11 +391,20 @@ fun ServersScreen(
                             expanded = moreMenuOpen,
                             onDismissRequest = { moreMenuOpen = false }
                         ) {
-                            MenuActionItem(
-                                labelRes = R.string.servers_menu_real_ping_all,
-                                enabled = !isTesting && !isConnected,
-                                onClick = { moreMenuOpen = false; vm.testAllRealPing() }
-                            )
+                            if (isTesting && canCancelTest) {
+                                // #62: while a test runs, this item cancels it.
+                                MenuActionItem(
+                                    labelRes = R.string.servers_menu_cancel_test,
+                                    enabled = !isCancellingTest,
+                                    onClick = { moreMenuOpen = false; vm.cancelTest() }
+                                )
+                            } else {
+                                MenuActionItem(
+                                    labelRes = R.string.servers_menu_real_ping_all,
+                                    enabled = !isTesting && !isConnected,
+                                    onClick = { moreMenuOpen = false; vm.testAllRealPing() }
+                                )
+                            }
                             MenuActionItem(
                                 labelRes = R.string.servers_menu_restart,
                                 enabled = !isTesting,
@@ -478,16 +490,24 @@ fun ServersScreen(
             }
             item {
                 // «تست همه سرورها» — full width, 48dp, pill, strong border.
+                // #62: while a Test all / Real-test all runs, the same pill
+                // becomes «لغو تست» and cancels it (measured results stay).
+                val cancelMode = isTesting && canCancelTest
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
                         .height(48.dp)
-                        .alpha(if (isTesting || profiles.isEmpty()) 0.5f else 1f)
+                        .alpha(
+                            if ((isTesting && !cancelMode) || isCancellingTest ||
+                                profiles.isEmpty()
+                            ) 0.5f else 1f
+                        )
                         .background(Color.Transparent, CircleShape)
                         .border(1.5.dp, LiteColors.hairlineStrong, CircleShape)
                         .clickable(
-                            enabled = !isTesting && profiles.isNotEmpty(),
-                            onClick = { vm.testAll() }
+                            enabled = if (cancelMode) !isCancellingTest
+                            else !isTesting && profiles.isNotEmpty(),
+                            onClick = { if (cancelMode) vm.cancelTest() else vm.testAll() }
                         ),
                     contentAlignment = Alignment.Center
                 ) {
@@ -501,7 +521,12 @@ fun ServersScreen(
                         }
                         Text(
                             text = stringResource(
-                                if (isTesting) R.string.btn_testing else R.string.btn_test_all
+                                when {
+                                    isCancellingTest -> R.string.btn_cancelling_test
+                                    cancelMode -> R.string.btn_cancel_test
+                                    isTesting -> R.string.btn_testing
+                                    else -> R.string.btn_test_all
+                                }
                             ),
                             fontSize = 14.sp,
                             fontWeight = FontWeight.Bold,

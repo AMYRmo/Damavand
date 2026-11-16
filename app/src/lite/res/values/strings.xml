@@ -56,6 +56,8 @@
     <!-- Servers -->
     <string name="btn_test_all">تست همه سرورها</string>
     <string name="btn_testing">در حال تست…</string>
+    <string name="btn_cancel_test">لغو تست</string>
+    <string name="btn_cancelling_test">در حال لغو…</string>
     <string name="test_note">تست فقط هنگام باز بودن این صفحه اجرا می‌شود</string>
     <string name="servers_chain_hint">برای ساخت زنجیره، روی یک سرور نگه دارید و سرورها را به‌ترتیب انتخاب کنید</string>
     <string name="server_delete_title">حذف سرور</string>
@@ -165,6 +167,7 @@
     <string name="servers_sort_newest">جدیدترین اول</string>
     <string name="server_menu_share_full">اشتراک‌گذاری کامل</string>
     <string name="servers_menu_real_ping_all">تست واقعی همه</string>
+    <string name="servers_menu_cancel_test">لغو تست</string>
     <string name="servers_menu_restart">راه‌اندازی دوباره سرویس</string>
     <string name="servers_menu_locate">پیدا کردن سرور متصل</string>
     <string name="servers_menu_update_subs">به‌روزرسانی همه اشتراک‌ها</string>

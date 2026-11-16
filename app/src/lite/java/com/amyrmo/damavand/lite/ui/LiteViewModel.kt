@@ -43,12 +43,14 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.withPermit
 import kotlinx.coroutines.withContext
@@ -432,6 +434,21 @@ class LiteViewModel(app: Application) : AndroidViewModel(app) {
     /** Profile ids currently being ping-tested (rows show «…»). */
     private val _testingIds = MutableStateFlow<Set<String>>(emptySet())
     val testingIds: StateFlow<Set<String>> = _testingIds.asStateFlow()
+    /**
+     * The running user-started test (Test all / Real-test all), kept so
+     * it can be cancelled (#62). Null while no cancellable test runs —
+     * the Connect-fastest sweep is not tracked here.
+     */
+    private var testJob: Job? = null
+    private val _canCancelTest = MutableStateFlow(false)
+    /** True while a Test all / Real-test all run can be cancelled. */
+    val canCancelTest: StateFlow<Boolean> = _canCancelTest.asStateFlow()
+    private val _isCancellingTest = MutableStateFlow(false)
+    /** True after Cancel until the running test has stopped its core. */
+    val isCancellingTest: StateFlow<Boolean> = _isCancellingTest.asStateFlow()
+    /** The real-test fetch in flight, disconnected on cancel so it stops fast. */
+    private val realTestConn =
+        java.util.concurrent.atomic.AtomicReference<java.net.HttpURLConnection?>(null)
 
     // ---- subscription import ----
     private val _subImport = MutableStateFlow<SubImportState>(SubImportState.Idle)
@@ -806,7 +823,9 @@ class LiteViewModel(app: Application) : AndroidViewModel(app) {
         _isTesting.value = true
         _testProgress.value = 0 to list.size
         _testingIds.value = list.map { it.id }.toSet()
-        viewModelScope.launch(Dispatchers.IO) {
+        _isCancellingTest.value = false
+        _canCancelTest.value = true
+        testJob = viewModelScope.launch(Dispatchers.IO) {
             // 3.2.0: cap the parallel tests (PattNG real-ping concurrency).
             val concurrency = try {
                 settings.realPingConcurrencyNow()
@@ -826,28 +845,63 @@ class LiteViewModel(app: Application) : AndroidViewModel(app) {
             // on-device (3.1.0). The file itself is also locked +
             // atomically written now (ProfileRepository).
             val results = java.util.concurrent.ConcurrentHashMap<String, Long>()
-            val jobs = list.map { profile ->
-                launch {
-                    semaphore.withPermit {
-                        val ping = PingTester.ping(profile, preferIpv6)
-                        results[profile.id] = ping
-                        withContext(Dispatchers.Main) {
-                            _testingIds.update { it - profile.id }
-                            val (done, total) = _testProgress.value
-                            _testProgress.value = (done + 1) to total
+            var completed = false
+            try {
+                val jobs = list.map { profile ->
+                    launch {
+                        semaphore.withPermit {
+                            val ping = PingTester.ping(profile, preferIpv6)
+                            // #62: a ping that finished after Cancel is dropped.
+                            ensureActive()
+                            results[profile.id] = ping
+                            withContext(Dispatchers.Main) {
+                                _testingIds.update { it - profile.id }
+                                val (done, total) = _testProgress.value
+                                _testProgress.value = (done + 1) to total
+                            }
                         }
                     }
                 }
-            }
-            jobs.forEach { it.join() }
-            repo.updatePings(results)
-            withContext(Dispatchers.Main) {
-                refreshProfiles()
-                _testingIds.value = emptySet()
-                _isTesting.value = false
-                onDone?.invoke()
+                jobs.forEach { it.join() }
+                completed = true
+            } finally {
+                // #62: on cancel, keep what was already measured (saved
+                // once, batched, as before) and skip the post-test actions.
+                withContext(NonCancellable) {
+                    if (results.isNotEmpty()) repo.updatePings(results)
+                    withContext(Dispatchers.Main) {
+                        refreshProfiles()
+                        finishTestRun()
+                        if (completed) onDone?.invoke()
+                    }
+                }
             }
         }
+    }
+
+    /** Reset the test-run state; called on the main thread when a run ends. */
+    private fun finishTestRun() {
+        _testingIds.value = emptySet()
+        _isTesting.value = false
+        _canCancelTest.value = false
+        _isCancellingTest.value = false
+        testJob = null
+    }
+
+    /**
+     * Cancel the running Test all / Real-test all (#62). Pending profiles
+     * are skipped, results already measured stay, and the real test's
+     * own `finally` still stops its Xray core — [isTesting] stays true
+     * until it has, so a connect cannot start while the test core runs.
+     */
+    fun cancelTest() {
+        val job = testJob ?: return
+        if (!job.isActive || _isCancellingTest.value) return
+        _isCancellingTest.value = true
+        job.cancel()
+        // Abort the real-test fetch in flight instead of waiting out its
+        // timeouts; its finally then stops the core as usual.
+        try { realTestConn.get()?.disconnect() } catch (_: Exception) {}
     }
 
     /**
@@ -870,7 +924,9 @@ class LiteViewModel(app: Application) : AndroidViewModel(app) {
         _isTesting.value = true
         _testProgress.value = 0 to list.size
         _testingIds.value = list.map { it.id }.toSet()
-        viewModelScope.launch(Dispatchers.IO) {
+        _isCancellingTest.value = false
+        _canCancelTest.value = true
+        testJob = viewModelScope.launch(Dispatchers.IO) {
             val geoReady = GeoDownloader(context).isReady()
             val settingsSnapshot = try {
                 settings.xraySettingsNow(RoutingStore(context))
@@ -881,20 +937,33 @@ class LiteViewModel(app: Application) : AndroidViewModel(app) {
                 "https://www.google.com/generate_204"
             }
             val results = mutableMapOf<String, Long>()
-            for (profile in list) {
-                val ping = realPingOne(profile, geoReady, settingsSnapshot, testUrl)
-                results[profile.id] = ping
-                withContext(Dispatchers.Main) {
-                    _testingIds.update { it - profile.id }
-                    val (done, total) = _testProgress.value
-                    _testProgress.value = (done + 1) to total
+            try {
+                for (profile in list) {
+                    // #62: stop before starting the next profile's core.
+                    ensureActive()
+                    val ping = realPingOne(profile, geoReady, settingsSnapshot, testUrl) {
+                        !isActive
+                    }
+                    // A test cut short by Cancel is not a failure: drop it.
+                    ensureActive()
+                    results[profile.id] = ping
+                    withContext(Dispatchers.Main) {
+                        _testingIds.update { it - profile.id }
+                        val (done, total) = _testProgress.value
+                        _testProgress.value = (done + 1) to total
+                    }
                 }
-            }
-            repo.updatePings(results)
-            withContext(Dispatchers.Main) {
-                refreshProfiles()
-                _testingIds.value = emptySet()
-                _isTesting.value = false
+            } finally {
+                // realPingOne has already stopped its core (its own
+                // finally) by the time we get here. Keep the measured
+                // results on cancel too (#62).
+                withContext(NonCancellable) {
+                    if (results.isNotEmpty()) repo.updatePings(results)
+                    withContext(Dispatchers.Main) {
+                        refreshProfiles()
+                        finishTestRun()
+                    }
+                }
             }
         }
     }
@@ -905,6 +974,7 @@ class LiteViewModel(app: Application) : AndroidViewModel(app) {
         geoReady: Boolean,
         settingsSnapshot: XrayConfig.XraySettings,
         testUrl: String,
+        isCancelled: () -> Boolean = { false },
     ): Long {
         // The service is not running here (testAllRealPing refuses while
         // connected), so the fixed test port 1180 cannot collide.
@@ -914,6 +984,7 @@ class LiteViewModel(app: Application) : AndroidViewModel(app) {
         return try {
             val t0 = System.currentTimeMillis()
             while (System.currentTimeMillis() - t0 < 3000) {
+                if (isCancelled()) return -1
                 try {
                     java.net.Socket().use {
                         it.connect(java.net.InetSocketAddress("127.0.0.1", 1180), 300)
@@ -928,11 +999,22 @@ class LiteViewModel(app: Application) : AndroidViewModel(app) {
                 java.net.Proxy.Type.SOCKS,
                 java.net.InetSocketAddress("127.0.0.1", 1180)
             )
+            if (isCancelled()) return -1
             val conn = java.net.URL(testUrl).openConnection(proxy) as java.net.HttpURLConnection
             conn.connectTimeout = 8000
             conn.readTimeout = 8000
             conn.instanceFollowRedirects = false
-            val code = conn.responseCode
+            // #62: cancelTest() disconnects this to abort the fetch.
+            realTestConn.set(conn)
+            if (isCancelled()) {
+                conn.disconnect()
+                return -1
+            }
+            val code = try {
+                conn.responseCode
+            } finally {
+                realTestConn.compareAndSet(conn, null)
+            }
             conn.disconnect()
             if (code == 204 || code == 200) System.currentTimeMillis() - fetchStart else -1
         } catch (_: Exception) {
