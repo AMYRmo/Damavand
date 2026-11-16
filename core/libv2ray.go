@@ -72,9 +72,11 @@ func NewCoreController(handler CoreCallbackHandler) *CoreController {
 	return &CoreController{handler: handler}
 }
 
-// StartLoop starts the core from a JSON config (the tun fd is unused:
-// Lite runs the core behind a SOCKS inbound and bridges the tun in
-// Java, so fd is always 0).
+// StartLoop starts the core from a JSON config. When fd > 0 (Xray-tun
+// mode, PattNG's useHevTun=false), the fd is handed to the core through
+// the "xray.tun.fd" env flag, which the core's Android tun handler reads
+// (common/platform.TunFdKey) — the tun inbound then reads packets
+// straight from the VPN interface, no HEV bridge.
 func (c *CoreController) StartLoop(config string, fd int) error {
 	c.mu.Lock()
 	defer c.mu.Unlock()
@@ -83,7 +85,11 @@ func (c *CoreController) StartLoop(config string, fd int) error {
 		c.instance = nil
 		c.running = false
 	}
-	_ = fd
+	if fd > 0 {
+		_ = os.Setenv("xray.tun.fd", strconv.Itoa(fd))
+	} else {
+		_ = os.Unsetenv("xray.tun.fd")
+	}
 
 	config = injectStats(config)
 	cfg, err := core.LoadConfig("json", strings.NewReader(config))
@@ -117,6 +123,7 @@ func (c *CoreController) StopLoop() error {
 	err := c.instance.Close()
 	c.instance = nil
 	c.running = false
+	_ = os.Unsetenv("xray.tun.fd")
 	if c.handler != nil {
 		c.handler.Shutdown()
 	}
