@@ -10,43 +10,33 @@ import kotlinx.coroutines.runBlocking
  * selected profile/chain — only when the user enabled it in Settings.
  * The VPN permission persists across reboots once granted; if it was
  * never granted the service fails gracefully (no tun, no crash).
+ *
+ * 3.2.16 (#50): the selection is resolved by StartIntent, so a
+ * selected chain or Auto entry now reconnects as itself (BootReceiver
+ * used to handle `chain:` but not `auto:`, so Auto + boot did
+ * nothing). 3.2.16 (#51): when boot auto-start is OFF, the persisted
+ * tile state is reset here — otherwise the tile still showed
+ * "connected" after a reboot while no tunnel existed, and a tap
+ * could never connect again.
  */
 class BootReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
         if (intent.action != Intent.ACTION_BOOT_COMPLETED) return
         runBlocking {
             val store = SettingsStore(context)
-            if (!store.autoStartBootNow()) return@runBlocking
-            val repo = ProfileRepository(context)
+            if (!store.autoStartBootNow()) {
+                // No tunnel after this reboot: the tile/shortcuts must
+                // not keep showing the pre-reboot "connected" state.
+                try {
+                    context.getSharedPreferences("lite_tile", Context.MODE_PRIVATE)
+                        .edit().putBoolean("connected", false)
+                        .putBoolean("connecting", false).apply()
+                } catch (_: Exception) {
+                }
+                return@runBlocking
+            }
             val selected = store.selectedProfileIdNow() ?: return@runBlocking
-            var aether = false
-            val links: List<String> = if (selected.startsWith("chain:")) {
-                val chain = repo.loadChains()
-                    .firstOrNull { "chain:${it.id}" == selected } ?: return@runBlocking
-                chain.memberIds.mapNotNull { id ->
-                    repo.loadProfiles().firstOrNull { it.id == id }?.link
-                }
-            } else {
-                val profile = repo.loadProfiles()
-                    .firstOrNull { it.id == selected } ?: return@runBlocking
-                aether = profile.isAether
-                listOf(profile.link)
-            }
-            if (links.isEmpty()) return@runBlocking
-            val svc = Intent(context, LiteVpnService::class.java).apply {
-                action = LiteVpnService.ACTION_START
-                if (links.size == 1) {
-                    putExtra(LiteVpnService.EXTRA_LINK, links[0])
-                } else {
-                    putStringArrayListExtra(LiteVpnService.EXTRA_LINKS, ArrayList(links))
-                }
-                putExtra(LiteVpnService.EXTRA_TEST_URL, store.testUrlNow())
-                putExtra(LiteVpnService.EXTRA_KILL_SWITCH, store.killSwitchNow())
-                // An Aether profile's link is not an Xray link: without
-                // this flag the service tried XrayConfig on aether://<uuid>
-                // and every boot auto-start failed with "config failed".
-                if (aether) putExtra(LiteVpnService.EXTRA_AETHER, true)
-            }
+            val svc = StartIntent.build(context, selected) ?: return@runBlocking
             context.startForegroundService(svc)
         }
     }
