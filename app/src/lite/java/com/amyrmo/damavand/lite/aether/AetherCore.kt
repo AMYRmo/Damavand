@@ -282,6 +282,14 @@ data class AetherExit(
      * out through from the one that has the name by now, which an update of its subscription may have changed.
      */
     val nodeContent: String? = null,
+    /**
+     * A digest of the entry-side hops of a chain this core is a hop
+     * of (PattNG's AetherExit.through, 3.2.13): it tells the core that
+     * dials out through one chain from the core of another, which an
+     * update of a subscription may have changed, as [nodeContent] does
+     * for a named node.
+     */
+    val hops: String? = null,
 ) {
 
     /**
@@ -290,16 +298,28 @@ data class AetherExit(
      * node and its content join only where there are some, so that the key of any other exit-node stays what it was.
      */
     val key: String
-        get() = digest((listOf(finalMask, dialMode) + listOfNotNull(node, nodeContent)).joinToString("\u0000") { it.orEmpty() })
+        get() = digest((listOf(finalMask, dialMode, hops) + listOfNotNull(node, nodeContent)).joinToString("\u0000") { it.orEmpty() })
 
     companion object {
         /** An exit-node with nothing set, as the core of a custom configuration dials out through. */
         val PLAIN = AetherExit()
 
-        /** The exit-node of the core of [settings]: the profile it names as its node, or else a plain one. */
+        /** The exit-node of the core of [settings]: the profile it names as its node, or else a plain one — carrying the final mask and dial mode the settings hold, as PattNG's manager carries the profile's own on its exit (3.2.13). */
         fun of(settings: AetherSettings): AetherExit =
-            settings.exitNode?.trim()?.takeIf { it.isNotEmpty() }?.let { AetherExit(node = it) }
-                ?: AetherExit()
+            AetherExit(
+                finalMask = settings.finalMask?.trim()?.takeIf { it.isNotEmpty() },
+                dialMode = settings.dialMode?.trim()?.takeIf { it.isNotEmpty() },
+                node = settings.exitNode?.trim()?.takeIf { it.isNotEmpty() },
+            )
+
+        /**
+         * The exit of the core of a chain hop (PattNG's
+         * AetherExit.through, 3.2.13): a digest of the links on its
+         * entry side — the hops the core dials out through — so a chain
+         * whose entry side changed is a different core.
+         */
+        fun through(links: List<String>): AetherExit =
+            AetherExit(hops = digest(links.joinToString("\u0000")))
 
         /** The digest of [text]: the exit key, and the node content. */
         fun digest(text: String): String =
