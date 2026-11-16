@@ -6,6 +6,7 @@ import android.app.NotificationManager
 import android.app.PendingIntent
 import android.content.ComponentName
 import android.content.Intent
+import android.content.res.Resources
 import android.net.VpnService
 import android.os.Build
 import android.os.IBinder
@@ -45,6 +46,13 @@ import kotlin.math.max
  * - One core per connection (Xray only).
  */
 class LiteVpnService : VpnService() {
+
+    // Status, log and notification text in the in-app language: every
+    // getString() goes through getResources(), and the plain service
+    // context followed the system language.
+    override fun getResources(): Resources =
+        if (baseContext == null) super.getResources()
+        else LocaleHelper.localized(baseContext).resources
 
     companion object {
         const val ACTION_START = "com.amyrmo.damavand.lite.START"

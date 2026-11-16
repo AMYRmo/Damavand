@@ -27,6 +27,7 @@ import com.amyrmo.damavand.lite.aether.AetherSettings
 import com.amyrmo.damavand.lite.BackupManager
 import com.amyrmo.damavand.lite.GeoDownloader
 import com.amyrmo.damavand.lite.LiteVpnService
+import com.amyrmo.damavand.lite.LocaleHelper
 import com.amyrmo.damavand.lite.PingTester
 import com.amyrmo.damavand.lite.Profile
 import com.amyrmo.damavand.lite.Chain
@@ -77,6 +78,8 @@ data class ConnectionUiState(
 class LiteViewModel(app: Application) : AndroidViewModel(app) {
 
     private val context: Context get() = getApplication<Application>().applicationContext
+    // Status/error text in the in-app language, not the system one.
+    private val strings: Context get() = LocaleHelper.localized(context)
     private val repo = ProfileRepository(context)
     private val settings = SettingsStore(context)
     private val routingStore = RoutingStore(context)
@@ -386,7 +389,7 @@ class LiteViewModel(app: Application) : AndroidViewModel(app) {
                 val tag = Regex("\"tag_name\"\\s*:\\s*\"(v[0-9.]+)\"")
                     .find(body)?.groupValues?.getOrNull(1)
                 if (tag == null) {
-                    _updateCheck.value = UpdateCheckState.Failed(context.getString(R.string.update_not_found))
+                    _updateCheck.value = UpdateCheckState.Failed(strings.getString(R.string.update_not_found))
                 } else {
                     val latest = tag.removePrefix("v")
                     val current = com.amyrmo.damavand.lite.BuildConfig.VERSION_NAME
@@ -399,7 +402,7 @@ class LiteViewModel(app: Application) : AndroidViewModel(app) {
                 }
             } catch (e: Exception) {
                 _updateCheck.value =
-                    UpdateCheckState.Failed(e.message ?: context.getString(R.string.update_error))
+                    UpdateCheckState.Failed(e.message ?: strings.getString(R.string.update_error))
             }
         }
     }
@@ -603,7 +606,7 @@ class LiteViewModel(app: Application) : AndroidViewModel(app) {
             if (profile.isAether) {
                 if (isRootModeNow()) {
                     _connection.update {
-                        it.copy(state = ConnState.ERROR, detail = context.getString(R.string.aether_root_unsupported))
+                        it.copy(state = ConnState.ERROR, detail = strings.getString(R.string.aether_root_unsupported))
                     }
                     return
                 }
@@ -652,7 +655,7 @@ class LiteViewModel(app: Application) : AndroidViewModel(app) {
         val list = profilesForGroup(effectiveGroupKey()).filter { !it.isAether }
         if (list.isEmpty()) {
             _connection.update {
-                it.copy(state = ConnState.ERROR, detail = context.getString(R.string.fastest_none))
+                it.copy(state = ConnState.ERROR, detail = strings.getString(R.string.fastest_none))
             }
             return
         }
@@ -662,7 +665,7 @@ class LiteViewModel(app: Application) : AndroidViewModel(app) {
         _connection.update {
             it.copy(
                 state = ConnState.CONNECTING,
-                detail = context.getString(R.string.fastest_sweep, 0, list.size),
+                detail = strings.getString(R.string.fastest_sweep, 0, list.size),
             )
         }
         viewModelScope.launch(Dispatchers.IO) {
@@ -690,7 +693,7 @@ class LiteViewModel(app: Application) : AndroidViewModel(app) {
                             val next = (done + 1) to total
                             _testProgress.value = next
                             _connection.update {
-                                it.copy(detail = context.getString(R.string.fastest_sweep, next.first, next.second))
+                                it.copy(detail = strings.getString(R.string.fastest_sweep, next.first, next.second))
                             }
                         }
                     }
@@ -709,7 +712,7 @@ class LiteViewModel(app: Application) : AndroidViewModel(app) {
                     .sortedBy { it.lastPingMs }
                 if (ranked.isEmpty()) {
                     _connection.update {
-                        it.copy(state = ConnState.ERROR, detail = context.getString(R.string.fastest_none))
+                        it.copy(state = ConnState.ERROR, detail = strings.getString(R.string.fastest_none))
                     }
                     return@withContext
                 }
@@ -721,8 +724,8 @@ class LiteViewModel(app: Application) : AndroidViewModel(app) {
     // ---- Auto (3.2.8, Damavand-faithful) ----
     /** The display label of one group (for the Auto card + notification). */
     fun groupLabel(groupKey: String): String = when (groupKey) {
-        "__all__" -> context.getString(R.string.servers_group_all)
-        "" -> context.getString(R.string.servers_group_manual)
+        "__all__" -> strings.getString(R.string.servers_group_all)
+        "" -> strings.getString(R.string.servers_group_manual)
         else -> _subscriptions.value.firstOrNull { it.url == groupKey }?.displayName
             ?: groupKey.substringAfter("://").substringBefore("/")
     }
@@ -741,7 +744,7 @@ class LiteViewModel(app: Application) : AndroidViewModel(app) {
         val members = profilesForGroup(groupKey)
         if (members.isEmpty()) {
             _connection.update {
-                it.copy(state = ConnState.ERROR, detail = context.getString(R.string.fastest_none))
+                it.copy(state = ConnState.ERROR, detail = strings.getString(R.string.fastest_none))
             }
             return
         }
@@ -754,7 +757,7 @@ class LiteViewModel(app: Application) : AndroidViewModel(app) {
             members.map { it.link },
             autoSelect = true,
             autoId = autoId,
-            displayName = context.getString(R.string.auto_card_title, groupLabel(groupKey)),
+            displayName = strings.getString(R.string.auto_card_title, groupLabel(groupKey)),
         )
     }
 
@@ -1206,7 +1209,7 @@ class LiteViewModel(app: Application) : AndroidViewModel(app) {
         if (_aetherKeysRenewing.value) return
         val current = _aetherKeysSettings.value
         AetherKeys.problem(current)?.let { problem ->
-            _aetherKeysNotice.value = context.getString(
+            _aetherKeysNotice.value = strings.getString(
                 when (problem) {
                     AetherKeys.Problem.INVALID_ENROLL_ADDRESS -> R.string.aether_keys_invalid_enroll_address
                     AetherKeys.Problem.INVALID_API_SNI -> R.string.aether_keys_invalid_api_sni
@@ -1227,7 +1230,7 @@ class LiteViewModel(app: Application) : AndroidViewModel(app) {
             var exitStarted = false
             try {
                 if (_connection.value.state == ConnState.CONNECTED || _connection.value.state == ConnState.CONNECTING) {
-                    _aetherKeysNotice.value = context.getString(R.string.aether_keys_renew_blocked)
+                    _aetherKeysNotice.value = strings.getString(R.string.aether_keys_renew_blocked)
                     return@launch
                 }
                 // The profile chosen as the exit-node may be renamed or gone since the page opened, or share its name
@@ -1238,7 +1241,7 @@ class LiteViewModel(app: Application) : AndroidViewModel(app) {
                     val matches = profiles.value.filter { it.name == node }
                     val exitProfile = matches.singleOrNull()
                     if (exitProfile == null || exitProfile.isAether) {
-                        _aetherKeysNotice.value = context.getString(R.string.aether_keys_exit_missing, node)
+                        _aetherKeysNotice.value = strings.getString(R.string.aether_keys_exit_missing, node)
                         return@launch
                     }
                     val cfg = XrayConfig.build(
@@ -1248,13 +1251,13 @@ class LiteViewModel(app: Application) : AndroidViewModel(app) {
                         settings = settings.xraySettingsNow(RoutingStore(context)),
                     )
                     if (cfg == null || !XrayController.start(cfg)) {
-                        _aetherKeysNotice.value = context.getString(R.string.aether_keys_exit_failed, node)
+                        _aetherKeysNotice.value = strings.getString(R.string.aether_keys_exit_failed, node)
                         return@launch
                     }
                     exitStarted = true
                     exitPort = renewExitPort
                 }
-                aetherKeysAppendLog(context.getString(R.string.aether_keys_renewing))
+                aetherKeysAppendLog(strings.getString(R.string.aether_keys_renewing))
                 val keys = AetherIdentityManager.renew(
                     context = context,
                     kind = kind,
@@ -1264,12 +1267,12 @@ class LiteViewModel(app: Application) : AndroidViewModel(app) {
                     onOutput = ::aetherKeysAppendLog,
                 )
                 if (keys == null) {
-                    aetherKeysAppendLog(context.getString(R.string.aether_keys_renew_failed))
+                    aetherKeysAppendLog(strings.getString(R.string.aether_keys_renew_failed))
                 } else {
                     // By now the core and the exit it dialled out through have ended, and the new keys are in place.
-                    aetherKeysAppendLog(context.getString(R.string.aether_keys_renewed))
+                    aetherKeysAppendLog(strings.getString(R.string.aether_keys_renewed))
                     _aetherKeys.value = AetherIdentityManager.keys(context)
-                    _aetherKeysNotice.value = context.getString(R.string.aether_keys_renewed)
+                    _aetherKeysNotice.value = strings.getString(R.string.aether_keys_renewed)
                 }
             } catch (e: CancellationException) {
                 // By now the core and what it started have ended. A run cancelled once every new key was ready has put
@@ -1290,7 +1293,7 @@ class LiteViewModel(app: Application) : AndroidViewModel(app) {
     fun cancelAetherKeysRenewal() {
         val job = aetherKeysRenewJob ?: return
         if (!_aetherKeysRenewing.value || job.isCancelled) return
-        aetherKeysAppendLog(context.getString(R.string.aether_keys_renew_cancelled))
+        aetherKeysAppendLog(strings.getString(R.string.aether_keys_renew_cancelled))
         job.cancel()
     }
 
@@ -1475,11 +1478,11 @@ class LiteViewModel(app: Application) : AndroidViewModel(app) {
     fun importRoutingPreset(preset: String) {
         val rules: List<Triple<String, String, String>> = when (preset) {
             "bypass_ir" -> listOf(
-                Triple(context.getString(R.string.routing_preset_iran_domains), "geosite:geolocation-ir", "direct"),
-                Triple(context.getString(R.string.routing_preset_iran_ips), "geoip:ir", "direct"),
+                Triple(strings.getString(R.string.routing_preset_iran_domains), "geosite:geolocation-ir", "direct"),
+                Triple(strings.getString(R.string.routing_preset_iran_ips), "geoip:ir", "direct"),
             )
             "block_ads" -> listOf(
-                Triple(context.getString(R.string.routing_preset_ads), "geosite:category-ads-all", "block"),
+                Triple(strings.getString(R.string.routing_preset_ads), "geosite:category-ads-all", "block"),
             )
             else -> return
         }
