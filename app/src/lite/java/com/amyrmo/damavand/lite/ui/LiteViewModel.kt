@@ -798,7 +798,10 @@ class LiteViewModel(app: Application) : AndroidViewModel(app) {
 
     fun testAll(onDone: (() -> Unit)? = null) {
         if (_isTesting.value) return
-        val list = _profiles.value
+        // 3.2.12 (Amir): test ONLY the selected group's configs — the
+        // subscription (or Manual) the user is looking at — not every
+        // config in the app. ("__all__" still means every config.)
+        val list = profilesForGroup(effectiveGroupKey())
         if (list.isEmpty()) return
         _isTesting.value = true
         _testProgress.value = 0 to list.size
@@ -860,7 +863,9 @@ class LiteViewModel(app: Application) : AndroidViewModel(app) {
             _connection.value.state == ConnState.CONNECTING
         ) return
         // 3.2.10 (Aether): Aether profiles have no server to test.
-        val list = _profiles.value.filter { !it.isAether }
+        // 3.2.12 (Amir): same scoping as testAll — only the selected
+        // group's configs, not every config in the app.
+        val list = profilesForGroup(effectiveGroupKey()).filter { !it.isAether }
         if (list.isEmpty()) return
         _isTesting.value = true
         _testProgress.value = 0 to list.size
