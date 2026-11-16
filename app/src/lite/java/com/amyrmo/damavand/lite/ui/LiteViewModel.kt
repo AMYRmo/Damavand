@@ -19,6 +19,7 @@ import androidx.work.WorkManager
 import com.amyrmo.damavand.lite.AppLog
 import com.amyrmo.damavand.lite.AutoSelect
 import com.amyrmo.damavand.lite.AutoSelectIds
+import com.amyrmo.damavand.lite.aether.AetherSettings
 import com.amyrmo.damavand.lite.BackupManager
 import com.amyrmo.damavand.lite.GeoDownloader
 import com.amyrmo.damavand.lite.LiteVpnService
@@ -199,6 +200,9 @@ class LiteViewModel(app: Application) : AndroidViewModel(app) {
     val realPingConcurrency = settings.realPingConcurrency
     val ipApiUrl = settings.ipApiUrl
     val proxyOnly = settings.proxyOnly
+    // 3.2.10 (PattNG root mode).
+    val rootMode = settings.rootMode
+    val rootLanShare = settings.rootLanShare
     val showSpeedNotif = settings.showSpeedNotif
     val confirmDelete = settings.confirmDelete
     val showAllGroups = settings.showAllGroups
@@ -517,6 +521,8 @@ class LiteViewModel(app: Application) : AndroidViewModel(app) {
         autoSelect: Boolean = false,
         autoId: String? = null,
         displayName: String? = null,
+        // 3.2.10 (Aether): the single link is an Aether profile.
+        aether: Boolean = false,
     ) {
         viewModelScope.launch {
             val kill = settings.killSwitchNow()
@@ -538,6 +544,9 @@ class LiteViewModel(app: Application) : AndroidViewModel(app) {
                     putExtra(LiteVpnService.EXTRA_AUTO_SELECT, true)
                     autoId?.let { putExtra(LiteVpnService.EXTRA_AUTO_ID, it) }
                 }
+                // 3.2.10 (Aether): the service builds the Aether
+                // config and starts the core beside Xray.
+                if (aether) putExtra(LiteVpnService.EXTRA_AETHER, true)
                 displayName?.let { putExtra(LiteVpnService.EXTRA_NAME, it) }
             }
             context.startService(intent)
@@ -564,18 +573,33 @@ class LiteViewModel(app: Application) : AndroidViewModel(app) {
         }
         val profile = selectedProfile
         if (profile != null && _selectedId.value == profile.id) {
+            // 3.2.10 (Aether): no pre-test, no ping — the core
+            // measures its own endpoints. Root mode and Aether are
+            // not combined in 3.2.10: refuse with a plain message.
+            if (profile.isAether) {
+                if (isRootModeNow()) {
+                    _connection.update {
+                        it.copy(state = ConnState.ERROR, detail = context.getString(R.string.aether_root_unsupported))
+                    }
+                    return
+                }
+                startService(listOf(profile.link), aether = true)
+                return
+            }
             startService(listOf(profile.link))
             return
         }
         val candidates = _profiles.value
-            .filter { it.lastPingMs > 0 }
+            .filter { !it.isAether && it.lastPingMs > 0 }
             .sortedBy { it.lastPingMs }
             .take(5)
             .map { it.link }
         if (candidates.isNotEmpty()) {
             startService(emptyList(), candidates)
         } else {
-            val link = profile?.link ?: fastestProfile?.link ?: return
+            // 3.2.10 (Aether): never the fallback pick — it has no
+            // ping and no server to test.
+            val link = profile?.takeIf { !it.isAether }?.link ?: fastestProfile?.link ?: return
             startService(listOf(link))
         }
     }
@@ -599,7 +623,9 @@ class LiteViewModel(app: Application) : AndroidViewModel(app) {
         if (_isTesting.value) return
         if (_connection.value.state == ConnState.CONNECTING) return
         if (_connection.value.state == ConnState.CONNECTED) return
-        val list = profilesForGroup(effectiveGroupKey())
+        // 3.2.10 (Aether): Aether profiles have no server to ping —
+        // they never join the sweep.
+        val list = profilesForGroup(effectiveGroupKey()).filter { !it.isAether }
         if (list.isEmpty()) {
             _connection.update {
                 it.copy(state = ConnState.ERROR, detail = context.getString(R.string.fastest_none))
@@ -797,7 +823,8 @@ class LiteViewModel(app: Application) : AndroidViewModel(app) {
         if (_connection.value.state == ConnState.CONNECTED ||
             _connection.value.state == ConnState.CONNECTING
         ) return
-        val list = _profiles.value
+        // 3.2.10 (Aether): Aether profiles have no server to test.
+        val list = _profiles.value.filter { !it.isAether }
         if (list.isEmpty()) return
         _isTesting.value = true
         _testProgress.value = 0 to list.size
@@ -924,8 +951,10 @@ class LiteViewModel(app: Application) : AndroidViewModel(app) {
      */
     fun deleteInvalidProfiles() {
         val badIds = _profiles.value.filter {
-            XrayConfig.parse(it.link) == null ||
-                (it.lastPingMs == -1L && it.lastTestedAt > 0)
+            // 3.2.10 (Aether): an Aether profile's link is not a
+            // share link — it is never invalid by the parser.
+            !it.isAether && (XrayConfig.parse(it.link) == null ||
+                (it.lastPingMs == -1L && it.lastTestedAt > 0))
         }.map { it.id }.toSet()
         deleteProfiles(badIds)
     }
@@ -946,6 +975,9 @@ class LiteViewModel(app: Application) : AndroidViewModel(app) {
 
     /** Ping one profile (3.0.0, PattNG per-config test). */
     fun testOne(profile: Profile) {
+        // 3.2.10 (Aether): an Aether profile has no server to ping —
+        // its ping stays untouched.
+        if (profile.isAether) return
         if (profile.id in _testingIds.value) return
         _testingIds.update { it + profile.id }
         viewModelScope.launch(Dispatchers.IO) {
@@ -1050,6 +1082,37 @@ class LiteViewModel(app: Application) : AndroidViewModel(app) {
                 (result as ProfileRepository.FetchResult.Ok).profiles.isNotEmpty()
             if (ok) refreshProfiles()
             withContext(Dispatchers.Main) { onResult(ok) }
+        }
+    }
+
+    /** Add a standalone Aether profile (3.2.10): its link is
+     * "aether://<uuid>" and its settings ride in aetherJson — the
+     * link parser never sees it. */
+    fun addAetherProfile(name: String, settings: AetherSettings, onResult: (Profile?) -> Unit) {
+        viewModelScope.launch(Dispatchers.IO) {
+            val profile = Profile.aether(
+                name.trim().ifEmpty { "Aether" },
+                AetherSettings.toJson(settings),
+            )
+            repo.saveProfiles(repo.loadProfiles() + profile)
+            withContext(Dispatchers.Main) {
+                refreshProfiles()
+                onResult(profile)
+            }
+        }
+    }
+
+    /** Update an Aether profile's name and settings (3.2.10). */
+    fun updateAetherProfile(id: String, name: String, settings: AetherSettings) {
+        viewModelScope.launch(Dispatchers.IO) {
+            val old = repo.loadProfiles().firstOrNull { it.id == id } ?: return@launch
+            repo.updateProfile(
+                old.copy(
+                    name = name.trim().ifEmpty { old.name },
+                    aetherJson = AetherSettings.toJson(settings),
+                )
+            )
+            withContext(Dispatchers.Main) { refreshProfiles() }
         }
     }
 
@@ -1378,6 +1441,22 @@ class LiteViewModel(app: Application) : AndroidViewModel(app) {
     fun setRealPingConcurrency(v: String) = viewModelScope.launch { settings.setRealPingConcurrency(v) }
     fun setIpApiUrl(v: String) = viewModelScope.launch { settings.setIpApiUrl(v) }
     fun setProxyOnly(v: Boolean) = viewModelScope.launch { settings.setProxyOnly(v) }
+    // 3.2.10 (PattNG root mode): turning it ON probes for su first;
+    // without root the setting stays off and the caller shows the toast.
+    fun setRootMode(v: Boolean, onDenied: () -> Unit = {}) = viewModelScope.launch {
+        if (v) {
+            if (com.amyrmo.damavand.lite.root.RootManager.refresh()) {
+                settings.setRootMode(true)
+            } else {
+                onDenied()
+            }
+        } else {
+            settings.setRootMode(false)
+        }
+    }
+    fun setRootLanShare(v: Boolean) = viewModelScope.launch { settings.setRootLanShare(v) }
+    /** Synchronous read for MainActivity's connect gate (DataStore is cached). */
+    fun isRootModeNow(): Boolean = kotlinx.coroutines.runBlocking { settings.rootModeNow() }
     fun setShowSpeedNotif(v: Boolean) = viewModelScope.launch { settings.setShowSpeedNotif(v) }
     fun setConfirmDelete(v: Boolean) = viewModelScope.launch { settings.setConfirmDelete(v) }
     fun setShowAllGroups(v: Boolean) = viewModelScope.launch { settings.setShowAllGroups(v) }
