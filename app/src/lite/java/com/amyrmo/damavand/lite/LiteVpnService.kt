@@ -214,7 +214,11 @@ class LiteVpnService : VpnService() {
                 intentionalStop = true
                 stopTunnel()
             }
-            ACTION_QUERY -> broadcastStatus()
+            ACTION_QUERY -> {
+                broadcastStatus()
+                // Started only to answer: don't leave an idle service behind.
+                if (!running) stopSelf(startId)
+            }
         }
         return START_NOT_STICKY
     }
@@ -1366,6 +1370,10 @@ class LiteVpnService : VpnService() {
             }
         }
         if (!running && tun == null) {
+            // Nothing runs (e.g. a fresh process after a reboot or kill
+            // while connected): still correct the persisted tile state,
+            // or the tile and shortcuts stay "connected" for good.
+            refreshTile(STATE_DISCONNECTED)
             stopSelf()
             return
         }

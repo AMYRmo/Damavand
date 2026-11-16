@@ -523,7 +523,13 @@ class LiteViewModel(app: Application) : AndroidViewModel(app) {
         }
         // Ask the service for its current state (in case it is already running).
         runCatching {
-            context.sendBroadcast(Intent(LiteVpnService.ACTION_QUERY).setPackage(context.packageName))
+            // A start command, not a broadcast: the service handles
+            // ACTION_QUERY only in onStartCommand (it registers no
+            // receiver), and answering also corrects the tile state a
+            // killed process left behind.
+            context.startService(
+                Intent(context, LiteVpnService::class.java).setAction(LiteVpnService.ACTION_QUERY)
+            )
         }
     }
 
