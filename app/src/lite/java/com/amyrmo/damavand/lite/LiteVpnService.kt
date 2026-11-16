@@ -568,7 +568,14 @@ class LiteVpnService : VpnService() {
         val geoReady = GeoDownloader(applicationContext).isReady()
         // The fastest-connect probe talks SOCKS to the core, so the
         // local proxy is forced on here whatever the setting says.
-        val settings = loadXraySettings().copy(tunMode = false, localProxyEnabled = true)
+        // The test inbound is private to this probe: loopback only and
+        // no auth. With a SOCKS user set, the inbound would demand
+        // username/password, which java.net's SOCKS client never sends,
+        // so every real test (and with it every connect) would fail.
+        val settings = loadXraySettings().copy(
+            tunMode = false, localProxyEnabled = true,
+            socksUser = "", socksPass = "", socksShareLan = false, httpProxyEnabled = false,
+        )
         val cfg = XrayConfig.buildLinks(links, activeTestPort, geoReady, settings) ?: return false
         if (!XrayController.start(cfg)) return false
         try {
@@ -873,7 +880,8 @@ class LiteVpnService : VpnService() {
                 if (!HevTunCore.start(
                         this, descriptor!!, activeSocksPort, settings.mtu,
                         settings.ifaceAddr, null, false, pipeline = true,
-                        logLevel = hevLog, rwTimeout = hevTimeout
+                        logLevel = hevLog, rwTimeout = hevTimeout,
+                        socksUser = settings.socksUser, socksPass = settings.socksPass,
                     )
                 ) {
                     lastDetail = getString(R.string.conn_tunnel_bridge_failed)
