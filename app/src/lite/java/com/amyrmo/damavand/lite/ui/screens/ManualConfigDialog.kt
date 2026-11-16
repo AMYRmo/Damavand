@@ -37,7 +37,9 @@ import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.style.TextDirection
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.amyrmo.damavand.lite.Profile
 import com.amyrmo.damavand.lite.R
+import com.amyrmo.damavand.lite.XrayConfig
 import com.amyrmo.damavand.lite.ui.LiteViewModel
 import com.amyrmo.damavand.lite.ui.theme.LiteColors
 import com.amyrmo.damavand.lite.ui.theme.Vazirmatn
@@ -51,12 +53,133 @@ import java.net.URLEncoder
  * profile (custom://). The built link goes through the same parser as
  * pasted links, so an invalid field set fails loudly instead of
  * connecting broken.
+ *
+ * 3.2.8: the same form is the EDIT dialog too (PattNG's
+ * ServerVlessActivity etc. edit field-by-field — the old Edit dialog
+ * was just a raw link box). [ManualConfigDialog] adds a fresh config,
+ * [EditConfigDialog] edits one in place, with the protocol locked
+ * (PattNG edits one protocol per screen) and the fields pre-filled
+ * from the parsed link.
  */
 @Composable
 fun ManualConfigDialog(vm: LiteViewModel, onDismiss: () -> Unit) {
     val context = LocalContext.current
-    var proto by remember { mutableStateOf("vless") }
-    val fields = remember { mutableStateMapOf<String, String>() }
+    ManualConfigEditor(
+        initialProto = "vless",
+        initialFields = emptyMap(),
+        titleRes = R.string.manual_title,
+        confirmRes = R.string.manual_add,
+        allowProtoChange = true,
+        onSave = { _, link, done ->
+            vm.addManualLink(link) { ok ->
+                if (ok) {
+                    Toast.makeText(
+                        context,
+                        context.getString(R.string.manual_added),
+                        Toast.LENGTH_SHORT
+                    ).show()
+                }
+                done(ok)
+            }
+        },
+        onDismiss = onDismiss
+    )
+}
+
+/** Edit one existing profile, field by field (3.2.8, PattNG). */
+@Composable
+fun EditConfigDialog(
+    profile: Profile,
+    onDismiss: () -> Unit,
+    onSave: (String, String, (Boolean) -> Unit) -> Unit
+) {
+    val parsed = remember(profile.link) { XrayConfig.parse(profile.link) } ?: run {
+        // Unparseable — the caller falls back to the raw link dialog.
+        onDismiss()
+        return
+    }
+    ManualConfigEditor(
+        initialProto = parsed.proto,
+        initialFields = fieldsFromParsed(parsed, profile.name),
+        titleRes = R.string.server_edit_title,
+        confirmRes = R.string.server_edit_save,
+        allowProtoChange = false,
+        onSave = onSave,
+        onDismiss = onDismiss
+    )
+}
+
+/** The parsed link → the editor's field map (PattNG's field set). */
+private fun fieldsFromParsed(p: XrayConfig.Parsed, name: String): Map<String, String> {
+    val f = mutableMapOf<String, String>()
+    f["name"] = name
+    f["addr"] = p.addr
+    if (p.port > 0) f["port"] = p.port.toString()
+    when (p.proto) {
+        "vless", "vmess" -> {
+            f["uuid"] = p.id
+            f["security"] = p.tls.ifEmpty { "tls" }
+            f["net"] = p.net.ifEmpty { "tcp" }
+            f["sni"] = p.sni
+            f["path"] = p.path
+            f["host"] = p.host
+            f["fp"] = p.fp
+            f["allowInsecure"] = if (p.allowInsecure) "1" else "0"
+            f["alpn"] = p.alpn
+            f["cs"] = p.cipherSuites
+            f["pbk"] = p.realityPublicKey
+            f["sid"] = p.realityShortId
+            f["flow"] = p.flow
+        }
+        "trojan" -> {
+            f["password"] = p.id
+            f["security"] = p.tls.ifEmpty { "tls" }
+            f["sni"] = p.sni
+            f["fp"] = p.fp
+            f["allowInsecure"] = if (p.allowInsecure) "1" else "0"
+            f["alpn"] = p.alpn
+            f["cs"] = p.cipherSuites
+            f["pbk"] = p.realityPublicKey
+            f["sid"] = p.realityShortId
+        }
+        "ss" -> {
+            f["method"] = p.id.substringBefore(":")
+            f["password"] = p.id.substringAfter(":", "")
+        }
+        "socks", "http" -> {
+            f["username"] = p.id.substringBefore(":")
+            f["password"] = p.id.substringAfter(":", "")
+        }
+        "hysteria2" -> {
+            f["password"] = p.id
+            f["sni"] = p.sni
+            f["insecure"] = p.hyInsecure
+        }
+        "wg" -> {
+            f["privateKey"] = p.id
+            f["publicKey"] = p.wgPublicKey
+            f["allowedIps"] = p.wgAllowedIps
+            f["localAddress"] = p.wgAddress
+            f["mtu"] = p.wgMtu
+        }
+    }
+    return f
+}
+
+@Composable
+private fun ManualConfigEditor(
+    initialProto: String,
+    initialFields: Map<String, String>,
+    titleRes: Int,
+    confirmRes: Int,
+    allowProtoChange: Boolean,
+    onSave: (String, String, (Boolean) -> Unit) -> Unit,
+    onDismiss: () -> Unit
+) {
+    var proto by remember { mutableStateOf(initialProto) }
+    val fields = remember {
+        mutableStateMapOf<String, String>().apply { putAll(initialFields) }
+    }
     var error by remember { mutableStateOf(false) }
     var saving by remember { mutableStateOf(false) }
 
@@ -67,7 +190,7 @@ fun ManualConfigDialog(vm: LiteViewModel, onDismiss: () -> Unit) {
         onDismissRequest = { if (!saving) onDismiss() },
         title = {
             Text(
-                text = stringResource(R.string.manual_title),
+                text = stringResource(titleRes),
                 fontSize = 16.sp,
                 fontWeight = androidx.compose.ui.text.font.FontWeight.Bold,
                 color = LiteColors.text,
@@ -78,30 +201,33 @@ fun ManualConfigDialog(vm: LiteViewModel, onDismiss: () -> Unit) {
             Column(
                 modifier = Modifier.verticalScroll(rememberScrollState())
             ) {
-                // Protocol picker.
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .horizontalScroll(rememberScrollState()),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    for (p in listOf(
-                        "vless", "vmess", "trojan", "ss", "socks",
-                        "http", "hysteria2", "wg", "json"
-                    )) {
-                        ManualChip(
-                            label = when (p) {
-                                "ss" -> "Shadowsocks"
-                                "wg" -> "WireGuard"
-                                "json" -> "JSON"
-                                else -> p.replaceFirstChar { it.uppercase() }
-                            },
-                            selected = proto == p,
-                            onClick = { proto = p; error = false }
-                        )
+                // Protocol picker (add only — edit locks the protocol,
+                // like PattNG's per-protocol edit screens).
+                if (allowProtoChange) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .horizontalScroll(rememberScrollState()),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        for (p in listOf(
+                            "vless", "vmess", "trojan", "ss", "socks",
+                            "http", "hysteria2", "wg", "json"
+                        )) {
+                            ManualChip(
+                                label = when (p) {
+                                    "ss" -> "Shadowsocks"
+                                    "wg" -> "WireGuard"
+                                    "json" -> "JSON"
+                                    else -> p.replaceFirstChar { it.uppercase() }
+                                },
+                                selected = proto == p,
+                                onClick = { proto = p; error = false }
+                            )
+                        }
                     }
+                    Spacer(Modifier.height(16.dp))
                 }
-                Spacer(Modifier.height(16.dp))
                 if (proto == "json") {
                     ManualField(
                         labelRes = R.string.manual_name,
@@ -294,14 +420,9 @@ fun ManualConfigDialog(vm: LiteViewModel, onDismiss: () -> Unit) {
                         return@TextButton
                     }
                     saving = true
-                    vm.addManualLink(link) { ok ->
+                    onSave(f("name"), link) { ok ->
                         saving = false
                         if (ok) {
-                            Toast.makeText(
-                                context,
-                                context.getString(R.string.manual_added),
-                                Toast.LENGTH_SHORT
-                            ).show()
                             onDismiss()
                         } else {
                             error = true
@@ -311,7 +432,7 @@ fun ManualConfigDialog(vm: LiteViewModel, onDismiss: () -> Unit) {
                 enabled = !saving
             ) {
                 Text(
-                    text = stringResource(R.string.manual_add),
+                    text = stringResource(confirmRes),
                     fontSize = 14.sp,
                     fontWeight = androidx.compose.ui.text.font.FontWeight.Bold,
                     color = LiteColors.text,
