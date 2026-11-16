@@ -172,12 +172,13 @@ object XrayConfig {
             }
             val atIdx = effectiveRest.lastIndexOf('@')
             if (atIdx < 0) return null
-            val user = effectiveRest.substring(0, atIdx)
+            // RFC 3986 userinfo is percent-encoded (a trojan/hysteria2
+            // password with '@', ':' or '+', a WireGuard key's '/', '=').
+            val user = percentDecode(effectiveRest.substring(0, atIdx))
             val afterAt = effectiveRest.substring(atIdx + 1)
             val hostPort = afterAt.substringBefore("?").substringBefore("/")
             val query = afterAt.substringAfter("?", "")
-            val addr = hostPort.substringBefore(":")
-            val port = hostPort.substringAfter(":", "0").toIntOrNull() ?: 0
+            val (addr, port) = splitHostPort(hostPort)
             if (addr.isEmpty() || port == 0) return null
             val q = query.split("&").mapNotNull {
                 val kv = it.split("=", limit = 2)
@@ -230,6 +231,59 @@ object XrayConfig {
         }
     }
 
+    /**
+     * "host:port" or "[ipv6]:port" -> host (brackets removed) and port, 0
+     * when missing/invalid. A bracketed IPv6 literal used to be split at
+     * its first ':' ("[2001" / "db8::1]:443"), so every IPv6 link was
+     * rejected.
+     */
+    internal fun splitHostPort(hostPort: String): Pair<String, Int> {
+        if (hostPort.startsWith("[")) {
+            val end = hostPort.indexOf(']')
+            if (end < 0) return "" to 0
+            val host = hostPort.substring(1, end)
+            val rest = hostPort.substring(end + 1)
+            val port = if (rest.startsWith(":")) rest.substring(1).toIntOrNull() ?: 0 else 0
+            return host to (port.takeIf { it in 1..65535 } ?: 0)
+        }
+        val host = hostPort.substringBefore(":")
+        val port = hostPort.substringAfter(":", "0").toIntOrNull() ?: 0
+        return host to (port.takeIf { it in 1..65535 } ?: 0)
+    }
+
+    /**
+     * Percent-decoding for URI userinfo. Unlike URLDecoder it keeps '+'
+     * (a literal in base64 keys and passwords, not a space) and leaves a
+     * malformed '%' sequence as is instead of throwing.
+     */
+    internal fun percentDecode(text: String): String {
+        if ('%' !in text) return text
+        val bytes = java.io.ByteArrayOutputStream()
+        val plain = StringBuilder()
+        fun flush() {
+            if (plain.isNotEmpty()) {
+                bytes.write(plain.toString().toByteArray(Charsets.UTF_8))
+                plain.setLength(0)
+            }
+        }
+        var i = 0
+        while (i < text.length) {
+            val c = text[i]
+            if (c == '%' && i + 2 < text.length &&
+                Character.digit(text[i + 1], 16) >= 0 && Character.digit(text[i + 2], 16) >= 0
+            ) {
+                flush()
+                bytes.write(Character.digit(text[i + 1], 16) * 16 + Character.digit(text[i + 2], 16))
+                i += 3
+            } else {
+                plain.append(c)
+                i++
+            }
+        }
+        flush()
+        return String(bytes.toByteArray(), Charsets.UTF_8)
+    }
+
     /** Base64 (URL-safe first, then standard) with padding repaired. */
     private fun b64decode(text: String): String? {
         val clean = text.trim()
@@ -260,7 +314,10 @@ object XrayConfig {
         val userInfo: String
         val hostPort: String
         if ('@' in noQuery) {
-            val rawUser = noQuery.substringBeforeLast('@')
+            // SIP002: the userinfo is percent-encoded (a plain AEAD-2022
+            // key's '+', '/', '=' / ':' arrive as %2B, %2F, %3D / %3A, and
+            // base64 padding as %3D).
+            val rawUser = percentDecode(noQuery.substringBeforeLast('@'))
             hostPort = noQuery.substringAfterLast('@')
             // Plain "method:password" already contains ':'; a base64
             // userinfo never does, so decode only in that case.
@@ -274,8 +331,7 @@ object XrayConfig {
         }
         val method = userInfo.substringBefore(":")
         val password = userInfo.substringAfter(":", "")
-        val addr = hostPort.substringBefore(":")
-        val port = hostPort.substringAfter(":", "0").toIntOrNull() ?: 0
+        val (addr, port) = splitHostPort(hostPort.substringBefore("/"))
         if (method.isEmpty() || password.isEmpty() || addr.isEmpty() || port == 0) return null
         return Parsed(
             proto = "ss",
@@ -386,14 +442,18 @@ object XrayConfig {
         dialerProxy: String? = null,
         settings: XraySettings = XraySettings(),
     ): JsonObject? {
-        val stream = streamSettings(p, settings)
+        // Chain hop: Xray reads dialerProxy ONLY from
+        // streamSettings.sockopt — the outbound object itself has no
+        // "sockopt" field, and an unknown key there is silently ignored
+        // (the hop would then dial its server directly).
+        val sockopt: JsonObject? = dialerProxy?.let { dp -> buildJsonObject { put("dialerProxy", dp) } }
+        val stream = streamSettings(p, settings).let { base ->
+            if (sockopt != null) JsonObject(base + ("sockopt" to sockopt)) else base
+        }
         fun withProxy(body: JsonObjectBuilder.() -> Unit): JsonObject = buildJsonObject {
             put("tag", tag)
             body()
             put("streamSettings", stream)
-            if (dialerProxy != null) {
-                putJsonObject("sockopt") { put("dialerProxy", dialerProxy) }
-            }
             // MUX (3.1.0): several streams over one connection.
             // 3.2.0: concurrency + XUDP concurrency from settings.
             if (settings.muxEnabled) {
@@ -526,9 +586,7 @@ object XrayConfig {
                         if (p.echConfigList.isNotEmpty()) put("echConfigList", p.echConfigList)
                         if (p.echOutbound.isNotEmpty()) put("echOutbound", p.echOutbound)
                     }
-                }
-                if (dialerProxy != null) {
-                    putJsonObject("sockopt") { put("dialerProxy", dialerProxy) }
+                    if (sockopt != null) put("sockopt", sockopt)
                 }
             }
             // 3.2.0 (PattNG): WireGuard (no streamSettings, no mux).
@@ -554,7 +612,9 @@ object XrayConfig {
                     putJsonArray("peers") {
                         add(buildJsonObject {
                             put("publicKey", p.wgPublicKey)
-                            put("endpoint", "${p.addr}:${p.port}")
+                            // An IPv6 endpoint needs brackets: "[addr]:port".
+                            val host = if (':' in p.addr) "[${p.addr}]" else p.addr
+                            put("endpoint", "$host:${p.port}")
                             putJsonArray("allowedIPs") {
                                 val allowed = p.wgAllowedIps.ifEmpty { "0.0.0.0/0,::/0" }
                                     .split(",")
@@ -577,8 +637,8 @@ object XrayConfig {
                         }
                     }
                 }
-                if (dialerProxy != null) {
-                    putJsonObject("sockopt") { put("dialerProxy", dialerProxy) }
+                if (sockopt != null) {
+                    putJsonObject("streamSettings") { put("sockopt", sockopt) }
                 }
             }
             else -> null
@@ -785,10 +845,9 @@ object XrayConfig {
      * AetherDependency.of / routeThroughXray for chains:
      *
      * - the Aether hop's outbound is a SOCKS outbound dialling the core
-     *   on 127.0.0.1:[aetherPort]; it dials the core through the next
-     *   hop toward the entry (sockopt.dialerProxy, the same chaining
-     *   rule as [buildChain]), or directly when the Aether hop IS the
-     *   entry hop;
+     *   on 127.0.0.1:[aetherPort] directly — PattNG skips the Aether hop
+     *   for dialerProxy (its listener is loopback; the core exits through
+     *   secondary-socks, below), never a top-level "sockopt";
      * - the hops on its exit side dial through its outbound, as they
      *   dial through any hop;
      * - the core dials out through Xray's secondary-socks inbound on
@@ -840,6 +899,11 @@ object XrayConfig {
             val tag = if (i == 0) "proxy" else "proxy-chain-$i"
             val dialerProxy = if (i < resolved.size - 1) "proxy-chain-${i + 1}" else null
             if (profile.isAether) {
+                // PattNG skips the Aether hop for dialerProxy: this
+                // SOCKS outbound dials the core on loopback, and the core
+                // exits through secondary-socks (see below), so no
+                // dialerProxy here — also never a top-level "sockopt":
+                // Xray reads it only from streamSettings.sockopt.
                 buildJsonObject {
                     put("tag", tag)
                     put("protocol", "socks")
@@ -850,9 +914,6 @@ object XrayConfig {
                                 put("port", aetherPort)
                             })
                         }
-                    }
-                    if (dialerProxy != null) {
-                        putJsonObject("sockopt") { put("dialerProxy", dialerProxy) }
                     }
                 }
             } else {
