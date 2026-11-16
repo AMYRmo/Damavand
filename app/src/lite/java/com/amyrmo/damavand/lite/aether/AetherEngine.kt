@@ -273,6 +273,9 @@ object AetherEngine {
             return
         }
         target.process = process
+        // 3.2.22: the pid, so a start and its exit line can be matched
+        // when two sessions run back to back in the same second.
+        AppLog.i(TAG, "AetherCore: started pid ${process.pid()}")
         thread(name = "aether-core-output", isDaemon = true) { watch(target, process) }
     }
 
@@ -453,13 +456,18 @@ object AetherEngine {
             AppLog.i(TAG, "AetherCore: output closed: ${e.message}")
         }
         val exitCode = process.waitFor()
-        if (!release(target)) return
-        reapOrphans(target.context)
+        // 3.2.22: the exit code is logged BEFORE release(), so it is
+        // never swallowed when a new start replaced this session: the
+        // code is what tells a death on its own (1/2 a startup error,
+        // 101 a Rust panic, 134/139 abort/segfault) from a stop by the
+        // app (143 SIGTERM, 137 SIGKILL).
         if (target.chainEnd != null) {
             AppLog.e(TAG, "AetherCore: the core was ended with code $exitCode, Tor or Psiphon inside the tunnel had ended")
         } else {
             AppLog.e(TAG, "AetherCore: the core exited on its own with code $exitCode")
         }
+        if (!release(target)) return
+        reapOrphans(target.context)
         target.onExit()
     }
 
@@ -476,6 +484,9 @@ object AetherEngine {
 
     /** Ends [process] and whatever it started: SIGTERM, then force after [EXIT_WAIT_MS]. */
     private fun end(process: Process, context: Context) {
+        // 3.2.22: say when the app itself ends a core that is still
+        // alive, so the log tells an app stop from a death on its own.
+        if (process.isAlive) AppLog.i(TAG, "AetherCore: stopping the live session core")
         try {
             process.destroy()
             if (!process.waitFor(EXIT_WAIT_MS, TimeUnit.MILLISECONDS)) {
