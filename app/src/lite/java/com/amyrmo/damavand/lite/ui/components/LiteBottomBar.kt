@@ -14,6 +14,7 @@ import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.Icon
+import androidx.compose.material3.minimumInteractiveComponentSize
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
@@ -22,6 +23,7 @@ import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
@@ -158,10 +160,14 @@ fun CircleIconButton(
     onClick: () -> Unit,
     glyphColor: Color,
     icon: ImageVector,
-    flip: Boolean = false
+    flip: Boolean = false,
+    // Read by TalkBack; null left these as "unlabelled button".
+    contentDescription: String? = null
 ) {
     Box(
         modifier = Modifier
+            // 48 dp touch target around the smaller visual circle.
+            .minimumInteractiveComponentSize()
             .size(buttonSize)
             .background(
                 if (filled) LiteColors.accent else Color.Transparent,
@@ -171,12 +177,12 @@ fun CircleIconButton(
                 if (filled) Modifier
                 else Modifier.border(1.dp, LiteColors.hairline, CircleShape)
             )
-            .clickable(onClick = onClick),
+            .clickable(role = Role.Button, onClick = onClick),
         contentAlignment = Alignment.Center
     ) {
         Icon(
             imageVector = icon,
-            contentDescription = null,
+            contentDescription = contentDescription,
             tint = glyphColor,
             modifier = Modifier.size(glyphSize)
                 .then(if (flip) Modifier.rotate(180f) else Modifier)

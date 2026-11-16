@@ -346,13 +346,15 @@ fun ServersScreen(
                             searchOpen = !searchOpen
                             if (!searchOpen) searchQuery = ""
                         },
+                        contentDescription = stringResource(R.string.cd_search),
                         icon = SearchVector
                     )
                     Spacer(Modifier.width(8.dp))
                     Box {
                         HeaderIconButton(
                             onClick = { sortMenuOpen = true },
-                            icon = SortVector
+                            icon = SortVector,
+                            contentDescription = stringResource(R.string.cd_sort)
                         )
                         DropdownMenu(
                             expanded = sortMenuOpen,
@@ -382,7 +384,8 @@ fun ServersScreen(
                     Box {
                         HeaderIconButton(
                             onClick = { moreMenuOpen = true },
-                            icon = DotsVerticalVector
+                            icon = DotsVerticalVector,
+                            contentDescription = stringResource(R.string.cd_more_options)
                         )
                         DropdownMenu(
                             expanded = moreMenuOpen,
@@ -441,7 +444,8 @@ fun ServersScreen(
                         filled = true,
                         onClick = { showAddSheet = true },
                         glyphColor = Color.White,
-                        icon = PlusVector
+                        icon = PlusVector,
+                        contentDescription = stringResource(R.string.cd_add)
                     )
                 }
                 Spacer(Modifier.height(16.dp))
@@ -1183,14 +1187,15 @@ private fun sortProfiles(list: List<Profile>, mode: SortMode): List<Profile> {
 // ---- Header icon button (3.1.2: vector icon via CircleIconButton) ----
 
 @Composable
-private fun HeaderIconButton(onClick: () -> Unit, icon: ImageVector) {
+private fun HeaderIconButton(onClick: () -> Unit, icon: ImageVector, contentDescription: String) {
     CircleIconButton(
         buttonSize = 40.dp,
         glyphSize = 18.dp,
         filled = false,
         onClick = onClick,
         glyphColor = LiteColors.text,
-        icon = icon
+        icon = icon,
+        contentDescription = contentDescription
     )
 }
 
@@ -1652,7 +1657,8 @@ private fun ChainRow(
             filled = false,
             onClick = onMenu,
             glyphColor = LiteColors.text,
-            icon = DotsVerticalVector
+            icon = DotsVerticalVector,
+            contentDescription = stringResource(R.string.cd_more_options)
         )
     }
 }
@@ -1808,7 +1814,8 @@ private fun ServerRow(
             filled = false,
             onClick = onMenu,
             glyphColor = LiteColors.text,
-            icon = DotsVerticalVector
+            icon = DotsVerticalVector,
+            contentDescription = stringResource(R.string.cd_more_options)
         )
     }
 }

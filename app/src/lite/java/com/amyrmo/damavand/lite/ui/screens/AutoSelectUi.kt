@@ -150,7 +150,8 @@ fun AutoSelectCard(
             filled = false,
             onClick = onConnect,
             glyphColor = LiteColors.accent,
-            icon = PlayVector
+            icon = PlayVector,
+            contentDescription = stringResource(R.string.server_menu_connect)
         )
         Spacer(Modifier.width(8.dp))
         CircleIconButton(
@@ -159,7 +160,8 @@ fun AutoSelectCard(
             filled = false,
             onClick = onDetails,
             glyphColor = LiteColors.textSecondary,
-            icon = InfoVector
+            icon = InfoVector,
+            contentDescription = stringResource(R.string.cd_details)
         )
     }
 }

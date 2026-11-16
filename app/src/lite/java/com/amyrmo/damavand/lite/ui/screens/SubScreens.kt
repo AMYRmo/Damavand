@@ -36,7 +36,8 @@ fun SubScreenHeader(titleRes: Int, onBack: () -> Unit) {
             onClick = onBack,
             glyphColor = LiteColors.text,
             icon = ChevronForwardVector,
-            flip = true
+            flip = true,
+            contentDescription = stringResource(R.string.cd_back)
         )
         Spacer(Modifier.width(12.dp))
         Text(

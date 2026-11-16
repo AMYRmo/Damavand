@@ -495,6 +495,13 @@
     <string name="logs_empty">No events recorded yet</string>
     <string name="logs_clear">Clear</string>
     <string name="logs_share">Send</string>
+    <string name="cd_back">Back</string>
+    <string name="cd_more_options">More options</string>
+    <string name="cd_refresh">Refresh</string>
+    <string name="cd_add">Add</string>
+    <string name="cd_details">Details</string>
+    <string name="cd_search">Search</string>
+    <string name="cd_sort">Sort</string>
 
     <!-- 3.1.0 — PattNG: stats -->
     <string name="stats_usage_title">Usage per server</string>
