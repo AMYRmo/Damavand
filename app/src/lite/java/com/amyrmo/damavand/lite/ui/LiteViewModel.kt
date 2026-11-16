@@ -19,6 +19,10 @@ import androidx.work.WorkManager
 import com.amyrmo.damavand.lite.AppLog
 import com.amyrmo.damavand.lite.AutoSelect
 import com.amyrmo.damavand.lite.AutoSelectIds
+import com.amyrmo.damavand.lite.aether.AetherIdentityManager
+import com.amyrmo.damavand.lite.aether.AetherKey
+import com.amyrmo.damavand.lite.aether.AetherKeys
+import com.amyrmo.damavand.lite.aether.AetherKeysSettings
 import com.amyrmo.damavand.lite.aether.AetherSettings
 import com.amyrmo.damavand.lite.BackupManager
 import com.amyrmo.damavand.lite.GeoDownloader
@@ -34,8 +38,10 @@ import com.amyrmo.damavand.lite.SettingsStore
 import com.amyrmo.damavand.lite.Subscription
 import com.amyrmo.damavand.lite.XrayConfig
 import com.amyrmo.damavand.lite.XrayController
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -203,6 +209,24 @@ class LiteViewModel(app: Application) : AndroidViewModel(app) {
     // 3.2.10 (PattNG root mode).
     val rootMode = settings.rootMode
     val rootLanShare = settings.rootLanShare
+    // 3.2.11 (PattNG full parity): IPv6 + prefer-IPv6 + Aether listen port.
+    val ipv6Enabled = settings.ipv6Enabled
+    val preferIpv6 = settings.preferIpv6
+    val aetherListenPort = settings.aetherListenPort
+    // 3.2.11 (PattNG full parity): the WARP keys page's state — its
+    // settings (loaded from SettingsStore), the keys in use, the log of
+    // the renewal run, and whether one is running.
+    private val _aetherKeysSettings = MutableStateFlow(AetherKeysSettings())
+    val aetherKeysSettings = _aetherKeysSettings.asStateFlow()
+    private val _aetherKeys = MutableStateFlow<List<AetherKey>>(emptyList())
+    val aetherKeys = _aetherKeys.asStateFlow()
+    private val _aetherKeysLog = MutableStateFlow<List<String>>(emptyList())
+    val aetherKeysLog = _aetherKeysLog.asStateFlow()
+    private val _aetherKeysRenewing = MutableStateFlow(false)
+    val aetherKeysRenewing = _aetherKeysRenewing.asStateFlow()
+    private val _aetherKeysNotice = MutableStateFlow<String?>(null)
+    val aetherKeysNotice = _aetherKeysNotice.asStateFlow()
+    private var aetherKeysRenewJob: Job? = null
     val showSpeedNotif = settings.showSpeedNotif
     val confirmDelete = settings.confirmDelete
     val showAllGroups = settings.showAllGroups
@@ -647,12 +671,18 @@ class LiteViewModel(app: Application) : AndroidViewModel(app) {
             } catch (_: Exception) {
                 5
             }
+            // 3.2.11 (PattNG prefer-IPv6): resolved once per sweep.
+            val preferIpv6 = try {
+                settings.preferIpv6Now()
+            } catch (_: Exception) {
+                false
+            }
             val semaphore = kotlinx.coroutines.sync.Semaphore(concurrency)
             val results = java.util.concurrent.ConcurrentHashMap<String, Long>()
             val jobs = list.map { profile ->
                 launch {
                     semaphore.withPermit {
-                        val ping = PingTester.ping(profile)
+                        val ping = PingTester.ping(profile, preferIpv6)
                         results[profile.id] = ping
                         withContext(Dispatchers.Main) {
                             _testingIds.update { it - profile.id }
@@ -781,6 +811,12 @@ class LiteViewModel(app: Application) : AndroidViewModel(app) {
                 5
             }
             val semaphore = kotlinx.coroutines.sync.Semaphore(concurrency)
+            // 3.2.11 (PattNG prefer-IPv6): resolved once per test-all run.
+            val preferIpv6 = try {
+                settings.preferIpv6Now()
+            } catch (_: Exception) {
+                false
+            }
             // 3.1.1 — ping in parallel, but collect the results and
             // save ONCE at the end: per-profile updatePing from parallel
             // coroutines raced on profiles.json and wiped every config
@@ -790,7 +826,7 @@ class LiteViewModel(app: Application) : AndroidViewModel(app) {
             val jobs = list.map { profile ->
                 launch {
                     semaphore.withPermit {
-                        val ping = PingTester.ping(profile)
+                        val ping = PingTester.ping(profile, preferIpv6)
                         results[profile.id] = ping
                         withContext(Dispatchers.Main) {
                             _testingIds.update { it - profile.id }
@@ -981,7 +1017,13 @@ class LiteViewModel(app: Application) : AndroidViewModel(app) {
         if (profile.id in _testingIds.value) return
         _testingIds.update { it + profile.id }
         viewModelScope.launch(Dispatchers.IO) {
-            val ping = PingTester.ping(profile)
+            // 3.2.11 (PattNG prefer-IPv6).
+            val preferIpv6 = try {
+                settings.preferIpv6Now()
+            } catch (_: Exception) {
+                false
+            }
+            val ping = PingTester.ping(profile, preferIpv6)
             repo.updatePing(profile.id, ping)
             withContext(Dispatchers.Main) {
                 refreshProfiles()
@@ -1114,6 +1156,137 @@ class LiteViewModel(app: Application) : AndroidViewModel(app) {
             )
             withContext(Dispatchers.Main) { refreshProfiles() }
         }
+    }
+
+    // -- WARP keys (3.2.11, PattNG ServerAetherKeysActivity) ------------
+
+    /** The SOCKS port of the Xray the keys renewal dials out through, when it names an exit-node profile. */
+    private val renewExitPort = 10825
+
+    /** Loads the keys page's settings and the keys in use (call when the keys dialog opens). */
+    fun loadAetherKeys() {
+        viewModelScope.launch(Dispatchers.IO) {
+            _aetherKeysSettings.value = settings.aetherKeysSettingsNow()
+            _aetherKeys.value = AetherIdentityManager.keys(context)
+        }
+    }
+
+    /** Saves one change of the keys page's settings (the dialog calls this on every edit). */
+    fun setAetherKeysSettings(next: AetherKeysSettings) {
+        if (next == _aetherKeysSettings.value) return
+        _aetherKeysSettings.value = next
+        viewModelScope.launch { settings.setAetherKeysSettings(next.toJson()) }
+    }
+
+    /** Clears the keys page's notice (the dialog calls this once shown). */
+    fun clearAetherKeysNotice() {
+        _aetherKeysNotice.value = null
+    }
+
+    private fun aetherKeysAppendLog(line: String) {
+        _aetherKeysLog.update { (it + line).takeLast(200) }
+    }
+
+    /**
+     * Gets new keys as the settings say: registers them with a run of the core, which dials out through the exit-node
+     * of the settings, and puts them in place of the keys in use once all of them are ready.
+     *
+     * Lite adaptations (PattNG renews through a second Xray instance; Lite has none):
+     * - While a tunnel is connected the renewal is refused: the exit Xray the run needs would end the tunnel, and
+     *   the keys in use belong to the running session.
+     * - With an exit-node profile named, the exit runs on Lite's own XrayController on [renewExitPort] and is
+     *   stopped again after the run, whatever the outcome.
+     */
+    fun renewAetherKeys() {
+        if (_aetherKeysRenewing.value) return
+        val current = _aetherKeysSettings.value
+        AetherKeys.problem(current)?.let { problem ->
+            _aetherKeysNotice.value = context.getString(
+                when (problem) {
+                    AetherKeys.Problem.INVALID_ENROLL_ADDRESS -> R.string.aether_keys_invalid_enroll_address
+                    AetherKeys.Problem.INVALID_API_SNI -> R.string.aether_keys_invalid_api_sni
+                    AetherKeys.Problem.INVALID_API_HOST -> R.string.aether_keys_invalid_api_host
+                    AetherKeys.Problem.INVALID_FRAGMENT -> R.string.aether_keys_invalid_fragment
+                    AetherKeys.Problem.INVALID_ECH_DNS -> R.string.aether_keys_invalid_ech_dns
+                    AetherKeys.Problem.INVALID_ECH_DOMAIN -> R.string.aether_keys_invalid_ech_domain
+                    AetherKeys.Problem.INVALID_FINAL_MASK -> R.string.aether_keys_invalid_final_mask
+                    AetherKeys.Problem.INVALID_COMMAND -> R.string.aether_keys_invalid_command
+                }
+            )
+            return
+        }
+        val arguments = AetherKeys.runArguments(current)
+        val kind = AetherKeys.kindOf(arguments) ?: return
+        _aetherKeysRenewing.value = true
+        aetherKeysRenewJob = viewModelScope.launch {
+            var exitStarted = false
+            try {
+                if (_connection.value.state == ConnState.CONNECTED || _connection.value.state == ConnState.CONNECTING) {
+                    _aetherKeysNotice.value = context.getString(R.string.aether_keys_renew_blocked)
+                    return@launch
+                }
+                // The profile chosen as the exit-node may be renamed or gone since the page opened, or share its name
+                // with another by now; the run would reach WARP without it.
+                val node = current.exitNode.trim()
+                var exitPort: Int? = null
+                if (node.isNotEmpty()) {
+                    val matches = profiles.value.filter { it.name == node }
+                    val exitProfile = matches.singleOrNull()
+                    if (exitProfile == null || exitProfile.isAether) {
+                        _aetherKeysNotice.value = context.getString(R.string.aether_keys_exit_missing, node)
+                        return@launch
+                    }
+                    val cfg = XrayConfig.build(
+                        exitProfile.link,
+                        renewExitPort,
+                        geoAvailable = false,
+                        settings = settings.xraySettingsNow(RoutingStore(context)),
+                    )
+                    if (cfg == null || !XrayController.start(cfg)) {
+                        _aetherKeysNotice.value = context.getString(R.string.aether_keys_exit_failed, node)
+                        return@launch
+                    }
+                    exitStarted = true
+                    exitPort = renewExitPort
+                }
+                aetherKeysAppendLog(context.getString(R.string.aether_keys_renewing))
+                val keys = AetherIdentityManager.renew(
+                    context = context,
+                    kind = kind,
+                    arguments = arguments,
+                    exit = current.exit,
+                    exitPort = exitPort,
+                    onOutput = ::aetherKeysAppendLog,
+                )
+                if (keys == null) {
+                    aetherKeysAppendLog(context.getString(R.string.aether_keys_renew_failed))
+                } else {
+                    // By now the core and the exit it dialled out through have ended, and the new keys are in place.
+                    aetherKeysAppendLog(context.getString(R.string.aether_keys_renewed))
+                    _aetherKeys.value = AetherIdentityManager.keys(context)
+                    _aetherKeysNotice.value = context.getString(R.string.aether_keys_renewed)
+                }
+            } catch (e: CancellationException) {
+                // By now the core and what it started have ended. A run cancelled once every new key was ready has put
+                // them in place all the same, so the keys in use are shown where they changed.
+                withContext(NonCancellable) { _aetherKeys.value = AetherIdentityManager.keys(context) }
+                throw e
+            } finally {
+                if (exitStarted) XrayController.stop()
+                _aetherKeysRenewing.value = false
+            }
+        }
+    }
+
+    /**
+     * Stops getting new keys: the core that registers them ends, with whatever it started, and until then the run
+     * shows as going on. The keys in use stay, unless every new key was ready already.
+     */
+    fun cancelAetherKeysRenewal() {
+        val job = aetherKeysRenewJob ?: return
+        if (!_aetherKeysRenewing.value || job.isCancelled) return
+        aetherKeysAppendLog(context.getString(R.string.aether_keys_renew_cancelled))
+        job.cancel()
     }
 
     /** Re-fetch every auto-update subscription from the network. */
@@ -1377,6 +1550,53 @@ class LiteViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
+    // 3.2.11 (PattNG ImportConfigLocal): import configs from a local
+    // file — share links (one per line, plain or base64) or a full raw
+    // Xray JSON config (stored as a custom:// profile, like the manual
+    // editor). onResult gets the number of newly added profiles, or -1
+    // when nothing usable was found.
+    fun importFile(uri: Uri, onResult: (Int) -> Unit) {
+        viewModelScope.launch(Dispatchers.IO) {
+            val added = try {
+                val text = context.contentResolver.openInputStream(uri)?.bufferedReader()?.readText().orEmpty()
+                val trimmed = text.trim()
+                val links = when {
+                    trimmed.isEmpty() -> ""
+                    trimmed.startsWith("{") -> {
+                        val b64 = android.util.Base64.encodeToString(
+                            trimmed.toByteArray(Charsets.UTF_8),
+                            android.util.Base64.URL_SAFE or android.util.Base64.NO_WRAP
+                        )
+                        "custom://$b64"
+                    }
+                    trimmed.contains("://") -> trimmed
+                    else -> {
+                        // A base64 subscription body (standard, then URL-safe).
+                        var decoded = trimmed
+                        for (flags in listOf(android.util.Base64.DEFAULT, android.util.Base64.URL_SAFE)) {
+                            try {
+                                val d = String(android.util.Base64.decode(trimmed, flags), Charsets.UTF_8)
+                                if (d.contains("://")) { decoded = d; break }
+                            } catch (_: Exception) {
+                            }
+                        }
+                        decoded
+                    }
+                }
+                if (links.isEmpty()) -1 else when (val r = repo.addSingleLinks(links)) {
+                    is ProfileRepository.FetchResult.Ok -> r.profiles.size
+                    else -> -1
+                }
+            } catch (_: Exception) {
+                -1
+            }
+            withContext(Dispatchers.Main) {
+                if (added > 0) refreshProfiles()
+                onResult(added)
+            }
+        }
+    }
+
     fun importBackup(uri: Uri, onResult: (Boolean) -> Unit) {
         viewModelScope.launch(Dispatchers.IO) {
             val ok = try {
@@ -1455,6 +1675,10 @@ class LiteViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
     fun setRootLanShare(v: Boolean) = viewModelScope.launch { settings.setRootLanShare(v) }
+    // 3.2.11 (PattNG full parity).
+    fun setIpv6Enabled(v: Boolean) = viewModelScope.launch { settings.setIpv6Enabled(v) }
+    fun setPreferIpv6(v: Boolean) = viewModelScope.launch { settings.setPreferIpv6(v) }
+    fun setAetherListenPort(v: String) = viewModelScope.launch { settings.setAetherListenPort(v) }
     /** Synchronous read for MainActivity's connect gate (DataStore is cached). */
     fun isRootModeNow(): Boolean = kotlinx.coroutines.runBlocking { settings.rootModeNow() }
     fun setShowSpeedNotif(v: Boolean) = viewModelScope.launch { settings.setShowSpeedNotif(v) }
@@ -1512,6 +1736,44 @@ class LiteViewModel(app: Application) : AndroidViewModel(app) {
         viewModelScope.launch(Dispatchers.IO) {
             val ok = geo.importFile(uri, kind)
             onDone(ok)
+        }
+    }
+
+    // ---- asset URLs (3.2.11, PattNG UserAssetUrlActivity) ----
+
+    /** The URL each asset file downloads from, or its built-in one when the user set none. */
+    val assetGeoipUrl = settings.assetGeoipUrl
+    val assetGeositeUrl = settings.assetGeositeUrl
+    val assetPsiphonUrl = settings.assetPsiphonUrl
+
+    /** The built-in URL an asset downloads from when the user set none. */
+    fun defaultAssetUrl(kind: String): String = when (kind) {
+        "geoip" -> GeoDownloader.DEFAULT_GEOIP_URL
+        "geosite" -> GeoDownloader.DEFAULT_GEOSITE_URL
+        "psiphon" -> com.amyrmo.damavand.lite.aether.PsiphonServerList.PSIPHON_SERVERS_URL
+        else -> ""
+    }
+
+    /** Saves the URL an asset file downloads from (blank restores the built-in one). */
+    fun setAssetUrl(kind: String, url: String) {
+        viewModelScope.launch {
+            when (kind) {
+                "geoip" -> settings.setAssetGeoipUrl(url)
+                "geosite" -> settings.setAssetGeositeUrl(url)
+                "psiphon" -> settings.setAssetPsiphonUrl(url)
+            }
+        }
+    }
+
+    /** Downloads one asset file from [url], and reports whether the new file verified. */
+    fun downloadAssetUrl(kind: String, url: String, onDone: (Boolean) -> Unit) {
+        if (url.isBlank()) {
+            onDone(false)
+            return
+        }
+        viewModelScope.launch(Dispatchers.IO) {
+            val ok = geo.downloadFromUrl(url, kind)
+            withContext(Dispatchers.Main) { onDone(ok) }
         }
     }
 
