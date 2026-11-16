@@ -1056,10 +1056,13 @@ class LiteViewModel(app: Application) : AndroidViewModel(app) {
     /** Persist the stored order fastest-first (PattNG auto-sort after test). */
     fun sortProfilesByPing() {
         viewModelScope.launch(Dispatchers.IO) {
-            val sorted = repo.loadProfiles().sortedWith(
-                compareBy<Profile> { it.lastPingMs <= 0 }.thenBy { it.lastPingMs }
-            )
-            repo.saveProfiles(sorted)
+            // 3.2.16 (#53): one atomic load-transform-save, so a
+            // subscription refresh landing mid-sort is not lost.
+            repo.updateProfiles { profiles ->
+                profiles.sortedWith(
+                    compareBy<Profile> { it.lastPingMs <= 0 }.thenBy { it.lastPingMs }
+                )
+            }
             withContext(Dispatchers.Main) { refreshProfiles() }
         }
     }
@@ -1216,7 +1219,7 @@ class LiteViewModel(app: Application) : AndroidViewModel(app) {
                 name.trim().ifEmpty { "Aether" },
                 AetherSettings.toJson(settings),
             )
-            repo.saveProfiles(repo.loadProfiles() + profile)
+            repo.updateProfiles { it + profile }
             withContext(Dispatchers.Main) {
                 refreshProfiles()
                 onResult(profile)
