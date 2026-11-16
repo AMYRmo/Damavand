@@ -72,6 +72,18 @@ class SettingsStore(private val context: Context) {
         val KEY_HEV_LOGLEVEL = stringPreferencesKey("hev_loglevel")
         val KEY_HEV_RW_TIMEOUT = stringPreferencesKey("hev_rw_timeout")
         val KEY_BALANCER_GROUPS = stringSetPreferencesKey("balancer_groups")
+        // 3.2.8 (Auto, Damavand-faithful): the group selected in the
+        // Servers tab (group key: "__all__" / "" / subscription URL),
+        // shared with Home so fastest-connect tests that group's
+        // configs; + the Auto tuning (Damavand's defaults) and the
+        // last Auto pick per auto id (the "initial" member).
+        val KEY_SELECTED_GROUP = stringPreferencesKey("selected_group")
+        val KEY_AUTO_PROBE_URL = stringPreferencesKey("auto_probe_url")
+        val KEY_AUTO_CHECK_SECONDS = stringPreferencesKey("auto_check_seconds")
+        val KEY_AUTO_SWEEP_MINUTES = stringPreferencesKey("auto_sweep_minutes")
+        val KEY_AUTO_SWITCH_MARGIN = stringPreferencesKey("auto_switch_margin")
+        val KEY_AUTO_RETRY = booleanPreferencesKey("auto_retry")
+        val KEY_AUTO_LAST_PICK = stringPreferencesKey("auto_last_pick")
     }
 
     val killSwitch: Flow<Boolean> = context.liteDataStore.data.map { it[KEY_KILL_SWITCH] ?: false }
@@ -134,6 +146,22 @@ class SettingsStore(private val context: Context) {
     // subscription URLs; "" is the manual group).
     val balancerGroups: Flow<Set<String>> =
         context.liteDataStore.data.map { it[KEY_BALANCER_GROUPS] ?: emptySet() }
+
+    // 3.2.8 (Auto): the selected group, shared by Servers + Home.
+    val selectedGroup: Flow<String?> =
+        context.liteDataStore.data.map { it[KEY_SELECTED_GROUP] }
+    // 3.2.8 (Auto tuning — Damavand's defaults: check 30 s, sweep
+    // 10 min, switch margin 30%, retry on).
+    val autoProbeUrl: Flow<String> =
+        context.liteDataStore.data.map { it[KEY_AUTO_PROBE_URL] ?: "" }
+    val autoCheckSeconds: Flow<String> =
+        context.liteDataStore.data.map { it[KEY_AUTO_CHECK_SECONDS] ?: "30" }
+    val autoSweepMinutes: Flow<String> =
+        context.liteDataStore.data.map { it[KEY_AUTO_SWEEP_MINUTES] ?: "10" }
+    val autoSwitchMargin: Flow<String> =
+        context.liteDataStore.data.map { it[KEY_AUTO_SWITCH_MARGIN] ?: "30" }
+    val autoRetry: Flow<Boolean> =
+        context.liteDataStore.data.map { it[KEY_AUTO_RETRY] ?: true }
 
     suspend fun setKillSwitch(v: Boolean) = context.liteDataStore.edit { it[KEY_KILL_SWITCH] = v }
     suspend fun setAutoConnect(v: Boolean) = context.liteDataStore.edit { it[KEY_AUTO_CONNECT] = v }
@@ -203,6 +231,32 @@ class SettingsStore(private val context: Context) {
         }
     }
 
+    // 3.2.8 (Auto).
+    suspend fun setSelectedGroup(v: String?) {
+        context.liteDataStore.edit {
+            if (v == null) it.remove(KEY_SELECTED_GROUP) else it[KEY_SELECTED_GROUP] = v
+        }
+    }
+
+    suspend fun setAutoProbeUrl(v: String) = context.liteDataStore.edit { it[KEY_AUTO_PROBE_URL] = v }
+    suspend fun setAutoCheckSeconds(v: String) = context.liteDataStore.edit { it[KEY_AUTO_CHECK_SECONDS] = v }
+    suspend fun setAutoSweepMinutes(v: String) = context.liteDataStore.edit { it[KEY_AUTO_SWEEP_MINUTES] = v }
+    suspend fun setAutoSwitchMargin(v: String) = context.liteDataStore.edit { it[KEY_AUTO_SWITCH_MARGIN] = v }
+    suspend fun setAutoRetry(v: Boolean) = context.liteDataStore.edit { it[KEY_AUTO_RETRY] = v }
+
+    /** Remember the Auto pick for one auto id (the "initial" member). */
+    suspend fun setAutoLastPick(autoId: String, profileId: String) {
+        context.liteDataStore.edit {
+            val cur = try {
+                org.json.JSONObject(it[KEY_AUTO_LAST_PICK] ?: "{}")
+            } catch (_: Exception) {
+                org.json.JSONObject()
+            }
+            cur.put(autoId, profileId)
+            it[KEY_AUTO_LAST_PICK] = cur.toString()
+        }
+    }
+
     // 3.2.7: bulk restore for backups.
     suspend fun setBalancerGroups(keys: Set<String>) =
         context.liteDataStore.edit { it[KEY_BALANCER_GROUPS] = keys }
@@ -234,6 +288,26 @@ class SettingsStore(private val context: Context) {
     suspend fun showSpeedNotifNow(): Boolean = showSpeedNotif.first()
     suspend fun confirmDeleteNow(): Boolean = confirmDelete.first()
     suspend fun showAllGroupsNow(): Boolean = showAllGroups.first()
+
+    suspend fun selectedGroupNow(): String? = selectedGroup.first()
+
+    suspend fun autoLastPickNow(autoId: String): String? {
+        val raw = context.liteDataStore.data.first()[KEY_AUTO_LAST_PICK] ?: return null
+        return try {
+            org.json.JSONObject(raw).optString(autoId).takeIf { it.isNotEmpty() }
+        } catch (_: Exception) {
+            null
+        }
+    }
+
+    /** The Auto tuning snapshot for one connection build. */
+    suspend fun autoTuningNow(): AutoSelectTuning = AutoSelectTuning(
+        probeUrl = autoProbeUrl.first().trim(),
+        activeIntervalSec = autoCheckSeconds.first().toIntOrNull()?.coerceIn(10, 600) ?: 30,
+        sweepIntervalMin = autoSweepMinutes.first().toIntOrNull()?.coerceIn(1, 120) ?: 10,
+        switchMarginPercent = autoSwitchMargin.first().toIntOrNull()?.coerceIn(5, 90) ?: 30,
+        retry = autoRetry.first(),
+    )
 
     suspend fun languageNow(): String = language.first()
 
