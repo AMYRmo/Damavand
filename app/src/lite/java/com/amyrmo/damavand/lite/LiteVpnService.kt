@@ -67,6 +67,26 @@ class LiteVpnService : VpnService() {
         const val ACTION_STATUS = "com.amyrmo.damavand.lite.STATUS"
         const val ACTION_LOG = "com.amyrmo.damavand.lite.LOG"
 
+        // 3.2.26 (Oblivion GeoService._providers/_ispProviders): the
+        // location chain — Cloudflare trace first, then ipwho.is,
+        // ipinfo.io, ipapi.co, ip-api.com. One endpoint is not
+        // enough: any single one can be blocked or slow through the
+        // exit, and then the pill stayed "Unknown" and no flag
+        // showed at all.
+        private const val TRACE_URL = "https://www.cloudflare.com/cdn-cgi/trace"
+        private val LOCATION_PROVIDERS = listOf(
+            TRACE_URL,
+            "https://ipwho.is/",
+            "https://ipinfo.io/json",
+            "https://ipapi.co/json/",
+            "http://ip-api.com/json/?fields=status,country,countryCode,city,isp,query",
+        )
+        private val ISP_PROVIDERS = listOf(
+            "https://ipwho.is/",
+            "http://ip-api.com/json/?fields=status,country,countryCode,city,isp,query",
+            "https://ipinfo.io/json",
+        )
+
         const val EXTRA_LINK = "link"
         const val EXTRA_LINKS = "links"
         const val EXTRA_KILL_SWITCH = "kill_switch"
@@ -1192,41 +1212,127 @@ class LiteVpnService : VpnService() {
         }, "lite-loc").also { it.start() }
     }
 
-    /** One location attempt through the tunnel's SOCKS proxy; true when it answered. */
+    /** One location attempt through the tunnel's SOCKS proxy; true when a provider answered with an exit IP and a country code. */
     private fun tryFetchLocation(): Boolean {
-        try {
-            val apiUrl = try {
-                kotlinx.coroutines.runBlocking {
-                    SettingsStore(applicationContext).ipApiUrlNow()
-                }
+        val configured = try {
+            kotlinx.coroutines.runBlocking {
+                SettingsStore(applicationContext).ipApiUrlNow()
+            }
+        } catch (_: Exception) {
+            ""
+        }.trim()
+        val providers = (listOfNotNull(configured.takeIf { it.isNotBlank() }) + LOCATION_PROVIDERS).distinct()
+        for (url in providers) {
+            val geo = try {
+                fetchGeo(url)
             } catch (_: Exception) {
-                "https://ipinfo.io/json"
-            }
-            val proxy = Proxy(Proxy.Type.SOCKS, InetSocketAddress("127.0.0.1", activeSocksPort))
-            val conn = URL(apiUrl).openConnection(proxy) as HttpURLConnection
-            conn.connectTimeout = 8000
-            conn.readTimeout = 8000
-            val body = conn.inputStream.bufferedReader().readText()
-            conn.disconnect()
-            val j = JSONObject(body)
-            val country = j.optString("country")
-            val city = j.optString("city")
-            // 3.2.21: the exit IP + ISP ride in the same payload
-            // (ipinfo: "ip" / "org"; ipwho.is: "ip" /
-            // connection.org). Any endpoint without them just
-            // leaves the pill's rows blank.
-            ip = j.optString("ip")
-            isp = j.optString("org").ifBlank {
-                j.optJSONObject("connection")?.optString("org") ?: ""
-            }
-            countryCode = country
-            location = listOf(city, country).filter { it.isNotBlank() }
+                null
+            } ?: continue
+            ip = geo.ip
+            isp = geo.isp
+            countryCode = geo.countryCode
+            location = listOf(geo.city, geo.country).filter { it.isNotBlank() }
                 .joinToString(if (LiteFormat.persianDigits) "، " else ", ")
             broadcastStatus()
             return true
-        } catch (_: Exception) {
-            return false
         }
+        return false
+    }
+
+    /** The exit's IP, country, city and ISP as one provider reported them. */
+    private data class ExitGeo(
+        val ip: String,
+        val country: String,
+        val countryCode: String,
+        val city: String,
+        val isp: String,
+    )
+
+    private fun fetchGeo(url: String): ExitGeo? {
+        val proxy = Proxy(Proxy.Type.SOCKS, InetSocketAddress("127.0.0.1", activeSocksPort))
+        val conn = URL(url).openConnection(proxy) as HttpURLConnection
+        conn.setRequestProperty("User-Agent", "Damavand")
+        conn.connectTimeout = 8000
+        conn.readTimeout = 8000
+        val body = conn.inputStream.bufferedReader().readText()
+        conn.disconnect()
+        return if (url == TRACE_URL) parseTraceGeo(body)?.let { mergeIsp(it) } else parseJsonGeo(url, body)
+    }
+
+    /** Cloudflare's trace format (Oblivion GeoService.parseTrace): ip=, loc= (country code), colo=. */
+    private fun parseTraceGeo(body: String): ExitGeo? {
+        val fields = mutableMapOf<String, String>()
+        for (line in body.split('\n')) {
+            val sep = line.indexOf('=')
+            if (sep <= 0) continue
+            fields[line.substring(0, sep).trim()] = line.substring(sep + 1).trim()
+        }
+        val ip = fields["ip"].orEmpty()
+        val code = fields["loc"].orEmpty().uppercase()
+        if (ip.isBlank() || code.length != 2) return null
+        return ExitGeo(ip = ip, country = code, countryCode = code, city = fields["colo"].orEmpty(), isp = "")
+    }
+
+    /** A trace answer carries no ISP (Oblivion GeoService._lookupIsp): take the first ISP provider that has one. */
+    private fun mergeIsp(trace: ExitGeo): ExitGeo {
+        for (url in ISP_PROVIDERS) {
+            val geo = try {
+                fetchGeo(url)
+            } catch (_: Exception) {
+                null
+            } ?: continue
+            if (geo.isp.isNotBlank()) return trace.copy(isp = geo.isp)
+        }
+        return trace
+    }
+
+    private fun parseJsonGeo(url: String, body: String): ExitGeo? {
+        val j = JSONObject(body)
+        val geo = when {
+            url.contains("ip-api.com") -> {
+                if (j.optString("status") == "fail") return null
+                ExitGeo(
+                    ip = j.optString("query"),
+                    country = j.optString("country"),
+                    countryCode = j.optString("countryCode").uppercase(),
+                    city = j.optString("city"),
+                    isp = j.optString("isp"),
+                )
+            }
+            url.contains("ipwho.is") -> {
+                if (j.optBoolean("success", true) == false) return null
+                ExitGeo(
+                    ip = j.optString("ip"),
+                    country = j.optString("country"),
+                    countryCode = j.optString("country_code").uppercase(),
+                    city = j.optString("city"),
+                    isp = j.optJSONObject("connection")?.optString("isp")
+                        .orEmpty().ifBlank { j.optJSONObject("connection")?.optString("org").orEmpty() },
+                )
+            }
+            url.contains("ipapi.co") -> ExitGeo(
+                ip = j.optString("ip"),
+                country = j.optString("country_name").ifBlank { j.optString("country") },
+                countryCode = j.optString("country_code").uppercase(),
+                city = j.optString("city"),
+                isp = j.optString("org"),
+            )
+            else -> ExitGeo(
+                // ipinfo.io and any custom URL (ipinfo shape):
+                // "country" already is the 2-letter code.
+                ip = j.optString("ip"),
+                country = j.optString("country"),
+                countryCode = j.optString("country").uppercase(),
+                city = j.optString("city"),
+                isp = j.optString("org").ifBlank {
+                    j.optJSONObject("connection")?.optString("org") ?: ""
+                },
+            )
+        }
+        // An answer without an exit IP or a 2-letter code is not
+        // usable for the pill or the flag — try the next provider.
+        if (geo.ip.isBlank() || geo.countryCode.length != 2) return null
+        return geo
     }
 
     /**
