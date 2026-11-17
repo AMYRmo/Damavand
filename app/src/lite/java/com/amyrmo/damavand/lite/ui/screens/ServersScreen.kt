@@ -1380,7 +1380,9 @@ private fun SubscriptionCard(
         Row(verticalAlignment = Alignment.CenterVertically) {
             Column(Modifier.weight(1f)) {
                 Text(
-                    text = subscription.displayName,
+                    // 3.2.27 (ZedSecure BentoProviderCard): the panel's
+                    // `profile-title` first, else the subscription name.
+                    text = subscription.title.ifBlank { subscription.displayName },
                     fontSize = 21.sp,
                     fontWeight = FontWeight.Bold,
                     color = LiteColors.text,
@@ -1454,8 +1456,12 @@ private fun SubscriptionCard(
         // 3.2.21 (Damavand): one row — usage on the left, expiry on
         // the right; the expiry turns red when expired, exhausted or
         // ≤ 3 days out. Shown only when either text exists.
+        // 3.2.27 (ZedSecure BentoProviderCard): the usage row shows
+        // whenever a total is reported, even with zero used so far
+        // ("0 B / 100 GB") — ZedSecure keys on used != null, and Lite
+        // reports used = 0 the same way. Only a missing total hides it.
         val usageText = when {
-            used > 0 && total > 0 -> stringResource(
+            total > 0 -> stringResource(
                 R.string.subs_usage,
                 LiteFormat.formatVolume(used),
                 LiteFormat.formatVolume(total)
