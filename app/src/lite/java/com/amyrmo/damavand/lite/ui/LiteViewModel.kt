@@ -29,6 +29,7 @@ import com.amyrmo.damavand.lite.aether.AetherKey
 import com.amyrmo.damavand.lite.aether.AetherKeys
 import com.amyrmo.damavand.lite.aether.AetherKeysSettings
 import com.amyrmo.damavand.lite.aether.AetherSettings
+import com.amyrmo.damavand.lite.aether.PsiphonServerList
 import com.amyrmo.damavand.lite.BackupManager
 import com.amyrmo.damavand.lite.GeoDownloader
 import com.amyrmo.damavand.lite.LiteVpnService
@@ -246,6 +247,18 @@ class LiteViewModel(app: Application) : AndroidViewModel(app) {
     val aetherKeysNotice = _aetherKeysNotice.asStateFlow()
     private val _aetherKeysCoreAvailable = MutableStateFlow(true)
     val aetherKeysCoreAvailable = _aetherKeysCoreAvailable.asStateFlow()
+    // 3.2.25 (PattNG ServerAetherViewModel.psiphonRegions): the Exit
+    // country list — regions the bundled Psiphon list offers plus
+    // what the core last reported, loaded on IO when the Aether
+    // editor opens (the unpack + entry parse are file work).
+    private val _psiphonRegions = MutableStateFlow<List<String>>(emptyList())
+    val psiphonRegions = _psiphonRegions.asStateFlow()
+
+    fun loadPsiphonRegions() {
+        viewModelScope.launch(Dispatchers.IO) {
+            _psiphonRegions.value = PsiphonServerList.psiphonRegions(context)
+        }
+    }
     private var aetherKeysRenewJob: Job? = null
     /** The identity of each key file as the log last showed it. */
     private val aetherKeysShown = mutableMapOf<String, AetherIdentity?>()
