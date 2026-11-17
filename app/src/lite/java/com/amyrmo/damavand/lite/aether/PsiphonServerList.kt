@@ -176,10 +176,28 @@ object PsiphonServerList {
      * the stamp changed and reads every entry.
      */
     fun psiphonRegions(context: Context): List<String> {
+        // The copy in filesDir/assets is only made by GeoDownloader.isReady(),
+        // which runs at connect time: on a fresh install the editor opens
+        // before any connect, finds no list, and (with nothing remembered
+        // yet) would offer no country at all. Copy the bundled list first.
+        runCatching { com.amyrmo.damavand.lite.GeoDownloader(context).ensurePsiphonList() }
         val entries = entriesFile(File(context.filesDir, "assets"), AetherEngine.workDir(context))
         val listed = entries?.let { file -> runCatching { regions(file.readText()) }.getOrDefault(emptySet()) }.orEmpty()
-        return (listed + remembered(context)).toSortedSet().toList()
+        val known = listed + remembered(context)
+        // Still nothing (list missing, unsigned or unreadable): offer the
+        // regions the bundled list had at 3.2.25, so the list is never empty.
+        return (known.ifEmpty { FALLBACK_REGIONS }).toSortedSet().toList()
     }
+
+    /**
+     * Psiphon egress regions used only when neither the bundled list nor
+     * the core's last report names any: the regions of the servers in the
+     * psiphon_servers.dat bundled with 3.2.25.
+     */
+    internal val FALLBACK_REGIONS: Set<String> = setOf(
+        "AT", "AU", "BE", "CA", "CH", "CZ", "DE", "DK", "ES", "FI", "FR", "GB", "ID",
+        "IE", "IN", "IT", "JP", "LT", "NL", "NO", "PL", "RO", "RS", "SE", "SG", "US",
+    )
 
     /**
      * The server entries inside [packed], a signed, compressed list as Psiphon writes it; throws
