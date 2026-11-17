@@ -642,6 +642,14 @@ object XrayConfig {
                 }
             }
             // 3.2.0 (PattNG): Hysteria2 (UDP + TLS; no mux).
+            // 3.2.30: the stream network is "hysteria", NOT "udp" —
+            // PattNG sets NetworkType.HYSTERIA ("hysteria"), and the
+            // fork's transport/internet/hysteria registers exactly
+            // that name (config.go:84, dialer.go:375). "udp" is not
+            // a stream transport, so the core rejected the whole
+            // config with "unknown transport protocol: udp" — which
+            // killed Auto (its first member is the Hysteria2 link)
+            // and every single Hysteria2 connect too.
             "hysteria2" -> buildJsonObject {
                 put("tag", tag)
                 put("protocol", "hysteria2")
@@ -655,7 +663,7 @@ object XrayConfig {
                     }
                 }
                 putJsonObject("streamSettings") {
-                    put("network", "udp")
+                    put("network", "hysteria")
                     put("security", "tls")
                     putJsonObject("tlsSettings") {
                         put("serverName", p.sni.ifEmpty { p.addr })
