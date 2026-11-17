@@ -4,6 +4,7 @@ import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.ScrollState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -39,21 +40,25 @@ import com.amyrmo.damavand.lite.R
 import com.amyrmo.damavand.lite.ui.ConnState
 import com.amyrmo.damavand.lite.ui.ConnectionUiState
 import com.amyrmo.damavand.lite.ui.LiteViewModel
+import com.amyrmo.damavand.lite.ui.StatsRange
 import com.amyrmo.damavand.lite.ui.theme.LiteColors
 import com.amyrmo.damavand.lite.ui.theme.LiteFormat
 import com.amyrmo.damavand.lite.ui.theme.Vazirmatn
 import kotlin.math.max
 
 /**
- * Stats tab (spec §6): the live session, nothing else.
+ * Stats tab (spec §6): the live session, plus per-server usage by range.
  * Live 60 s download chart + two cards (best session ping, session volume).
- * No daily total — there is no real daily data.
+ * Usage per server (3.2.29): daily buckets, Today / This week / This month.
+ * Nothing older than 30 days is stored (RoutingStore prunes on every
+ * load/record), so "This month" is the last 30 days, no more.
  */
 @Composable
 fun StatsScreen(vm: LiteViewModel, connection: ConnectionUiState, scrollState: ScrollState) {
     val chart by vm.chart.collectAsState()
     val bestPing by vm.bestSessionPing.collectAsState()
-    val usage by vm.usage.collectAsState()
+    val usageDays by vm.usageDays.collectAsState()
+    val range by vm.statsRange.collectAsState()
     val profiles by vm.profiles.collectAsState()
     val connected = connection.state == ConnState.CONNECTED
 
@@ -180,7 +185,29 @@ fun StatsScreen(vm: LiteViewModel, connection: ConnectionUiState, scrollState: S
         }
         Spacer(Modifier.height(24.dp))
 
-        // Per-server usage (3.1.0, PattNG): all-time bytes per profile.
+        // Range tabs (3.2.29): Today / This week / This month.
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            for (r in StatsRange.entries) {
+                StatsRangeChip(
+                    labelRes = when (r) {
+                        StatsRange.TODAY -> R.string.stats_today
+                        StatsRange.WEEK -> R.string.stats_week
+                        StatsRange.MONTH -> R.string.stats_month
+                    },
+                    selected = range == r,
+                    onClick = { vm.selectStatsRange(r) },
+                    modifier = Modifier.weight(1f)
+                )
+            }
+        }
+        Spacer(Modifier.height(12.dp))
+
+        // Per-server usage (3.1.0, PattNG): bytes per profile in the
+        // selected range, summed over the daily buckets. Day keys are
+        // ISO dates, so lexicographic compare is chronological.
         Text(
             text = stringResource(R.string.stats_usage_title),
             fontSize = 13.sp,
@@ -189,14 +216,24 @@ fun StatsScreen(vm: LiteViewModel, connection: ConnectionUiState, scrollState: S
             fontFamily = Vazirmatn
         )
         Spacer(Modifier.height(8.dp))
-        val usageRows = remember(usage, profiles) {
-            usage.entries
+        val usageRows = remember(usageDays, range, profiles) {
+            val cutoff = java.time.LocalDate.now()
+                .minusDays((range.days - 1).toLong()).toString()
+            val totals = HashMap<String, Long>()
+            for ((day, perProfile) in usageDays) {
+                if (day < cutoff) continue
+                for ((id, bytes) in perProfile) {
+                    totals[id] = (totals[id] ?: 0L) + bytes
+                }
+            }
+            totals.entries
                 .mapNotNull { (id, bytes) ->
                     profiles.firstOrNull { it.id == id }?.let { it to bytes }
                 }
                 .sortedByDescending { it.second }
                 .take(5)
         }
+        val rangeTotal = remember(usageRows) { usageRows.sumOf { it.second } }
         Column(
             modifier = Modifier
                 .fillMaxWidth()
@@ -252,6 +289,18 @@ fun StatsScreen(vm: LiteViewModel, connection: ConnectionUiState, scrollState: S
                     }
                     Spacer(Modifier.height(12.dp))
                 }
+                Spacer(Modifier.height(4.dp))
+                Text(
+                    text = stringResource(
+                        R.string.stats_usage_total,
+                        LiteFormat.formatVolume(rangeTotal)
+                    ),
+                    fontSize = 13.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = LiteColors.text,
+                    fontFamily = Vazirmatn,
+                    style = TextStyle(fontFeatureSettings = "tnum")
+                )
             }
         }
         Spacer(Modifier.height(24.dp))
@@ -294,6 +343,37 @@ private fun StatCard(
             color = LiteColors.textMuted,
             fontFamily = Vazirmatn,
             maxLines = 2
+        )
+    }
+}
+
+/**
+ * Range tab (3.2.29): same pill as the ServersScreen GroupChip —
+ * accent background + white text when selected, surface + secondary
+ * text otherwise.
+ */
+@Composable
+private fun StatsRangeChip(
+    labelRes: Int,
+    selected: Boolean,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Box(
+        modifier = modifier
+            .clip(RoundedCornerShape(50))
+            .background(if (selected) LiteColors.accent else LiteColors.surface)
+            .clickable(onClick = onClick)
+            .padding(horizontal = 14.dp, vertical = 8.dp),
+        contentAlignment = Alignment.Center
+    ) {
+        Text(
+            text = stringResource(labelRes),
+            fontSize = 13.sp,
+            fontWeight = FontWeight.SemiBold,
+            color = if (selected) Color.White else LiteColors.textSecondary,
+            fontFamily = Vazirmatn,
+            maxLines = 1
         )
     }
 }
