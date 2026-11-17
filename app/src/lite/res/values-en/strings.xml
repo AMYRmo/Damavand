@@ -527,6 +527,10 @@
     <string name="stats_today">Today</string>
     <string name="stats_week">This week</string>
     <string name="stats_month">This month</string>
+    <string name="stats_reset_usage">Reset usage</string>
+    <string name="stats_reset_title">Reset usage?</string>
+    <string name="stats_reset_body">All recorded usage for every server will be cleared and counting restarts from zero.</string>
+    <string name="stats_reset_confirm">Reset</string>
 
     <!-- 3.2.2 — connection details + notification (were hardcoded Persian) -->
     <string name="conn_error_generic">Error: %1$s</string>
