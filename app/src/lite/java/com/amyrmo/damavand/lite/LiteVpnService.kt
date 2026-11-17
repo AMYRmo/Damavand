@@ -144,6 +144,13 @@ class LiteVpnService : VpnService() {
     // stopTunnel.
     private val connectInFlight = java.util.concurrent.atomic.AtomicBoolean(false)
 
+    // 3.2.27 (PattNG HandoverGate): the kill-switch reconnect of a
+    // dropped tunnel claims its start under this gate; stopTunnel
+    // closes it, so a reconnect claimed before the stop goes on and
+    // none is claimed after — a stop that came meanwhile owns what
+    // follows, as in PattNG's launchCore goesOn checks.
+    private val handoverGate = HandoverGate()
+
     private fun sessionLive(gen: Int): Boolean =
         running && !intentionalStop && gen == sessionGen.get()
     private var currentLinks: List<String> = emptyList()
@@ -506,6 +513,9 @@ class LiteVpnService : VpnService() {
             broadcastLog("connect already in progress — ignoring")
             return
         }
+        // 3.2.27 (PattNG HandoverGate): a new session opens the gate
+        // for the reconnect of a dropped tunnel; stopTunnel closes it.
+        handoverGate.open()
         running = true
         connected = false
         intentionalStop = false
@@ -1548,9 +1558,13 @@ class LiteVpnService : VpnService() {
                     // with the worker: a reconnect that ran runConnect
                     // directly could overlap a fresh user connect, and
                     // its Aether start killed the other core (143).
-                    if (sessionLive(gen) && currentLinks.isNotEmpty()) {
-                        startTunnel(currentLinks, currentCandidates, currentTestUrl, autoMode, autoId, aetherMode)
-                    }
+                    // 3.2.27 (PattNG HandoverGate): the reconnect
+                    // claims under the gate — a stop that closed it
+                    // meanwhile refuses the claim outright.
+                    handoverGate.runClaimed(
+                        { sessionLive(gen) && currentLinks.isNotEmpty() },
+                        { startTunnel(currentLinks, currentCandidates, currentTestUrl, autoMode, autoId, aetherMode) },
+                    )
                 } catch (_: Exception) {
                 }
             }, "lite-reconnect").also { it.start() }
@@ -1572,6 +1586,9 @@ class LiteVpnService : VpnService() {
         // main thread, so they pass this guard.)
         val caller = Thread.currentThread()
         if (caller !== worker && caller !== poller && android.os.Looper.myLooper() != android.os.Looper.getMainLooper()) return
+        // 3.2.27 (PattNG HandoverGate): close the gate first — no new
+        // reconnect claims begin from here; one already claimed goes on.
+        handoverGate.close()
         connectInFlight.set(false)
         // Per-server usage (3.1.0): attribute the session volume to
         // the exit profile (the last link) before tearing down.
@@ -1648,6 +1665,9 @@ class LiteVpnService : VpnService() {
     override fun onDestroy() {
         try { unregisterReceiver(queryReceiver) } catch (_: Exception) {}
         stopAutoSelectSession()
+        // 3.2.27 (PattNG HandoverGate): no reconnect claims after
+        // the service dies, even without a clean stopTunnel.
+        handoverGate.close()
         // 3.2.10 (Aether): the core dies with the service, even when
         // it is killed without a clean stopTunnel.
         try { AetherEngine.stop() } catch (_: Exception) {}
