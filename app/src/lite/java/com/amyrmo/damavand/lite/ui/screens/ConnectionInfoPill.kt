@@ -149,7 +149,7 @@ fun ConnectionInfoPill(
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis
                         )
-                        Spacer(Modifier.height(4.dp))
+                        Spacer(Modifier.size(4.dp))
                         val members = buildString {
                             append(stringResource(R.string.chain_members, LiteFormat.toPersian(chainMembers.size.toString())))
                             append(" — ")
