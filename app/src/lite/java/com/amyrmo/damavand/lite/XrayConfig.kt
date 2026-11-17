@@ -844,6 +844,40 @@ object XrayConfig {
     }
 
     /**
+     * The streamSettings of an outbound that dials the Aether core
+     * (3.2.27, PattNG CoreOutboundBuilder.applyDialMode): the
+     * profile's dialMode goes into streamSettings.sockopt.dialMode.
+     * Null when the core names no dialMode — the field is omitted.
+     */
+    private fun aetherDialStream(dialMode: String?): JsonObject? {
+        val mode = dialMode?.trim()?.takeIf { it.isNotEmpty() } ?: return null
+        return buildJsonObject {
+            putJsonObject("sockopt") { put("dialMode", mode) }
+        }
+    }
+
+    /**
+     * A freedom exit-node for an Aether core (3.2.27, PattNG
+     * CoreOutboundBuilder.toOutboundAetherExit): the core's finalMask
+     * as streamSettings.finalmask (no network — a freedom outbound
+     * has no transport) and its dialMode in sockopt. An invalid
+     * finalMask is skipped, as PattNG keeps the previous one.
+     */
+    private fun freedomExitNode(core: AetherCore): JsonObject = buildJsonObject {
+        put("tag", AetherArgs.TAG_EXIT_NODE)
+        put("protocol", "freedom")
+        val stream = buildJsonObject {
+            core.exit.finalMask?.let { mask ->
+                runCatching { Json.parseToJsonElement(mask) }.getOrNull()?.let { put("finalmask", it) }
+            }
+            core.exit.dialMode?.trim()?.takeIf { it.isNotEmpty() }?.let { mode ->
+                putJsonObject("sockopt") { put("dialMode", mode) }
+            }
+        }
+        if (stream.isNotEmpty()) put("streamSettings", stream)
+    }
+
+    /**
      * Aether config (3.2.10) — a port of PattNG's AetherDependency.of /
      * routeThroughXray, adapted to Lite's [assemble] skeleton:
      *
@@ -888,6 +922,9 @@ object XrayConfig {
         val proxy = buildJsonObject {
             put("tag", "proxy")
             put("protocol", "socks")
+            // 3.2.27 (PattNG applyDialMode): the profile's dialMode
+            // goes into streamSettings.sockopt.dialMode.
+            aetherDialStream(core.exit.dialMode)?.let { put("streamSettings", it) }
             putJsonObject("settings") {
                 putJsonArray("servers") {
                     add(buildJsonObject {
@@ -897,10 +934,7 @@ object XrayConfig {
                 }
             }
         }
-        val exit = exitOutbound ?: buildJsonObject {
-            put("tag", "exit-node")
-            put("protocol", "freedom")
-        }
+        val exit = exitOutbound ?: freedomExitNode(core)
         val secondarySocks = buildJsonObject {
             put("tag", AetherArgs.TAG_SECONDARY_SOCKS)
             put("port", secondaryPort)
@@ -977,9 +1011,20 @@ object XrayConfig {
         // Resolved exit-first, tags like buildChain: the exit hop is
         // "proxy", the rest "proxy-chain-<i>"; hop i dials through
         // hop i+1, toward the entry, and the entry hop dials directly.
+        // 3.2.27 (PattNG handleProxyChainResolvedOutbound): the hop
+        // AFTER the Aether hop in this order is the core's exit-node —
+        // it carries that tag, and the core dials out through it
+        // (secondary-socks → exit-node), so no separate freedom
+        // exit-node outbound is added when such a hop exists.
         val resolved = members.reversed()
+        val aetherResolvedIdx = resolved.indexOfFirst { it.isAether }
+        val exitNodeHopIdx = aetherResolvedIdx + 1
         val outbounds = resolved.mapIndexed { i, profile ->
-            val tag = if (i == 0) "proxy" else "proxy-chain-$i"
+            val tag = when {
+                i == 0 -> "proxy"
+                i == exitNodeHopIdx -> AetherArgs.TAG_EXIT_NODE
+                else -> "proxy-chain-$i"
+            }
             val dialerProxy = if (i < resolved.size - 1) "proxy-chain-${i + 1}" else null
             if (profile.isAether) {
                 // PattNG skips the Aether hop for dialerProxy: this
@@ -990,6 +1035,9 @@ object XrayConfig {
                 buildJsonObject {
                     put("tag", tag)
                     put("protocol", "socks")
+                    // 3.2.27 (PattNG applyDialMode): the profile's
+                    // dialMode goes into streamSettings.sockopt.
+                    aetherDialStream(core.exit.dialMode)?.let { put("streamSettings", it) }
                     putJsonObject("settings") {
                         putJsonArray("servers") {
                             add(buildJsonObject {
@@ -1004,10 +1052,14 @@ object XrayConfig {
                 outbound(parsed, tag, dialerProxy, xraySettings) ?: return null
             }
         }
-        val exit = exitOutbound ?: buildJsonObject {
-            put("tag", AetherArgs.TAG_EXIT_NODE)
-            put("protocol", "freedom")
-        }
+        // PattNG lacksChainHop: the core's exit has hops (an entry
+        // side) but no exit-node outbound exists — refuse the config,
+        // or the core would reach the internet without its exit.
+        val exit = if (exitNodeHopIdx < resolved.size) null
+            else exitOutbound ?: freedomExitNode(core)
+        val hasExitNode = exit != null ||
+            outbounds.any { (it["tag"] as? JsonPrimitive)?.content == AetherArgs.TAG_EXIT_NODE }
+        if (core.exit.hops != null && !hasExitNode) return null
         val secondarySocks = buildJsonObject {
             put("tag", AetherArgs.TAG_SECONDARY_SOCKS)
             put("port", secondaryPort)
@@ -1020,7 +1072,7 @@ object XrayConfig {
             put("outboundTag", AetherArgs.TAG_EXIT_NODE)
         }
         val config = assemble(
-            outbounds + exit,
+            outbounds + listOfNotNull(exit),
             socksPort,
             geoAvailable,
             xraySettings,
