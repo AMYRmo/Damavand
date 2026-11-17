@@ -117,6 +117,7 @@ class RoutingStore(private val context: Context) {
         return try {
             if (!usageFile.exists()) return emptyMap()
             val text = usageFile.readText()
+            var migrated = false
             val days: Map<String, Map<String, Long>> = try {
                 json.decodeFromString(text)
             } catch (_: Exception) {
@@ -124,10 +125,15 @@ class RoutingStore(private val context: Context) {
                 // bytes. Migrate once into today's bucket.
                 val flat: Map<String, Long> = json.decodeFromString(text)
                 if (flat.isEmpty()) return emptyMap()
+                migrated = true
                 mapOf(todayKey() to flat)
             }
             val pruned = pruneDays(days)
-            if (pruned.size != days.size) saveUsageDays(pruned)
+            // Write the migrated file at once: left in the old format,
+            // every later load re-dated the old totals to *that* day, so
+            // "Today" showed the all-time total each day until the next
+            // usage record happened to rewrite the file.
+            if (migrated || pruned.size != days.size) saveUsageDays(pruned)
             pruned
         } catch (_: Exception) {
             emptyMap()
