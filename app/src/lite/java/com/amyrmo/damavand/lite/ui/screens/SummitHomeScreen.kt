@@ -65,7 +65,6 @@ import com.amyrmo.damavand.lite.ui.LiteViewModel
 import com.amyrmo.damavand.lite.ui.components.BoltIcon
 import com.amyrmo.damavand.lite.ui.components.ChainLineIcon
 import com.amyrmo.damavand.lite.ui.components.ChevronForwardIcon
-import com.amyrmo.damavand.lite.ui.components.FlagBadge
 import com.amyrmo.damavand.lite.ui.components.PowerLineIcon
 import com.amyrmo.damavand.lite.ui.components.contourPoints
 import com.amyrmo.damavand.lite.ui.theme.LiteColors
@@ -712,11 +711,6 @@ private fun ServerCard(
                     modifier = Modifier.fillMaxWidth(),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    FlagBadge(
-                        countryCode = profile.countryCode.ifBlank { null },
-                        size = 44.dp
-                    )
-                    Spacer(Modifier.width(12.dp))
                     Column(modifier = Modifier.weight(1f)) {
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             Text(
