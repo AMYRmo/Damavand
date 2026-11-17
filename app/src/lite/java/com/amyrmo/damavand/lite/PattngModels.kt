@@ -56,6 +56,10 @@ data class SubUserInfo(
     // 3.2.27 (ZedSecure): the panel's `profile-title` header,
     // decoded; "" = not reported.
     val title: String = "",
+    // False when the panel sent `profile-title` but no
+    // `subscription-userinfo`: the usage/expiry fields above are then
+    // not reported and must not overwrite what the card already has.
+    val usageReported: Boolean = true,
 )
 
 /**

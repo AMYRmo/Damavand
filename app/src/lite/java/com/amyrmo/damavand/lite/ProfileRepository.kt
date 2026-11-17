@@ -400,13 +400,14 @@ class ProfileRepository(private val context: Context) {
                     }
                     saveProfiles(existing + fresh)
                     val info = fetched.userInfo
+                    val usage = info?.takeIf { it.usageReported }
                     saveSubscriptions(loadSubscriptions().map {
                         if (it.url == url) it.copy(
                             lastUpdated = System.currentTimeMillis(),
-                            upload = info?.upload ?: it.upload,
-                            download = info?.download ?: it.download,
-                            total = info?.total ?: it.total,
-                            expire = info?.expire ?: it.expire,
+                            upload = usage?.upload ?: it.upload,
+                            download = usage?.download ?: it.download,
+                            total = usage?.total ?: it.total,
+                            expire = usage?.expire ?: it.expire,
                             websiteUrl = info?.websiteUrl?.ifBlank { it.websiteUrl } ?: it.websiteUrl,
                             supportUrl = info?.supportUrl?.ifBlank { it.supportUrl } ?: it.supportUrl,
                             title = info?.title?.ifBlank { it.title } ?: it.title,
@@ -475,7 +476,11 @@ class ProfileRepository(private val context: Context) {
             // 3.2.27 (ZedSecure SubscriptionHeaders): `profile-title`
             // is its own header, not part of subscription-userinfo.
             val title = decodeProfileTitle(conn.getHeaderField("profile-title"))
-            conn.inputStream.bufferedReader().readText() to userInfo?.copy(title = title)
+            // A panel may send profile-title without
+            // subscription-userinfo; keep the title anyway.
+            val info = userInfo?.copy(title = title)
+                ?: title.takeIf { it.isNotEmpty() }?.let { SubUserInfo(title = it, usageReported = false) }
+            conn.inputStream.bufferedReader().readText() to info
         } catch (_: Exception) {
             null to null
         } finally {
@@ -712,15 +717,17 @@ class ProfileRepository(private val context: Context) {
                             )
                         )
                     } else if (info != null) {
+                        val usage = info.takeIf { it.usageReported }
                         saveSubscriptions(subs.map {
                             if (it.url == trimmed) it.copy(
                                 lastUpdated = System.currentTimeMillis(),
-                                upload = info.upload,
-                                download = info.download,
-                                total = info.total,
-                                expire = info.expire,
+                                upload = usage?.upload ?: it.upload,
+                                download = usage?.download ?: it.download,
+                                total = usage?.total ?: it.total,
+                                expire = usage?.expire ?: it.expire,
                                 websiteUrl = info.websiteUrl.ifBlank { it.websiteUrl },
                                 supportUrl = info.supportUrl.ifBlank { it.supportUrl },
+                                title = info.title.ifBlank { it.title },
                             ) else it
                         })
                     }
@@ -764,14 +771,16 @@ class ProfileRepository(private val context: Context) {
                 }.toMap()
                 saveSubscriptions(currentSubs.map { sub ->
                     val info = infoByUrl[sub.url]
+                    val usage = info?.takeIf { it.usageReported }
                     sub.copy(
                         lastUpdated = System.currentTimeMillis(),
-                        upload = info?.upload ?: sub.upload,
-                        download = info?.download ?: sub.download,
-                        total = info?.total ?: sub.total,
-                        expire = info?.expire ?: sub.expire,
+                        upload = usage?.upload ?: sub.upload,
+                        download = usage?.download ?: sub.download,
+                        total = usage?.total ?: sub.total,
+                        expire = usage?.expire ?: sub.expire,
                         websiteUrl = info?.websiteUrl?.ifBlank { sub.websiteUrl } ?: sub.websiteUrl,
                         supportUrl = info?.supportUrl?.ifBlank { sub.supportUrl } ?: sub.supportUrl,
+                        title = info?.title?.ifBlank { sub.title } ?: sub.title,
                     )
                 })
             }
