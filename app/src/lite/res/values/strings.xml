@@ -629,6 +629,7 @@
     <string name="aether_psiphon_cdn_sets_all">همه لیست‌های داخل Psiphon</string>
     <string name="aether_hint_psiphon_cdn_sets">کدام لیست لبه داخل Psiphon را اسکن جلوبرنده امتحان کند. هیچ‌کدام یعنی همه؛ کنار IPهای خودتان، بعد از آن‌ها امتحان می‌شوند</string>
     <string name="aether_psiphon_region">کشور خروج</string>
+    <string name="aether_psiphon_region_any">هر کشوری</string>
     <string name="aether_psiphon_bundled_list">شروع از لیست سرورهای داخل اپ</string>
     <string name="aether_hint_psiphon_bundled_list">روشن: Psiphon اول سرورهای psiphon_servers.dat را می‌گیرد و فقط وقتی خراب شدند لیست تازه می‌گیرد. خاموش: قبل از اولین اتصال لیست تازه می‌گیرد، پس لیست باید در دسترس باشد، چون پشت WARP است</string>
     <string name="aether_tor_bridges">پل‌ها</string>
