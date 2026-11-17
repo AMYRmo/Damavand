@@ -309,6 +309,7 @@
     <string name="manual_path">Path</string>
     <string name="manual_host">Host</string>
     <string name="manual_insecure">Skip certificate (Insecure)</string>
+    <string name="manual_obfs_password">Obfs password</string>
     <string name="manual_private_key">Private key</string>
     <string name="manual_public_key">Peer public key</string>
     <string name="manual_allowed_ips">Allowed IPs</string>
