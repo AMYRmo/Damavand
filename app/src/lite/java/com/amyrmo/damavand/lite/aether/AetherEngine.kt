@@ -276,7 +276,10 @@ object AetherEngine {
                 return false
             }
         }
-        AppLog.e(TAG, "AetherCore: timed out waiting for the listener")
+        // fix/aether-connect: not an error by itself — a session core is still
+        // scanning/handshaking here and the service waits again while
+        // it runs (PattNG re-arms its warm-up wait the same way).
+        AppLog.i(TAG, "AetherCore: the listener did not answer within $timeoutMs ms")
         return false
     }
 
@@ -604,6 +607,8 @@ object AetherEngine {
         val context: Context,
         val onExit: () -> Unit,
     ) {
+        /** Written by open() on the lifecycle executor, read by awaitListening() on the connect worker. */
+        @Volatile
         var process: Process? = null
 
         @Volatile

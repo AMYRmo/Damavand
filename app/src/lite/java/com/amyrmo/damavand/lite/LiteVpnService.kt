@@ -79,6 +79,10 @@ class LiteVpnService : VpnService() {
         // 3.2.10 (Aether): the single link is an Aether profile
         // ("aether://<uuid>") — no pre-test, the core measures itself.
         const val EXTRA_AETHER = "aether"
+
+        // fix/aether-connect (PattNG AETHER_WARM_UP_MS): one slice of the Aether
+        // warm-up wait; startAether re-arms it while the core runs.
+        private const val AETHER_WARM_UP_MS = 30_000L
         // 3.2.0: the display name for a group (notification title).
         const val EXTRA_NAME = "name"
         /** 3.1.0: the URL a real tunnel test fetches. */
@@ -648,7 +652,7 @@ class LiteVpnService : VpnService() {
         if (aetherMode) {
             // 3.2.10 (Aether): no pre-test — PattNG doesn't pre-test
             // Aether either; the core measures its own endpoints and
-            // the connect fails at awaitListening when it never comes up.
+            // the connect fails in startAether when the core exits first.
             connectWinner(chosen, gen)
             return
         }
@@ -839,10 +843,22 @@ class LiteVpnService : VpnService() {
 
     /**
      * Starts the Aether core process after Xray is up and waits for its
-     * listener to answer a SOCKS greeting; false when it never comes up.
-     * Runs on the connect worker thread (awaitListening blocks up to 30 s).
+     * listener to answer a SOCKS greeting; false when the core exits, the
+     * session is stopped, or the worker is interrupted before it does.
+     * Runs on the connect worker thread.
+     *
+     * fix/aether-connect: no fixed budget any more. The core binds its listener at
+     * once but leaves greetings unanswered until it has scanned and its
+     * tunnel is up, which can take minutes (PattNG
+     * CoreServiceManager.announceAetherWarmUp: it re-arms the 30 s wait
+     * for as long as the core runs). The old single 30 s wait here
+     * stop()ed a core that was still scanning (logcat: "timed out
+     * waiting for the listener", then "stopping the live session core"
+     * and exit 143), so a session whose scan took longer than 30 s could
+     * never connect. A user stop still ends the wait at once: stopTunnel
+     * clears the session and interrupts this worker.
      */
-    private fun startAether(core: AetherCore): Boolean {
+    private fun startAether(core: AetherCore, gen: Int): Boolean {
         // 3.2.11: the Psiphon client is packaged again — this refusal
         // only fires when the binary is missing on the device's ABI.
         if (AetherArgs.psiphonModeOf(core.arguments) != AetherPsiphon.OFF && !AetherEngine.isPsiphonSupported(this)) {
@@ -852,7 +868,13 @@ class LiteVpnService : VpnService() {
         // Tor without the transport binary still runs — direct Tor,
         // just no bridges where Tor is blocked; the core says so itself.
         AetherEngine.start(this, core) { onAetherExit() }
-        if (!AetherEngine.awaitListening(30_000)) {
+        var listening = false
+        while (!listening && AetherEngine.isRunning && sessionLive(gen) && !Thread.currentThread().isInterrupted) {
+            listening = AetherEngine.awaitListening(AETHER_WARM_UP_MS)
+        }
+        if (!listening) {
+            // A user stop already tore the session down; nothing to report.
+            if (!sessionLive(gen)) return false
             val reason = AetherEngine.stoppedMessage()
             lastDetail = if (reason != null) getString(R.string.conn_aether_stopped, reason)
             else getString(R.string.conn_aether_failed)
@@ -1006,17 +1028,30 @@ class LiteVpnService : VpnService() {
                 }
                 // Local DNS off: the tun uses the system DNS.
                 if (localDns) dnsServers.filter { withIpv6 || !it.contains(":") }.forEach { addDnsServer(it) }
-                // The app itself (Xray core) must bypass the tunnel.
-                runCatching { addDisallowedApplication(packageName) }
                 // Per-app proxy (3.1.0, PattNG): bypass mode excludes
                 // the listed apps; allow-only mode includes only them.
-                when (perApp.mode) {
-                    "allow_only" -> {
-                        perApp.packages.forEach { pkg ->
-                            runCatching { addAllowedApplication(pkg) }
-                        }
-                    }
-                    else -> {
+                // The app itself (Xray, the Aether core) must bypass the
+                // tunnel in both. fix/aether-connect: VpnService.Builder
+                // refuses to mix the two lists (addAllowedApplication
+                // throws UnsupportedOperationException once
+                // addDisallowedApplication was called), so the old
+                // unconditional addDisallowedApplication(packageName)
+                // made every addAllowedApplication fail silently and
+                // allow-only tunnelled every app. In allow-only mode the
+                // app stays out by never being allowed; when no listed
+                // app could be allowed (none installed), the app is
+                // disallowed instead, or an allow list left empty would
+                // route its own traffic back into the tunnel.
+                val allowedAny = if (perApp.mode == "allow_only") {
+                    perApp.packages.filter { it != packageName }.count { pkg ->
+                        runCatching { addAllowedApplication(pkg) }.isSuccess
+                    } > 0
+                } else {
+                    false
+                }
+                if (!allowedAny) {
+                    runCatching { addDisallowedApplication(packageName) }
+                    if (perApp.mode != "allow_only") {
                         perApp.packages.forEach { pkg ->
                             runCatching { addDisallowedApplication(pkg) }
                         }
@@ -1080,7 +1115,7 @@ class LiteVpnService : VpnService() {
             }
             // 3.2.10 (Aether): Xray is up — start the core now, before
             // the tun bridge forwards traffic into the SOCKS inbound.
-            if (aetherCore != null && !startAether(aetherCore)) {
+            if (aetherCore != null && !startAether(aetherCore, gen)) {
                 broadcastStatus(); stopTunnel(); return
             }
             if (!tunMode) {
@@ -1112,7 +1147,7 @@ class LiteVpnService : VpnService() {
                 broadcastStatus(); stopTunnel(); return
             }
             // 3.2.10 (Aether): Xray is up — start the core now.
-            if (aetherCore != null && !startAether(aetherCore)) {
+            if (aetherCore != null && !startAether(aetherCore, gen)) {
                 broadcastStatus(); stopTunnel(); return
             }
         }
