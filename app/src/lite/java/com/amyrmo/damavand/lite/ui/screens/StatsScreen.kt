@@ -223,7 +223,7 @@ fun StatsScreen(vm: LiteViewModel, connection: ConnectionUiState, scrollState: S
             fontFamily = Vazirmatn
         )
         Spacer(Modifier.height(8.dp))
-        val usageRows = remember(usageDays, range, profiles) {
+        val rangeTotals = remember(usageDays, range) {
             val cutoff = java.time.LocalDate.now()
                 .minusDays((range.days - 1).toLong()).toString()
             val totals = HashMap<String, Long>()
@@ -233,14 +233,20 @@ fun StatsScreen(vm: LiteViewModel, connection: ConnectionUiState, scrollState: S
                     totals[id] = (totals[id] ?: 0L) + bytes
                 }
             }
-            totals.entries
+            totals
+        }
+        val usageRows = remember(rangeTotals, profiles) {
+            rangeTotals.entries
                 .mapNotNull { (id, bytes) ->
                     profiles.firstOrNull { it.id == id }?.let { it to bytes }
                 }
                 .sortedByDescending { it.second }
                 .take(5)
         }
-        val rangeTotal = remember(usageRows) { usageRows.sumOf { it.second } }
+        // The total is everything recorded in the range — every server,
+        // not only the five rows shown, and including servers that were
+        // deleted or replaced by a subscription refresh since.
+        val rangeTotal = remember(rangeTotals) { rangeTotals.values.sum() }
         Column(
             modifier = Modifier
                 .fillMaxWidth()
