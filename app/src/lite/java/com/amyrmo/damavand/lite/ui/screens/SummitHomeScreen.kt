@@ -156,11 +156,20 @@ fun SummitHomeScreen(
         UnderRingCaption(connection = connection, profile = profile)
         // 3.2.21 (Damavand ConnectionInfoPill): while connected, the
         // flag of the exit place + the exit IP under the ring.
+        // 3.2.27 (Amir: "یه کارتش کن"): the pill is the ONE home
+        // card while connected — it carries the profile identity,
+        // so the ServerCard below is hidden while connected
+        // (Auto keeps its own card: it is a control surface with
+        // the pin sheet, not just a display).
+        val hideServerCard = connection.state == ConnState.CONNECTED && selectedAutoId == null
         if (connection.state == ConnState.CONNECTED) {
             Spacer(Modifier.height(16.dp))
             ConnectionInfoPill(
                 connection = connection,
                 onRefresh = { vm.refreshLocation() },
+                profile = if (hideServerCard) profile else null,
+                chain = if (hideServerCard) selectedChain else null,
+                chainMembers = if (hideServerCard) chainMembers else emptyList(),
             )
         }
         Spacer(Modifier.height(24.dp))
@@ -184,7 +193,7 @@ fun SummitHomeScreen(
                 },
                 onDetails = { showAutoSheet = true }
             )
-        } else {
+        } else if (!hideServerCard) {
             ServerCard(
                 profile = profile,
                 chain = selectedChain,
