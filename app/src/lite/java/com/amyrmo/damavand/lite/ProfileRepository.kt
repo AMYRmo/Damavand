@@ -409,6 +409,7 @@ class ProfileRepository(private val context: Context) {
                             expire = info?.expire ?: it.expire,
                             websiteUrl = info?.websiteUrl?.ifBlank { it.websiteUrl } ?: it.websiteUrl,
                             supportUrl = info?.supportUrl?.ifBlank { it.supportUrl } ?: it.supportUrl,
+                            title = info?.title?.ifBlank { it.title } ?: it.title,
                         ) else it
                     })
                     FetchResult.Ok(fresh, fetched.skippedUnsupported, info)
@@ -471,12 +472,41 @@ class ProfileRepository(private val context: Context) {
             ?: return null to null
         return try {
             val userInfo = parseUserInfo(conn.getHeaderField("subscription-userinfo"))
-            conn.inputStream.bufferedReader().readText() to userInfo
+            // 3.2.27 (ZedSecure SubscriptionHeaders): `profile-title`
+            // is its own header, not part of subscription-userinfo.
+            val title = decodeProfileTitle(conn.getHeaderField("profile-title"))
+            conn.inputStream.bufferedReader().readText() to userInfo?.copy(title = title)
         } catch (_: Exception) {
             null to null
         } finally {
             conn.disconnect()
         }
+    }
+
+    /**
+     * Decode a `profile-title` header value (3.2.27, ZedSecure
+     * SubscriptionHeaders.decodeTitle verbatim): a `base64:` prefix
+     * decodes as standard Base64, then URL-safe; a Latin-1 string
+     * with high bytes re-decodes as UTF-8; anything else is used
+     * raw. At most 60 chars, whitespace collapsed.
+     */
+    private fun decodeProfileTitle(header: String?): String {
+        val raw = header?.trim().orEmpty()
+        if (raw.isEmpty()) return ""
+        val decoded = if (raw.startsWith("base64:", ignoreCase = true)) {
+            val payload = raw.substring("base64:".length).trim()
+            runCatching {
+                java.util.Base64.getDecoder().decode(payload).decodeToString()
+            }.recoverCatching {
+                java.util.Base64.getUrlDecoder().decode(payload).decodeToString()
+            }.getOrNull() ?: return ""
+        } else if (raw.all { it.code < 256 } && raw.any { it.code >= 128 }) {
+            val bytes = ByteArray(raw.length) { raw[it].code.toByte() }
+            bytes.decodeToString().takeIf { '�' !in it } ?: raw
+        } else {
+            raw
+        }
+        return decoded.trim().replace(Regex("\\s+"), " ").take(60).takeIf { it.isNotEmpty() } ?: ""
     }
 
     /** Parse `upload=…; download=…; total=…; expire=…` (bytes, epoch s),
@@ -678,6 +708,7 @@ class ProfileRepository(private val context: Context) {
                                 expire = info?.expire ?: 0,
                                 websiteUrl = info?.websiteUrl ?: "",
                                 supportUrl = info?.supportUrl ?: "",
+                                title = info?.title ?: "",
                             )
                         )
                     } else if (info != null) {
