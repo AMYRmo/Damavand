@@ -84,12 +84,51 @@ class RoutingStore(private val context: Context) {
         savePerApp(config.copy(packages = pkgs))
     }
 
-    // ---- per-server usage (bytes per profile id, all-time) ----
+    // ---- per-server usage (bytes per profile id, bucketed by local day) ----
+    //
+    // 3.2.29: usage is stored per day ("yyyy-MM-dd" -> profileId -> bytes)
+    // so the Stats tab can show Today / This week / This month. NOTHING
+    // older than 30 days is kept: every load and every record prunes day
+    // keys older than today-29 (30 days kept, inclusive). The old flat
+    // format (profileId -> all-time bytes) is migrated once into today's
+    // bucket, so existing totals are not lost — they age out after 30 days.
 
-    fun loadUsage(): Map<String, Long> {
+    companion object {
+        const val USAGE_RETENTION_DAYS = 30
+    }
+
+    private fun todayKey(): String = java.time.LocalDate.now().toString()
+
+    private fun pruneDays(days: Map<String, Map<String, Long>>): Map<String, Map<String, Long>> {
+        val cutoff = java.time.LocalDate.now()
+            .minusDays((USAGE_RETENTION_DAYS - 1).toLong()).toString()
+        // Day keys are ISO dates, so lexicographic compare is chronological.
+        return days.filterKeys { it >= cutoff }
+    }
+
+    private fun saveUsageDays(days: Map<String, Map<String, Long>>) {
+        try {
+            usageFile.writeText(json.encodeToString(days))
+        } catch (_: Exception) {
+        }
+    }
+
+    fun loadUsageDays(): Map<String, Map<String, Long>> {
         return try {
             if (!usageFile.exists()) return emptyMap()
-            json.decodeFromString<Map<String, Long>>(usageFile.readText())
+            val text = usageFile.readText()
+            val days: Map<String, Map<String, Long>> = try {
+                json.decodeFromString(text)
+            } catch (_: Exception) {
+                // Old flat format (3.2.28 and earlier): profileId -> all-time
+                // bytes. Migrate once into today's bucket.
+                val flat: Map<String, Long> = json.decodeFromString(text)
+                if (flat.isEmpty()) return emptyMap()
+                mapOf(todayKey() to flat)
+            }
+            val pruned = pruneDays(days)
+            if (pruned.size != days.size) saveUsageDays(pruned)
+            pruned
         } catch (_: Exception) {
             emptyMap()
         }
@@ -98,9 +137,11 @@ class RoutingStore(private val context: Context) {
     fun recordUsage(profileId: String, bytes: Long) {
         if (profileId.isBlank() || bytes <= 0) return
         try {
-            val usage = loadUsage().toMutableMap()
-            usage[profileId] = (usage[profileId] ?: 0L) + bytes
-            usageFile.writeText(json.encodeToString(usage))
+            val days = loadUsageDays().toMutableMap()
+            val today = (days[todayKey()] ?: emptyMap()).toMutableMap()
+            today[profileId] = (today[profileId] ?: 0L) + bytes
+            days[todayKey()] = today
+            saveUsageDays(pruneDays(days))
         } catch (_: Exception) {
         }
     }
