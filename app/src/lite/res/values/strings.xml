@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="app_name">دماوند لایت</string>
+    <string name="app_name">دماوند</string>
 
     <!-- Header -->
 
@@ -142,7 +142,7 @@
     <string name="about_core">هسته</string>
     <string name="about_repo">مخزن</string>
     <string name="about_repo_value">AMYRmo/Damavand — شاخه lite</string>
-    <string name="about_copy">دماوند لایت — نسخه سبک دماوند. برای اتصال سریع و کم‌مصرف ساخته شده است.</string>
+    <string name="about_copy">دماوند — برای اتصال سریع و کم‌مصرف ساخته شده است.</string>
 
     <!-- Subscription import -->
     <string name="sub_import_title">افزودن سابسکریپشن</string>
@@ -152,7 +152,7 @@
     <string name="sub_import_cancel">لغو</string>
     <string name="sub_import_failed_network">دریافت سابسکریپشن ناموفق بود — اینترنت را بررسی کنید، یا وقتی به اینترنت آزاد وصل هستید دوباره تلاش کنید</string>
     <string name="sub_import_failed_empty">در این سابسکریپشن هیچ کانفیگ قابل‌استفاده‌ای پیدا نشد</string>
-    <string name="sub_import_failed_unsupported">%1$d کانفیگ با پروتکل پشتیبانی‌نشده رد شد — لایت فعلاً VLESS، VMess، Trojan و Shadowsocks را پشتیبانی می‌کند</string>
+    <string name="sub_import_failed_unsupported">%1$d کانفیگ با پروتکل پشتیبانی‌نشده رد شد — دماوند فعلاً VLESS، VMess، Trojan و Shadowsocks را پشتیبانی می‌کند</string>
     <string name="sub_import_failed_single">این لینک کانفیگ معتبر نیست — باید VLESS، VMess، Trojan، Shadowsocks یا Aether باشد</string>
 
     <!-- Misc -->
@@ -352,7 +352,7 @@
     <string name="auto_card_title">خودکار · %1$s</string>
     <string name="auto_card_desc">سریع‌ترین از %1$s سرور. اگر یکی قطع شود، اتصال در یک لحظه جابه‌جا می‌شود.</string>
     <string name="auto_info_title">انتخاب خودکار سرور</string>
-    <string name="auto_info_body">لایت همیشه سریع‌ترین سرور این سابسکریپشن را انتخاب می‌کند و اگر آن سرور قطع شود، در یک لحظه به سرور بعدی می‌رود. برای خاموش کردن خودکار، تیک را بزن.</string>
+    <string name="auto_info_body">دماوند همیشه سریع‌ترین سرور این سابسکریپشن را انتخاب می‌کند و اگر آن سرور قطع شود، در یک لحظه به سرور بعدی می‌رود. برای خاموش کردن خودکار، تیک را بزن.</string>
     <!-- 3.2.8 (Auto, Damavand) -->
     <string name="config_active">فعال</string>
     <string name="auto_card_idle">خودکار · %1$s سرور</string>
