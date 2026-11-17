@@ -89,6 +89,11 @@ data class ConnectionUiState(
  * It owns the service broadcasts, the profile list, the settings, the
  * geo download state and the 60-second live chart buffer.
  */
+/** Stats range (3.2.29): Today / This week / This month. `days` is the
+ * rolling window size — Today is 1 day, Week is the last 7 days,
+ * Month is the last 30 days. Nothing older than 30 days is stored. */
+enum class StatsRange(val days: Int) { TODAY(1), WEEK(7), MONTH(30) }
+
 class LiteViewModel(app: Application) : AndroidViewModel(app) {
 
     private val context: Context get() = getApplication<Application>().applicationContext
@@ -337,11 +342,6 @@ class LiteViewModel(app: Application) : AndroidViewModel(app) {
     private val _perAppPackages = MutableStateFlow<Set<String>>(emptySet())
     val perAppPackages: StateFlow<Set<String>> = _perAppPackages.asStateFlow()
 
-    /** Stats range (3.2.29): Today / This week / This month. `days` is the
-     * rolling window size — Today is 1 day, Week is the last 7 days,
-     * Month is the last 30 days. Nothing older than 30 days is stored. */
-    enum class StatsRange(val days: Int) { TODAY(1), WEEK(7), MONTH(30) }
-
     private val _usageDays = MutableStateFlow<Map<String, Map<String, Long>>>(emptyMap())
     val usageDays: StateFlow<Map<String, Map<String, Long>>> = _usageDays.asStateFlow()
 
@@ -362,6 +362,12 @@ class LiteViewModel(app: Application) : AndroidViewModel(app) {
 
     fun refreshUsage() {
         _usageDays.value = routingStore.loadUsageDays()
+    }
+
+    /** 3.2.30: reset all recorded usage (Stats reset button). */
+    fun clearUsage() {
+        routingStore.clearUsage()
+        _usageDays.value = emptyMap()
     }
 
     // ---- logs (3.1.0, PattNG) ----
