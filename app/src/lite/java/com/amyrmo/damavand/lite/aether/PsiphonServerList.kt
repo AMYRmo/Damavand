@@ -1,5 +1,6 @@
 package com.amyrmo.damavand.lite.aether
 
+import android.content.Context
 import android.util.Base64
 import java.io.ByteArrayInputStream
 import java.io.File
@@ -135,6 +136,50 @@ object PsiphonServerList {
      * included, so they can name countries the app's own list does not.
      */
     fun regionsOf(line: String): List<String>? = leavesFrom.find(line)?.groupValues?.get(1)?.split(' ')
+
+    /**
+     * The region memory (3.2.25, PattNG PsiphonServerList.remember/
+     * remembered/forgetRemembered, whose MMKV PREF_PSIPHON_REGIONS
+     * Lite does not have): what the core last reported it can leave
+     * from, kept in the "aether" prefs as one comma-joined sorted
+     * set, in place of the one before — the report is the whole set,
+     * so the last one is the truth. Empty before the first report.
+     */
+    private const val PREFS_NAME = "aether"
+    private const val REGIONS_KEY = "psiphon_regions"
+
+    /** Keeps [regions] as Psiphon's last report, in place of the one before. */
+    fun remember(context: Context, regions: Collection<String>) {
+        val kept = regions.mapNotNull { it.trim().uppercase(Locale.ROOT).takeIf { code -> code.length == 2 && code.all(Char::isLetter) } }.toSortedSet()
+        context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE).edit()
+            .putString(REGIONS_KEY, kept.joinToString(",")).apply()
+    }
+
+    /** Psiphon's last report of the countries it can leave from; empty before the first. */
+    fun remembered(context: Context): Set<String> =
+        context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+            .getString(REGIONS_KEY, "").orEmpty().split(',')
+            .filterTo(sortedSetOf()) { it.length == 2 }
+
+    /** Forgets the last report, for when the datastore it described is cleared. */
+    fun forgetRemembered(context: Context) {
+        context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE).edit()
+            .remove(REGIONS_KEY).apply()
+    }
+
+    /**
+     * The exit countries the editor offers (3.2.25, PattNG
+     * AetherEditorRepository.psiphonRegions): the regions the bundled
+     * list's servers offer, plus what the core last reported it can
+     * leave from (which can name countries the bundled list does
+     * not), sorted, deduped. Runs on IO: it unpacks the list when
+     * the stamp changed and reads every entry.
+     */
+    fun psiphonRegions(context: Context): List<String> {
+        val entries = entriesFile(File(context.filesDir, "assets"), AetherEngine.workDir(context))
+        val listed = entries?.let { file -> runCatching { regions(file.readText()) }.getOrDefault(emptySet()) }.orEmpty()
+        return (listed + remembered(context)).toSortedSet().toList()
+    }
 
     /**
      * The server entries inside [packed], a signed, compressed list as Psiphon writes it; throws
