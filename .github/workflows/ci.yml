@@ -1,5 +1,5 @@
-# Damavand Lite — build, sign, verify, release (private repo).
-name: Damavand Lite
+# Damavand — build, sign, verify, release.
+name: Damavand
 
 on:
   workflow_dispatch:
@@ -13,7 +13,7 @@ permissions:
   contents: write
 
 concurrency:
-  group: damavandlite-${{ github.ref }}
+  group: damavand-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
@@ -67,16 +67,16 @@ jobs:
       # until Amir says to publish; flip by removing --draft from the
       # gh release create line below and undrafting the release.
       # Release policy: release builds only, named
-      # Damavand-Lite-<version>-<abi>.apk for arm64-v8a, armeabi-v7a and
+      # Damavand-<version>-<abi>.apk for arm64-v8a, armeabi-v7a and
       # universal. No debug APKs are published, and no "debug" appears in
       # file names.
       #
       # Signing: the APKs are signed here with this repo's OWN stable
       # release keystore, kept in the repo secrets APP_KEYSTORE_BASE64 /
       # APP_KEYSTORE_PASSWORD / APP_KEYSTORE_ALIAS / APP_KEY_PASSWORD.
-      # This key is DIFFERENT from the Damavand repo's key (secrets do
-      # not copy between repos), so 2.0.0 needs one uninstall of the old
-      # Lite build first; after that, every build carries the same
+      # The key is the same one that signed the Lite line (3.2.7-3.2.30);
+      # the new Damavand app (applicationId com.amyrmo.damavand) installs
+      # fresh next to Lite, and every build after 1.0.1 carries the same
       # signature, so updates install over the previous one with data
       # and settings preserved — as long as versionCode keeps increasing.
       - name: Build and publish the release APKs (arm64, armv7, universal)
@@ -90,9 +90,9 @@ jobs:
           BT=$(ls -d "$ANDROID_HOME"/build-tools/* | sort -V | tail -1)
           echo "${{ secrets.APP_KEYSTORE_BASE64 }}" | base64 -d > /tmp/release.jks
           KEYPASS="${{ secrets.APP_KEY_PASSWORD }}"; [ -z "$KEYPASS" ] && KEYPASS="${{ secrets.APP_KEYSTORE_PASSWORD }}"
-          gh release view "v$VER" >/dev/null 2>&1 || gh release create "v$VER" --draft --title "Damavand Lite $VER" --notes "Damavand Lite $VER — arm64-v8a for most phones, armeabi-v7a for older 32-bit phones, universal for any device."
+          gh release view "v$VER" >/dev/null 2>&1 || gh release create "v$VER" --draft --title "Damavand $VER" --notes "Damavand $VER — arm64-v8a for most phones, armeabi-v7a for older 32-bit phones, universal for any device."
           for ABI in arm64-v8a armeabi-v7a universal; do
             "$BT/zipalign" -f -p 4 "app/build/outputs/apk/release/app-$ABI-release-unsigned.apk" "/tmp/$ABI-aligned.apk"
-            "$BT/apksigner" sign --ks /tmp/release.jks --ks-key-alias "${{ secrets.APP_KEYSTORE_ALIAS }}" --ks-pass "pass:${{ secrets.APP_KEYSTORE_PASSWORD }}" --key-pass "pass:$KEYPASS" --out "Damavand-Lite-$VER-$ABI.apk" "/tmp/$ABI-aligned.apk"
-            gh release upload "v$VER" "Damavand-Lite-$VER-$ABI.apk" --clobber
+            "$BT/apksigner" sign --ks /tmp/release.jks --ks-key-alias "${{ secrets.APP_KEYSTORE_ALIAS }}" --ks-pass "pass:${{ secrets.APP_KEYSTORE_PASSWORD }}" --key-pass "pass:$KEYPASS" --out "Damavand-$VER-$ABI.apk" "/tmp/$ABI-aligned.apk"
+            gh release upload "v$VER" "Damavand-$VER-$ABI.apk" --clobber
           done
