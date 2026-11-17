@@ -49,19 +49,21 @@ object LiteFormat {
         else "${oneDecimal(mbps)} مگابیت"
     }
 
-    /** Bytes → "۳۲۴ کیلوبایت" (< 1 MB), "۱۸٫۲ مگابایت" or "۱٫۲ گیگابایت" (≥ 1000 MB).
-     *  3.1.2: small live sessions used to round to "۰ مگابایت" and look dead. */
+    /** Bytes → "۳۲۴ کیلوبایت" (< 1 MB), "۱۸٫۲ مگابایت" or "۱٫۲ گیگابایت" (≥ 1024 MB).
+     *  3.1.2: small live sessions used to round to "۰ مگابایت" and look dead.
+     *  3.2.30: 1024-based — panels (3x-ui, Remnawave) count a "GB" as 1024^3 bytes,
+     *  so 100 GiB must read "۱۰۰ گیگابایت", not "۱۰۷٫۳". Speeds stay decimal (Mbps). */
     fun formatVolume(bytes: Long): String {
-        val kb = bytes / 1_000.0
+        val kb = bytes / 1024.0
         if (!persianDigits) {
-            if (kb < 1000) return "${oneDecimal(kb)} KB"
-            val mb = kb / 1000.0
-            return if (mb >= 1000) "${oneDecimal(mb / 1000)} GB"
+            if (kb < 1024) return "${oneDecimal(kb)} KB"
+            val mb = kb / 1024.0
+            return if (mb >= 1024) "${oneDecimal(mb / 1024)} GB"
             else "${oneDecimal(mb)} MB"
         }
-        if (kb < 1000) return "${oneDecimal(kb)} کیلوبایت"
-        val mb = kb / 1000.0
-        return if (mb >= 1000) "${oneDecimal(mb / 1000)} گیگابایت"
+        if (kb < 1024) return "${oneDecimal(kb)} کیلوبایت"
+        val mb = kb / 1024.0
+        return if (mb >= 1024) "${oneDecimal(mb / 1024)} گیگابایت"
         else "${oneDecimal(mb)} مگابایت"
     }
 
