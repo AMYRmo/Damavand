@@ -25,6 +25,10 @@ data class Subscription(
     // (profile-web-page-url / support-url); "" = not reported.
     val websiteUrl: String = "",
     val supportUrl: String = "",
+    // 3.2.27 (ZedSecure Subscription.title): the panel's
+    // `profile-title` response header, base64-decoded; the card
+    // shows title ?: name. "" = not reported.
+    val title: String = "",
 ) {
     val displayName: String
         get() = name.ifBlank {
@@ -49,6 +53,9 @@ data class SubUserInfo(
     val expire: Long = 0,
     val websiteUrl: String = "",
     val supportUrl: String = "",
+    // 3.2.27 (ZedSecure): the panel's `profile-title` header,
+    // decoded; "" = not reported.
+    val title: String = "",
 )
 
 /**
