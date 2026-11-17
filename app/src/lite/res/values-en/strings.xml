@@ -630,6 +630,7 @@
     <string name="aether_psiphon_cdn_sets_all">All lists built into Psiphon</string>
     <string name="aether_hint_psiphon_cdn_sets">Which of the edge lists built into Psiphon the fronting scan tries. None checked means all of them; beside IPs of your own they are tried after those</string>
     <string name="aether_psiphon_region">Exit country</string>
+    <string name="aether_psiphon_region_any">Any country</string>
     <string name="aether_psiphon_bundled_list">Start from the bundled server list</string>
     <string name="aether_hint_psiphon_bundled_list">On: Psiphon dials the servers in psiphon_servers.dat at once and fetches a fresh list only when they fail. Off: it fetches a fresh list before its first connection, so the list must be reachable, as it is behind WARP</string>
     <string name="aether_tor_bridges">Bridges</string>
