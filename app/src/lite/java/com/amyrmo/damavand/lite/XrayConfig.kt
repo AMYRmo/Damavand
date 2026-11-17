@@ -109,6 +109,10 @@ object XrayConfig {
         val wgMtu: String = "",
         val wgReserved: String = "",
         val hyInsecure: String = "",
+        // 1.0.2 (PattNG Hysteria2Fmt): the salamander obfs password
+        // (obfs-password query param). Without it the obfs layer of
+        // a Hysteria2 link can never authenticate.
+        val obfsPassword: String = "",
         val customJson: String = "",
     )
 
@@ -240,6 +244,8 @@ object XrayConfig {
                 wgMtu = q["mtu"] ?: "",
                 wgReserved = q["reserved"] ?: "",
                 hyInsecure = q["insecure"] ?: "",
+                // 1.0.2: salamander obfs password (obfs-password).
+                obfsPassword = q["obfs-password"] ?: "",
             )
         } catch (_: Exception) {
             null
@@ -642,31 +648,51 @@ object XrayConfig {
                 }
             }
             // 3.2.0 (PattNG): Hysteria2 (UDP + TLS; no mux).
-            // 3.2.30: the stream network is "hysteria", NOT "udp" —
-            // PattNG sets NetworkType.HYSTERIA ("hysteria"), and the
-            // fork's transport/internet/hysteria registers exactly
-            // that name (config.go:84, dialer.go:375). "udp" is not
-            // a stream transport, so the core rejected the whole
-            // config with "unknown transport protocol: udp" — which
-            // killed Auto (its first member is the Hysteria2 link)
-            // and every single Hysteria2 connect too.
+            // 3.2.30 fixed the stream network ("hysteria", not
+            // "udp") — but Hysteria2 still never connected, and
+            // Auto (whose first member is the Hysteria2 link) died
+            // with it. 1.0.2, root-caused against PattNG + the fork
+            // (CluvexStudio/Xray-core @ 7b4c3ceb1534):
+            //  1. The fork has NO "hysteria2" protocol at all:
+            //     infra/conf/xray.go registers only "hysteria" ->
+            //     HysteriaClientConfig{version, address, port}
+            //     (version MUST be 2), and proxy/ has no hysteria2
+            //     package. "hysteria2" made the core reject the
+            //     whole config, so every Hysteria2 single connect
+            //     AND every Auto group failed at build time.
+            //     PattNG does exactly this: protocol "hysteria",
+            //     settings {version: 2, address, port}.
+            //  2. That client config has NO password field: the
+            //     password lives only in the transport config as
+            //     streamSettings.hysteriaSettings.auth
+            //     (transport/internet/hysteria Config.Auth).
+            //     PattNG: HysteriaSettingsBean(version = 2, auth).
+            //  3. No ALPN: the fork's hysteria dialer sets no ALPN
+            //     itself (no NextProtos/h3 in dialer.go), so the
+            //     QUIC handshake needs tlsSettings.alpn ["h3"] —
+            //     PattNG forces alpn = "h3" in toOutboundHysteria2.
+            //  4. Salamander obfs: PattNG puts it in
+            //     streamSettings.finalmask.udp as a mask
+            //     {type: "salamander", settings: {password}}; the
+            //     fork's finalmask has a salamander mask
+            //     (transport/internet/finalmask/salamander).
             "hysteria2" -> buildJsonObject {
                 put("tag", tag)
-                put("protocol", "hysteria2")
+                put("protocol", "hysteria")
                 putJsonObject("settings") {
-                    putJsonArray("servers") {
-                        add(buildJsonObject {
-                            put("address", p.addr)
-                            put("port", p.port)
-                            put("password", p.id)
-                        })
-                    }
+                    put("version", 2)
+                    put("address", p.addr)
+                    put("port", p.port)
                 }
                 putJsonObject("streamSettings") {
                     put("network", "hysteria")
                     put("security", "tls")
                     putJsonObject("tlsSettings") {
                         put("serverName", p.sni.ifEmpty { p.addr })
+                        putJsonArray("alpn") {
+                            val alpn = p.alpn.ifEmpty { "h3" }
+                            alpn.split(",").forEach { add(JsonPrimitive(it.trim())) }
+                        }
                         // 3.2.9: allowInsecure is removed in this core —
                         // never emitted (see streamSettings). Pinning and
                         // ECH fields are honoured when the link carries
@@ -676,6 +702,22 @@ object XrayConfig {
                         if (p.verifyPeerCertByName.isNotEmpty()) put("verifyPeerCertByName", p.verifyPeerCertByName)
                         if (p.echConfigList.isNotEmpty()) put("echConfigList", p.echConfigList)
                         if (p.echOutbound.isNotEmpty()) put("echOutbound", p.echOutbound)
+                    }
+                    putJsonObject("hysteriaSettings") {
+                        put("version", 2)
+                        put("auth", p.id)
+                    }
+                    if (p.obfsPassword.isNotEmpty()) {
+                        putJsonObject("finalmask") {
+                            putJsonArray("udp") {
+                                add(buildJsonObject {
+                                    put("type", "salamander")
+                                    putJsonObject("settings") {
+                                        put("password", p.obfsPassword)
+                                    }
+                                })
+                            }
+                        }
                     }
                     if (sockopt != null) put("sockopt", sockopt)
                 }
