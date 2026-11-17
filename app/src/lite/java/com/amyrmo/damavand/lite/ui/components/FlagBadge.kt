@@ -43,7 +43,10 @@ fun FlagBadge(
     modifier: Modifier = Modifier,
     size: Dp = 30.dp
 ) {
-    val code = countryCode?.uppercase()
+    // Only a 2-letter code is a country: "" (no location yet, or the
+    // lookup failed) and junk must fall through to the "··" badge,
+    // not an empty chip.
+    val code = countryCode?.trim()?.uppercase()?.takeIf { it.length == 2 && it.all { c -> c in 'A'..'Z' } }
     val assetName = code?.lowercase()
     val context = LocalContext.current
 
