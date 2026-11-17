@@ -1213,13 +1213,26 @@ class LiteVpnService : VpnService() {
             val city = j.optString("city")
             // 3.2.21: the exit IP + ISP ride in the same payload
             // (ipinfo: "ip" / "org"; ipwho.is: "ip" /
-            // connection.org). Any endpoint without them just
-            // leaves the pill's rows blank.
-            ip = j.optString("ip")
+            // connection.org; ip-api.com: "query" / "isp"). Any
+            // endpoint without them just leaves the pill's rows blank.
+            val answeredIp = j.optString("ip").ifBlank { j.optString("query") }
+            // Only ipinfo puts the ISO code in "country"; ipwho.is
+            // ("country_code") and ip-api.com ("countryCode") put the
+            // country's name there, which FlagBadge cannot map, so the
+            // flag stayed a globe on those endpoints.
+            val code = listOf(j.optString("country_code"), j.optString("countryCode"), country)
+                .map { it.trim() }
+                .firstOrNull { it.length == 2 && it.all(Char::isLetter) }
+                ?.uppercase(java.util.Locale.ROOT)
+                .orEmpty()
+            // An error payload (rate limit, success=false) has neither:
+            // let the backoff loop try again instead of stopping here.
+            if (answeredIp.isBlank() && code.isBlank()) return false
+            ip = answeredIp
             isp = j.optString("org").ifBlank {
-                j.optJSONObject("connection")?.optString("org") ?: ""
-            }
-            countryCode = country
+                j.optJSONObject("connection")?.optString("org").orEmpty()
+            }.ifBlank { j.optString("isp") }
+            countryCode = code
             location = listOf(city, country).filter { it.isNotBlank() }
                 .joinToString(if (LiteFormat.persianDigits) "، " else ", ")
             broadcastStatus()
