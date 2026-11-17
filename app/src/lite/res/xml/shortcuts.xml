@@ -1,5 +1,11 @@
 <?xml version="1.0" encoding="utf-8"?>
 <shortcuts xmlns:android="http://schemas.android.com/apk/res/android">
+    <!--
+      targetPackage is the applicationId (com.amyrmo.damavand since 1.0.1),
+      NOT the Kotlin package. Resource XML gets no ${applicationId}
+      placeholder, so keep this in step with app/build.gradle.kts.
+      targetClass is the Kotlin class name, which stays .lite.
+    -->
     <shortcut
         android:shortcutId="connect"
         android:enabled="true"
@@ -8,7 +14,7 @@
         android:shortcutLongLabel="@string/shortcut_connect">
         <intent
             android:action="android.intent.action.VIEW"
-            android:targetPackage="com.amyrmo.damavand.lite"
+            android:targetPackage="com.amyrmo.damavand"
             android:targetClass="com.amyrmo.damavand.lite.MainActivity">
             <extra android:name="lite_action" android:value="connect" />
         </intent>
@@ -21,7 +27,7 @@
         android:shortcutLongLabel="@string/shortcut_disconnect">
         <intent
             android:action="android.intent.action.VIEW"
-            android:targetPackage="com.amyrmo.damavand.lite"
+            android:targetPackage="com.amyrmo.damavand"
             android:targetClass="com.amyrmo.damavand.lite.MainActivity">
             <extra android:name="lite_action" android:value="disconnect" />
         </intent>
