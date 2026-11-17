@@ -1163,40 +1163,70 @@ class LiteVpnService : VpnService() {
         startPoller()
     }
 
+    /**
+     * 3.2.25: one attempt at connect time is not enough on Aether —
+     * the core's SOCKS answers a greeting before its exit carries
+     * traffic, so the first fetch can fail while the tunnel is still
+     * settling (which is why the pill stayed "Unknown location / No
+     * IP yet" and no flag showed even though the flag asset exists).
+     * Retry with backoff until the location is known or the tunnel
+     * ends; Refresh re-runs the same loop, and its first attempt
+     * always runs even when a location is already known.
+     */
     private fun fetchLocation() {
         Thread({
-            try {
-                val apiUrl = try {
-                    kotlinx.coroutines.runBlocking {
-                        SettingsStore(applicationContext).ipApiUrlNow()
+            val delays = listOf(0L, 5_000L, 15_000L, 30_000L)
+            for ((index, delay) in delays.withIndex()) {
+                if (index > 0) {
+                    if (location.isNotBlank() && ip.isNotBlank()) return@Thread
+                    try {
+                        Thread.sleep(delay)
+                    } catch (_: InterruptedException) {
+                        return@Thread
                     }
-                } catch (_: Exception) {
-                    "https://ipinfo.io/json"
                 }
-                val proxy = Proxy(Proxy.Type.SOCKS, InetSocketAddress("127.0.0.1", activeSocksPort))
-                val conn = URL(apiUrl).openConnection(proxy) as HttpURLConnection
-                conn.connectTimeout = 8000
-                conn.readTimeout = 8000
-                val body = conn.inputStream.bufferedReader().readText()
-                conn.disconnect()
-                val j = JSONObject(body)
-                val country = j.optString("country")
-                val city = j.optString("city")
-                // 3.2.21: the exit IP + ISP ride in the same payload
-                // (ipinfo: "ip" / "org"; ipwho.is: "ip" /
-                // connection.org). Any endpoint without them just
-                // leaves the pill's rows blank.
-                ip = j.optString("ip")
-                isp = j.optString("org").ifBlank {
-                    j.optJSONObject("connection")?.optString("org") ?: ""
-                }
-                countryCode = country
-                location = listOf(city, country).filter { it.isNotBlank() }
-                    .joinToString(if (LiteFormat.persianDigits) "، " else ", ")
-                broadcastStatus()
-            } catch (_: Exception) {
+                if (!running || !connected) return@Thread
+                if (tryFetchLocation()) return@Thread
             }
+            AppLog.w("LiteVpnService", "location: still unknown after ${delays.size} attempts")
         }, "lite-loc").also { it.start() }
+    }
+
+    /** One location attempt through the tunnel's SOCKS proxy; true when it answered. */
+    private fun tryFetchLocation(): Boolean {
+        try {
+            val apiUrl = try {
+                kotlinx.coroutines.runBlocking {
+                    SettingsStore(applicationContext).ipApiUrlNow()
+                }
+            } catch (_: Exception) {
+                "https://ipinfo.io/json"
+            }
+            val proxy = Proxy(Proxy.Type.SOCKS, InetSocketAddress("127.0.0.1", activeSocksPort))
+            val conn = URL(apiUrl).openConnection(proxy) as HttpURLConnection
+            conn.connectTimeout = 8000
+            conn.readTimeout = 8000
+            val body = conn.inputStream.bufferedReader().readText()
+            conn.disconnect()
+            val j = JSONObject(body)
+            val country = j.optString("country")
+            val city = j.optString("city")
+            // 3.2.21: the exit IP + ISP ride in the same payload
+            // (ipinfo: "ip" / "org"; ipwho.is: "ip" /
+            // connection.org). Any endpoint without them just
+            // leaves the pill's rows blank.
+            ip = j.optString("ip")
+            isp = j.optString("org").ifBlank {
+                j.optJSONObject("connection")?.optString("org") ?: ""
+            }
+            countryCode = country
+            location = listOf(city, country).filter { it.isNotBlank() }
+                .joinToString(if (LiteFormat.persianDigits) "، " else ", ")
+            broadcastStatus()
+            return true
+        } catch (_: Exception) {
+            return false
+        }
     }
 
     /**
