@@ -1280,10 +1280,18 @@ class LiteVpnService : VpnService() {
         val ip = fields["ip"].orEmpty()
         val code = fields["loc"].orEmpty().uppercase()
         if (ip.isBlank() || code.length != 2) return null
-        return ExitGeo(ip = ip, country = code, countryCode = code, city = fields["colo"].orEmpty(), isp = "")
+        // colo is the Cloudflare data centre that answered (an IATA
+        // code such as FRA), not the exit's city: leave the city empty
+        // and let mergeIsp fill the city and country name.
+        return ExitGeo(ip = ip, country = code, countryCode = code, city = "", isp = "")
     }
 
-    /** A trace answer carries no ISP (Oblivion GeoService._lookupIsp): take the first ISP provider that has one. */
+    /**
+     * A trace answer carries no ISP (Oblivion GeoService._lookupIsp), and
+     * no city or country name: take the first ISP provider that has an
+     * ISP; when it sees the same exit country, its city and country name
+     * too. The trace's IP and country code stay authoritative.
+     */
     private fun mergeIsp(trace: ExitGeo): ExitGeo {
         for (url in ISP_PROVIDERS) {
             val geo = try {
@@ -1291,7 +1299,13 @@ class LiteVpnService : VpnService() {
             } catch (_: Exception) {
                 null
             } ?: continue
-            if (geo.isp.isNotBlank()) return trace.copy(isp = geo.isp)
+            if (geo.isp.isBlank()) continue
+            val sameCountry = geo.countryCode.equals(trace.countryCode, ignoreCase = true)
+            return trace.copy(
+                isp = geo.isp,
+                city = if (sameCountry) geo.city else trace.city,
+                country = if (sameCountry) geo.country.ifBlank { trace.country } else trace.country,
+            )
         }
         return trace
     }
