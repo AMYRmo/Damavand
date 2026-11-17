@@ -58,7 +58,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
+import java.util.Locale
 import androidx.compose.ui.res.stringArrayResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
@@ -239,7 +241,7 @@ private fun AetherConfigEditor(
     var psiphonCdnIps by remember { mutableStateOf(initial.psiphonCdnIps.orEmpty()) }
     var psiphonCdnSni by remember { mutableStateOf(initial.psiphonCdnSni.orEmpty()) }
     var cdnSets by remember { mutableStateOf(AetherPsiphonCdnSet.parse(initial.psiphonCdnSets)) }
-    var psiphonRegion by remember { mutableStateOf(initial.psiphonRegion.orEmpty()) }
+    var psiphonRegion by remember { mutableStateOf(initial.psiphonRegion.orEmpty().trim().uppercase(Locale.ROOT)) }
     var psiphonBundledList by remember { mutableStateOf(initial.psiphonBundledList ?: true) }
     var tor by remember { mutableStateOf(initial.tor.orEmpty()) }
     var torBridges by remember { mutableStateOf(initial.torBridges.orEmpty()) }
@@ -270,6 +272,21 @@ private fun AetherConfigEditor(
     val isPsiphonAvailable = remember { AetherEngine.isPsiphonSupported(context) }
     val isTorTransportsAvailable = remember { AetherEngine.isTorTransportsSupported(context) }
     val exitNames = profiles.filter { !it.isAether }.map { it.name }
+
+    // 3.2.25 (PattNG AetherRegionField): the Exit country list —
+    // regions the bundled Psiphon list offers plus what the core
+    // last reported, each shown as its localized name with its code,
+    // sorted by name; the profile's own region stays an option even
+    // before the list loads, and "Any country" means no region.
+    val psiphonRegions by vm.psiphonRegions.collectAsState()
+    LaunchedEffect(Unit) { vm.loadPsiphonRegions() }
+    val regionLocale = LocalConfiguration.current.locales[0]
+    fun regionName(code: String): String =
+        runCatching { Locale.Builder().setRegion(code).build().getDisplayCountry(regionLocale) }.getOrNull()?.takeIf { it.isNotBlank() } ?: code
+    val regionCurrent = psiphonRegion.trim().uppercase(Locale.ROOT)
+    val regionCodes = (psiphonRegions + listOfNotNull(regionCurrent.takeIf { it.isNotEmpty() })).distinct().sortedBy { regionName(it) }
+    val regionItems = listOf(stringResource(R.string.aether_psiphon_region_any) to "") +
+        regionCodes.map { code -> "${regionName(code)} ($code)" to code }
 
     /** The settings as they stand, for the command line below and for saving. */
     val edited = initial.copy(
@@ -566,8 +583,7 @@ private fun AetherConfigEditor(
                         AetherDropdownField(
                             labelRes = R.string.aether_psiphon_region,
                             value = psiphonRegion,
-                            items = emptyList(),
-                            editable = true,
+                            items = regionItems,
                             onSelect = { psiphonRegion = it },
                         )
                         AetherSwitchRow(
