@@ -523,6 +523,9 @@
     <string name="stats_usage_title">مصرف هر سرور</string>
     <string name="stats_usage_empty">هنوز مصرفی ثبت نشده است</string>
     <string name="stats_usage_total">مجموع: %1$s</string>
+    <string name="stats_today">امروز</string>
+    <string name="stats_week">این هفته</string>
+    <string name="stats_month">این ماه</string>
 
     <!-- 3.2.2 — connection details + notification (were hardcoded Persian) -->
     <string name="conn_error_generic">خطا: %1$s</string>
