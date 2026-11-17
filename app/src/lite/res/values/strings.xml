@@ -526,6 +526,10 @@
     <string name="stats_today">امروز</string>
     <string name="stats_week">این هفته</string>
     <string name="stats_month">این ماه</string>
+    <string name="stats_reset_usage">ریست مصرف</string>
+    <string name="stats_reset_title">مصرف ریست بشه؟</string>
+    <string name="stats_reset_body">همه‌ی مصرف‌های ثبت‌شده برای همه‌ی سرورها پاک می‌شه و شمارش از صفر شروع می‌شه.</string>
+    <string name="stats_reset_confirm">ریست کن</string>
 
     <!-- 3.2.2 — connection details + notification (were hardcoded Persian) -->
     <string name="conn_error_generic">خطا: %1$s</string>
