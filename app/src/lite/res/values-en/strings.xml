@@ -524,6 +524,9 @@
     <string name="stats_usage_title">Usage per server</string>
     <string name="stats_usage_empty">No usage recorded yet</string>
     <string name="stats_usage_total">Total: %1$s</string>
+    <string name="stats_today">Today</string>
+    <string name="stats_week">This week</string>
+    <string name="stats_month">This month</string>
 
     <!-- 3.2.2 — connection details + notification (were hardcoded Persian) -->
     <string name="conn_error_generic">Error: %1$s</string>
