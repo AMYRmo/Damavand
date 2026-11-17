@@ -177,6 +177,9 @@ private fun fieldsFromParsed(p: XrayConfig.Parsed, name: String): Map<String, St
             f["password"] = p.id
             f["sni"] = p.sni
             f["insecure"] = p.hyInsecure
+            // 1.0.2: salamander obfs password — without it, editing
+            // an imported obfs link would silently drop it on save.
+            f["obfsPassword"] = p.obfsPassword
             // 3.2.9: ECH + pinning ride on Hysteria2 too (PattNG).
             f["ech"] = p.echConfigList
             f["echOutbound"] = p.echOutbound
@@ -456,6 +459,14 @@ private fun ManualConfigEditor(
                                 options = listOf("0", "1"),
                                 selected = f("insecure").ifEmpty { "0" },
                                 onSelect = { setF("insecure", it) }
+                            )
+                            // 1.0.2: salamander obfs password (PattNG
+                            // Hysteria2Fmt writes obfs=salamander +
+                            // obfs-password when it is set).
+                            ManualField(
+                                labelRes = R.string.manual_obfs_password,
+                                value = f("obfsPassword"),
+                                onValueChange = { setF("obfsPassword", it) }
                             )
                             // 3.2.9 (PattNG): ECH + pinning ride on
                             // Hysteria2 too (its blank security is TLS).
@@ -1000,6 +1011,11 @@ private fun buildManualLink(proto: String, f: Map<String, String>): String? {
             "hysteria2://${enc(pass)}@$addr:$port" + query(
                 "sni" to f["sni"].orEmpty(),
                 "insecure" to f["insecure"].orEmpty(),
+                // 1.0.2 (PattNG Hysteria2Fmt): obfs=salamander is
+                // written only when an obfs password is set; query()
+                // drops the empty pairs either way.
+                "obfs" to if (f["obfsPassword"].orEmpty().isEmpty()) "" else "salamander",
+                "obfs-password" to f["obfsPassword"].orEmpty(),
                 // 3.2.9 (PattNG): ECH + pinning ride on Hysteria2 too.
                 "ech" to f["ech"].orEmpty(),
                 "echOutbound" to f["echOutbound"].orEmpty(),
