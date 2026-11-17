@@ -1028,17 +1028,30 @@ class LiteVpnService : VpnService() {
                 }
                 // Local DNS off: the tun uses the system DNS.
                 if (localDns) dnsServers.filter { withIpv6 || !it.contains(":") }.forEach { addDnsServer(it) }
-                // The app itself (Xray core) must bypass the tunnel.
-                runCatching { addDisallowedApplication(packageName) }
                 // Per-app proxy (3.1.0, PattNG): bypass mode excludes
                 // the listed apps; allow-only mode includes only them.
-                when (perApp.mode) {
-                    "allow_only" -> {
-                        perApp.packages.forEach { pkg ->
-                            runCatching { addAllowedApplication(pkg) }
-                        }
-                    }
-                    else -> {
+                // The app itself (Xray, the Aether core) must bypass the
+                // tunnel in both. fix/aether-connect: VpnService.Builder
+                // refuses to mix the two lists (addAllowedApplication
+                // throws UnsupportedOperationException once
+                // addDisallowedApplication was called), so the old
+                // unconditional addDisallowedApplication(packageName)
+                // made every addAllowedApplication fail silently and
+                // allow-only tunnelled every app. In allow-only mode the
+                // app stays out by never being allowed; when no listed
+                // app could be allowed (none installed), the app is
+                // disallowed instead, or an allow list left empty would
+                // route its own traffic back into the tunnel.
+                val allowedAny = if (perApp.mode == "allow_only") {
+                    perApp.packages.filter { it != packageName }.count { pkg ->
+                        runCatching { addAllowedApplication(pkg) }.isSuccess
+                    } > 0
+                } else {
+                    false
+                }
+                if (!allowedAny) {
+                    runCatching { addDisallowedApplication(packageName) }
+                    if (perApp.mode != "allow_only") {
                         perApp.packages.forEach { pkg ->
                             runCatching { addDisallowedApplication(pkg) }
                         }
