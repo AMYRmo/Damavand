@@ -10,7 +10,7 @@ android {
     compileSdk = 36
 
     defaultConfig {
-        applicationId = "com.amyrmo.damavand.lite"
+        applicationId = "com.amyrmo.damavand"
         minSdk = 26
         targetSdk = 34
         versionCode = (project.property("damavand.versionCode") as String).toInt()
