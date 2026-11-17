@@ -337,8 +337,20 @@ class LiteViewModel(app: Application) : AndroidViewModel(app) {
     private val _perAppPackages = MutableStateFlow<Set<String>>(emptySet())
     val perAppPackages: StateFlow<Set<String>> = _perAppPackages.asStateFlow()
 
-    private val _usage = MutableStateFlow<Map<String, Long>>(emptyMap())
-    val usage: StateFlow<Map<String, Long>> = _usage.asStateFlow()
+    /** Stats range (3.2.29): Today / This week / This month. `days` is the
+     * rolling window size — Today is 1 day, Week is the last 7 days,
+     * Month is the last 30 days. Nothing older than 30 days is stored. */
+    enum class StatsRange(val days: Int) { TODAY(1), WEEK(7), MONTH(30) }
+
+    private val _usageDays = MutableStateFlow<Map<String, Map<String, Long>>>(emptyMap())
+    val usageDays: StateFlow<Map<String, Map<String, Long>>> = _usageDays.asStateFlow()
+
+    private val _statsRange = MutableStateFlow(StatsRange.TODAY)
+    val statsRange: StateFlow<StatsRange> = _statsRange.asStateFlow()
+
+    fun selectStatsRange(range: StatsRange) {
+        _statsRange.value = range
+    }
 
     fun refreshRouting() {
         _routingRules.value = routingStore.loadRouting().rules
@@ -349,7 +361,7 @@ class LiteViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     fun refreshUsage() {
-        _usage.value = routingStore.loadUsage()
+        _usageDays.value = routingStore.loadUsageDays()
     }
 
     // ---- logs (3.1.0, PattNG) ----
