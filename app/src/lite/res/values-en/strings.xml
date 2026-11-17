@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="app_name">Damavand Lite</string>
+    <string name="app_name">Damavand</string>
 
     <!-- Header -->
 
@@ -142,7 +142,7 @@
     <string name="about_core">Core</string>
     <string name="about_repo">Repository</string>
     <string name="about_repo_value">AMYRmo/Damavand — lite branch</string>
-    <string name="about_copy">Damavand Lite — the light version of Damavand. Built for fast, low-usage connections.</string>
+    <string name="about_copy">Damavand — built for fast, low-usage connections.</string>
 
     <!-- Subscription import -->
     <string name="sub_import_title">Add subscription</string>
@@ -152,7 +152,7 @@
     <string name="sub_import_cancel">Cancel</string>
     <string name="sub_import_failed_network">Fetching the subscription failed — check the internet, or try again when connected to open internet</string>
     <string name="sub_import_failed_empty">No usable config was found in this subscription</string>
-    <string name="sub_import_failed_unsupported">%1$d configs with unsupported protocols were skipped — Lite currently supports VLESS, VMess, Trojan and Shadowsocks</string>
+    <string name="sub_import_failed_unsupported">%1$d configs with unsupported protocols were skipped — Damavand currently supports VLESS, VMess, Trojan and Shadowsocks</string>
     <string name="sub_import_failed_single">This is not a valid config link — it must be VLESS, VMess, Trojan, Shadowsocks or Aether</string>
 
     <!-- Misc -->
@@ -352,7 +352,7 @@
     <string name="auto_card_title">Auto · %1$s</string>
     <string name="auto_card_desc">Fastest of %1$s servers. If one fails, connections move on in a moment.</string>
     <string name="auto_info_title">Automatic server selection</string>
-    <string name="auto_info_body">Lite always picks the fastest server of this subscription and moves to the next one in a moment if it drops. Tap the checkmark to turn automatic selection off.</string>
+    <string name="auto_info_body">Damavand always picks the fastest server of this subscription and moves to the next one in a moment if it drops. Tap the checkmark to turn automatic selection off.</string>
     <!-- 3.2.8 (Auto, Damavand) -->
     <string name="config_active">Active</string>
     <string name="auto_card_idle">Auto · %1$s servers</string>
