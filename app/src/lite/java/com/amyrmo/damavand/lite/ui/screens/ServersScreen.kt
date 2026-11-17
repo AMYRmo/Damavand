@@ -84,7 +84,6 @@ import com.amyrmo.damavand.lite.ui.components.CheckVector
 import com.amyrmo.damavand.lite.ui.components.CircleIconButton
 import com.amyrmo.damavand.lite.ui.components.CopyLineIcon
 import com.amyrmo.damavand.lite.ui.components.EditLineIcon
-import com.amyrmo.damavand.lite.ui.components.FlagBadge
 import com.amyrmo.damavand.lite.ui.components.MountainContourLine
 import com.amyrmo.damavand.lite.ui.components.RefreshLineIcon
 import com.amyrmo.damavand.lite.ui.components.ShareLineIcon
@@ -1835,8 +1834,6 @@ private fun ServerRow(
                 }
             }
         }
-        Spacer(Modifier.width(12.dp))
-        FlagBadge(countryCode = profile.countryCode.ifBlank { null }, size = 44.dp)
         Spacer(Modifier.width(12.dp))
         Column(modifier = Modifier.weight(1f)) {
             Text(
