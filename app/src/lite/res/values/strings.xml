@@ -309,6 +309,7 @@
     <string name="manual_path">مسیر (Path)</string>
     <string name="manual_host">هاست (Host)</string>
     <string name="manual_insecure">رد کردن گواهی (Insecure)</string>
+    <string name="manual_obfs_password">رمز عبور Obfs</string>
     <string name="manual_private_key">کلید خصوصی</string>
     <string name="manual_public_key">کلید عمومی همتا</string>
     <string name="manual_allowed_ips">Allowed IPs</string>
