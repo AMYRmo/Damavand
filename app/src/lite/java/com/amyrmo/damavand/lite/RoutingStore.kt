@@ -145,4 +145,12 @@ class RoutingStore(private val context: Context) {
         } catch (_: Exception) {
         }
     }
+
+    /** 3.2.30: wipe ALL recorded usage (the Stats reset button). */
+    fun clearUsage() {
+        try {
+            if (usageFile.exists()) usageFile.delete()
+        } catch (_: Exception) {
+        }
+    }
 }
