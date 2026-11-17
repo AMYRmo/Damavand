@@ -37,12 +37,16 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.amyrmo.damavand.lite.Chain
+import com.amyrmo.damavand.lite.Profile
 import com.amyrmo.damavand.lite.R
 import com.amyrmo.damavand.lite.ui.ConnectionUiState
+import com.amyrmo.damavand.lite.ui.components.ChainLineIcon
 import com.amyrmo.damavand.lite.ui.components.ChevronDownIcon
 import com.amyrmo.damavand.lite.ui.components.FlagBadge
 import com.amyrmo.damavand.lite.ui.components.RefreshVector
 import com.amyrmo.damavand.lite.ui.theme.LiteColors
+import com.amyrmo.damavand.lite.ui.theme.LiteFormat
 import com.amyrmo.damavand.lite.ui.theme.Vazirmatn
 
 /**
@@ -52,12 +56,20 @@ import com.amyrmo.damavand.lite.ui.theme.Vazirmatn
  * with the details (IPv4 / ISP / location) + a refresh under a
  * chevron. Same shape as Damavand's (22dp card, 24dp flag, two
  * lines, ping on the right), in Lite's own colors.
+ * 3.2.27 (Amir: "یه کارتش کن"): the pill IS the one home card
+ * while connected — it also carries the connected profile's
+ * identity (name + engine tag, or chain name + members), and the
+ * standalone ServerCard is hidden while connected, so Home no
+ * longer shows two cards repeating the same ping.
  */
 @Composable
 fun ConnectionInfoPill(
     connection: ConnectionUiState,
     onRefresh: () -> Unit,
     modifier: Modifier = Modifier,
+    profile: Profile? = null,
+    chain: Chain? = null,
+    chainMembers: List<Profile> = emptyList(),
 ) {
     var expanded by remember { mutableStateOf(false) }
     val chevronRotation by animateFloatAsState(
@@ -110,6 +122,66 @@ fun ConnectionInfoPill(
                     contentAlignment = Alignment.Center,
                 ) {
                     ChevronDownIcon(16.dp, LiteColors.textSecondary)
+                }
+            }
+        }
+        // 3.2.27: the connected profile's identity, on the same card
+        // (ServerCard's middle column, minus its own flag and ping
+        // chip — the pill already shows the live flag and ping).
+        if (profile != null) {
+            Spacer(Modifier.size(8.dp))
+            HorizontalDivider(color = LiteColors.hairline)
+            Spacer(Modifier.size(8.dp))
+            if (chain != null) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    ChainLineIcon(size = 22.dp, color = LiteColors.text)
+                    Spacer(Modifier.width(12.dp))
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = chain.name,
+                            fontSize = 14.5.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = LiteColors.text,
+                            fontFamily = Vazirmatn,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                        Spacer(Modifier.height(4.dp))
+                        val members = buildString {
+                            append(stringResource(R.string.chain_members, LiteFormat.toPersian(chainMembers.size.toString())))
+                            append(" — ")
+                            append(chainMembers.joinToString(" ← ") { it.name })
+                        }
+                        Text(
+                            text = members,
+                            fontSize = 12.sp,
+                            color = LiteColors.textSecondary,
+                            fontFamily = Vazirmatn,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                    }
+                }
+            } else {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = profile.name,
+                        fontSize = 14.5.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = LiteColors.text,
+                        fontFamily = Vazirmatn,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.weight(1f, fill = false)
+                    )
+                    Spacer(Modifier.width(8.dp))
+                    CoreTag(core = profile.core)
                 }
             }
         }
