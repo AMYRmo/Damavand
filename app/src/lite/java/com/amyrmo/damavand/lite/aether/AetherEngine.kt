@@ -481,6 +481,10 @@ object AetherEngine {
             process.inputStream.bufferedReader().forEachLine { line ->
                 val text = line.trim()
                 if (text.isNotEmpty()) AppLog.i(TAG, "[aether] $text")
+                // 3.2.25 (PattNG AetherCoreManager.relay): Psiphon's
+                // report of the countries it can leave from is kept
+                // for the editor's Exit country list.
+                PsiphonServerList.regionsOf(text)?.let { PsiphonServerList.remember(target.context, it) }
                 if (!target.wordSeen && isReadyWord(line)) target.wordSeen = true
                 if (isNoEchKeyWord(line)) target.noEchKey = true
                 // A core the app stopped, or one a new start replaced, is no longer the session's to end.
