@@ -115,7 +115,7 @@ class LiteTileService : TileService() {
                     }
                     Intent(this, LiteVpnService::class.java).apply {
                         action = LiteVpnService.ACTION_START
-                        val candidates = profiles.filter { !it.isAether && it.lastPingMs > 0 }
+                        val candidates = profiles.filter { !it.isAether && !it.isPsiphon && it.lastPingMs > 0 }
                             .sortedBy { it.lastPingMs }.take(5).map { it.link }
                         if (candidates.isNotEmpty()) {
                             putStringArrayListExtra(
@@ -125,6 +125,7 @@ class LiteTileService : TileService() {
                             profiles.firstOrNull()?.let {
                                 putExtra(LiteVpnService.EXTRA_LINK, it.link)
                                 if (it.isAether) putExtra(LiteVpnService.EXTRA_AETHER, true)
+                                if (it.isPsiphon) putExtra(LiteVpnService.EXTRA_PSIPHON, true)
                             } ?: run { openApp(); return }
                         }
                         putExtra(LiteVpnService.EXTRA_TEST_URL, testUrl)
