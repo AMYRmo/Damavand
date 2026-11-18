@@ -2,6 +2,7 @@ package com.amyrmo.damavand.lite.psiphon
 
 import android.util.Base64
 import java.io.File
+import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 import kotlinx.serialization.json.putJsonArray
@@ -87,10 +88,10 @@ object PsiphonConfig {
             put("InproxyTunnelProtocolPreferProbability", 0.0)
             put("InproxyTunnelProtocolSelectionProbability", 0.0)
             putJsonArray("LimitTunnelProtocols") {
-                for (protocol in PROTOCOLS) add(protocol)
+                for (protocol in PROTOCOLS) add(JsonPrimitive(protocol))
             }
             putJsonArray("DNSResolverAlternateServers") {
-                for (resolver in DNS_RESOLVERS) add(resolver)
+                for (resolver in DNS_RESOLVERS) add(JsonPrimitive(resolver))
             }
             if (code != null) put("EgressRegion", code)
         }.toString()
