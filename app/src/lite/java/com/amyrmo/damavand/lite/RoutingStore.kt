@@ -121,10 +121,15 @@ class RoutingStore(private val context: Context) {
                 json.decodeFromString(text)
             } catch (_: Exception) {
                 // Old flat format (3.2.28 and earlier): profileId -> all-time
-                // bytes. Migrate once into today's bucket.
+                // bytes. Migrate once into today's bucket — and SAVE it
+                // (1.0.1.2, #74): the old code returned the migration
+                // in memory only, so every load re-dated the all-time
+                // totals to THAT day.
                 val flat: Map<String, Long> = json.decodeFromString(text)
                 if (flat.isEmpty()) return emptyMap()
-                mapOf(todayKey() to flat)
+                val migrated = mapOf(todayKey() to flat)
+                saveUsageDays(migrated)
+                migrated
             }
             val pruned = pruneDays(days)
             if (pruned.size != days.size) saveUsageDays(pruned)
