@@ -26,6 +26,17 @@ import java.net.URL
  */
 object HttpFetch {
 
+    /**
+     * What a fetch ended as (1.0.1.2, #111): a non-2xx HTTP answer
+     * (404/403 for a dead sub URL) is NOT a network failure, and the
+     * caller needs to tell the user which one it was.
+     */
+    sealed interface Outcome {
+        data class Ok(val connection: HttpURLConnection) : Outcome
+        data class HttpError(val status: Int) : Outcome
+        data object Failed : Outcome
+    }
+
     fun openConnection(
         context: Context,
         url: String,
@@ -33,18 +44,33 @@ object HttpFetch {
         readTimeoutMs: Int,
         userAgent: String,
     ): HttpURLConnection? {
+        return when (val outcome = openConnectionDetailed(context, url, connectTimeoutMs, readTimeoutMs, userAgent)) {
+            is Outcome.Ok -> outcome.connection
+            else -> null
+        }
+    }
+
+    fun openConnectionDetailed(
+        context: Context,
+        url: String,
+        connectTimeoutMs: Int,
+        readTimeoutMs: Int,
+        userAgent: String,
+    ): Outcome {
+        var lastStatus: Int? = null
         // Attempt 1: the default route (through the VPN when it is on).
         try {
             val conn = (URL(url).openConnection() as HttpURLConnection).apply {
                 configure(connectTimeoutMs, readTimeoutMs, userAgent)
             }
-            if (conn.responseCode in 200..299) return conn
+            if (conn.responseCode in 200..299) return Outcome.Ok(conn)
+            lastStatus = conn.responseCode
             conn.disconnect()
         } catch (_: Exception) {
         }
         // Attempt 2: each non-VPN network, bypassing the tunnel.
         val cm = context.getSystemService(Context.CONNECTIVITY_SERVICE) as? ConnectivityManager
-            ?: return null
+            ?: return lastStatus?.let { Outcome.HttpError(it) } ?: Outcome.Failed
         for (network in cm.allNetworks) {
             val caps = runCatching { cm.getNetworkCapabilities(network) }.getOrNull() ?: continue
             if (!caps.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)) continue
@@ -53,12 +79,13 @@ object HttpFetch {
                 val conn = (network.openConnection(URL(url)) as HttpURLConnection).apply {
                     configure(connectTimeoutMs, readTimeoutMs, userAgent)
                 }
-                if (conn.responseCode in 200..299) return conn
+                if (conn.responseCode in 200..299) return Outcome.Ok(conn)
+                lastStatus = conn.responseCode
                 conn.disconnect()
             } catch (_: Exception) {
             }
         }
-        return null
+        return lastStatus?.let { Outcome.HttpError(it) } ?: Outcome.Failed
     }
 
     private fun HttpURLConnection.configure(
