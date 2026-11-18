@@ -271,7 +271,7 @@ private fun AetherConfigEditor(
     val freedom = exitNode.isBlank()
     val isPsiphonAvailable = remember { AetherEngine.isPsiphonSupported(context) }
     val isTorTransportsAvailable = remember { AetherEngine.isTorTransportsSupported(context) }
-    val exitNames = profiles.filter { !it.isAether }.map { it.name }
+    val exitNames = profiles.filter { !it.isAether && !it.isPsiphon }.map { it.name }
 
     // 3.2.25 (PattNG AetherRegionField): the Exit country list —
     // regions the bundled Psiphon list offers plus what the core
@@ -958,7 +958,7 @@ private fun AetherKeysDialog(vm: LiteViewModel, profiles: List<Profile>, onDismi
                 )
                 AetherPickerRow(
                     labelRes = R.string.aether_exit_node,
-                    options = profiles.filter { !it.isAether }.map { it.name },
+                    options = profiles.filter { !it.isAether && !it.isPsiphon }.map { it.name },
                     selected = settings.exitNode,
                     noneLabel = stringResource(R.string.aether_exit_node_freedom),
                     supportingText = if (settings.exitNode.isNotBlank()) stringResource(R.string.aether_hint_exit_node) else null,
