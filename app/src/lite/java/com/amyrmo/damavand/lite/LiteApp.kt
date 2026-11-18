@@ -50,7 +50,7 @@ class LiteApp : Application() {
         // digits stayed Persian even in the English UI. Initialise it
         // from the persisted language here, at process start.
         runCatching {
-            val stored = kotlinx.coroutines.runBlocking { SettingsStore(this).languageNow() }
+            val stored = kotlinx.coroutines.runBlocking { SettingsStore(this@LiteApp).languageNow() }
             com.amyrmo.damavand.lite.ui.theme.LiteFormat.persianDigits =
                 LocaleHelper.resolveLanguage(stored) == "fa"
         }
