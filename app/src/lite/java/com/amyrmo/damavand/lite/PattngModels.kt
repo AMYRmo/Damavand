@@ -47,10 +47,13 @@ data class Subscription(
  * [Subscription].
  */
 data class SubUserInfo(
-    val upload: Long = 0,
-    val download: Long = 0,
-    val total: Long = 0,
-    val expire: Long = 0,
+    // 1.0.1.2 (#89): the numbers are nullable — absent means "not
+    // reported", not zero. A panel sending a partial header (only
+    // expire=…, say) must not zero the stored usage figures.
+    val upload: Long? = null,
+    val download: Long? = null,
+    val total: Long? = null,
+    val expire: Long? = null,
     val websiteUrl: String = "",
     val supportUrl: String = "",
     // 3.2.27 (ZedSecure): the panel's `profile-title` header,
