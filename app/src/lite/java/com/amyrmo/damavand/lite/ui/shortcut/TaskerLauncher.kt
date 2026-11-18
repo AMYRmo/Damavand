@@ -3,6 +3,7 @@ package com.amyrmo.damavand.lite.ui.shortcut
 import android.content.Context
 import android.content.Intent
 import android.net.VpnService
+import com.amyrmo.damavand.lite.AppLog
 import com.amyrmo.damavand.lite.LiteVpnService
 import com.amyrmo.damavand.lite.MainActivity
 import com.amyrmo.damavand.lite.ProfileRepository
@@ -53,8 +54,22 @@ object TaskerLauncher {
             return false
         }
         val profiles = repo.loadProfiles()
-        val intent: Intent = if (guid != null && guid != TASKER_DEFAULT_GUID) {
-            val profile = profiles.firstOrNull { it.id == guid } ?: return false
+        // 1.0.1.2 (#105): a task naming a profile that was deleted used
+        // to do nothing at all. Fall back to the selected profile
+        // (the Default path) and log why — the automation keeps
+        // working instead of silently failing.
+        val named = if (guid != null && guid != TASKER_DEFAULT_GUID) {
+            profiles.firstOrNull { it.id == guid }.also {
+                if (it == null) AppLog.w(
+                    "TaskerLauncher",
+                    "Tasker profile $guid is gone; using the selected profile",
+                )
+            }
+        } else {
+            null
+        }
+        val intent: Intent = if (named != null) {
+            val profile = named
             Intent(context, LiteVpnService::class.java).apply {
                 action = LiteVpnService.ACTION_START
                 putExtra(LiteVpnService.EXTRA_LINK, profile.link)
