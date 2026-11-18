@@ -8,7 +8,7 @@
         android:shortcutLongLabel="@string/shortcut_connect">
         <intent
             android:action="android.intent.action.VIEW"
-            android:targetPackage="com.amyrmo.damavand.lite"
+            android:targetPackage="com.amyrmo.damavand"
             android:targetClass="com.amyrmo.damavand.lite.MainActivity">
             <extra android:name="lite_action" android:value="connect" />
         </intent>
@@ -21,7 +21,7 @@
         android:shortcutLongLabel="@string/shortcut_disconnect">
         <intent
             android:action="android.intent.action.VIEW"
-            android:targetPackage="com.amyrmo.damavand.lite"
+            android:targetPackage="com.amyrmo.damavand"
             android:targetClass="com.amyrmo.damavand.lite.MainActivity">
             <extra android:name="lite_action" android:value="disconnect" />
         </intent>
