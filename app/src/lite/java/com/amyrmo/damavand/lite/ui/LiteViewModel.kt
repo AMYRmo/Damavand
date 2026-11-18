@@ -94,6 +94,10 @@ data class ConnectionUiState(
  * Month is the last 30 days. Nothing older than 30 days is stored. */
 enum class StatsRange(val days: Int) { TODAY(1), WEEK(7), MONTH(30) }
 
+/** A subscription error shown under its card: a string plus an
+ *  optional number (the HTTP status, 1.0.1.2 #111). */
+data class SubError(val resId: Int, val arg: Int? = null)
+
 class LiteViewModel(app: Application) : AndroidViewModel(app) {
 
     private val context: Context get() = getApplication<Application>().applicationContext
@@ -261,6 +265,13 @@ class LiteViewModel(app: Application) : AndroidViewModel(app) {
 
     fun loadPsiphonRegions() {
         viewModelScope.launch(Dispatchers.IO) {
+            // 1.0.1.2 (#66): the regions come from the filesDir copy
+            // of the bundled Psiphon list, which used to exist only
+            // after a connect (ensurePsiphonList runs in isReady) — a
+            // fresh install saw only "Any country". Make the copy now
+            // so the editor shows the bundled list's regions before
+            // the first connect.
+            geo.ensurePsiphonList()
             _psiphonRegions.value = PsiphonServerList.psiphonRegions(context)
         }
     }
@@ -1289,6 +1300,8 @@ class LiteViewModel(app: Application) : AndroidViewModel(app) {
                     is ProfileRepository.FetchResult.Ok -> SubImportState.Added
                     ProfileRepository.FetchResult.NetworkError ->
                         SubImportState.Failed(R.string.sub_import_failed_network)
+                    is ProfileRepository.FetchResult.HttpError ->
+                        SubImportState.Failed(R.string.sub_import_failed_http, result.status)
                     is ProfileRepository.FetchResult.NoUsableLinks ->
                         if (result.skippedUnsupported > 0) {
                             SubImportState.Failed(
@@ -1552,7 +1565,8 @@ class LiteViewModel(app: Application) : AndroidViewModel(app) {
     /** Re-fetch every auto-update subscription from the network. */
     fun refreshAllSubscriptions() {
         viewModelScope.launch(Dispatchers.IO) {
-            repo.refreshAll()
+            val result = repo.refreshAllDetailed()
+            result.perSub.forEach { (url, fetch) -> recordSubResult(url, fetch) }
             withContext(Dispatchers.Main) {
                 refreshProfiles()
                 refreshSubscriptions()
@@ -1568,11 +1582,31 @@ class LiteViewModel(app: Application) : AndroidViewModel(app) {
     private val _updatingSubs = MutableStateFlow<Set<String>>(emptySet())
     val updatingSubs: StateFlow<Set<String>> = _updatingSubs.asStateFlow()
 
+    // 1.0.1.2 (#98): the last refresh failure per subscription URL
+    // (string resource id) — the card shows it until the next
+    // successful refresh. A failed refresh used to be completely
+    // silent: the spinner stopped and nothing had changed.
+    private val _subErrors = MutableStateFlow<Map<String, SubError>>(emptyMap())
+    val subErrors: StateFlow<Map<String, SubError>> = _subErrors.asStateFlow()
+
+    private fun recordSubResult(url: String, result: ProfileRepository.FetchResult) {
+        val err = when (result) {
+            is ProfileRepository.FetchResult.Ok -> null
+            ProfileRepository.FetchResult.NetworkError -> SubError(R.string.sub_import_failed_network)
+            is ProfileRepository.FetchResult.HttpError -> SubError(R.string.sub_import_failed_http, result.status)
+            is ProfileRepository.FetchResult.NoUsableLinks -> SubError(R.string.sub_import_failed_empty)
+            ProfileRepository.FetchResult.SingleLinkInvalid -> SubError(R.string.sub_import_failed_single)
+        }
+        _subErrors.update { cur ->
+            if (err == null) cur - url else cur + (url to err)
+        }
+    }
+
     fun updateSubscription(url: String) {
         viewModelScope.launch(Dispatchers.IO) {
             _updatingSubs.update { it + url }
             try {
-                repo.refreshOne(url)
+                recordSubResult(url, repo.refreshOne(url))
             } finally {
                 _updatingSubs.update { it - url }
             }
@@ -1791,26 +1825,29 @@ class LiteViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
-    /** Launchable apps, sorted by label, for the per-app picker. */
+    /**
+     * Every installed app, sorted by label, for the per-app picker.
+     * 1.0.1.2 (#103): PattNG lists every installed package
+     * (AppManagerUtil.getInstalledPackages) — the old launcher-only
+     * query hid apps with no launcher icon (browsers' helpers, VPN
+     * apps, work-profile apps) that the user may still want to route.
+     * One row per package, sorted by label.
+     */
     fun installedApps(): List<Pair<String, String>> {
         return try {
             val pm = context.packageManager
-            val launchIntent = Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_LAUNCHER)
-            val resolve = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-                pm.queryIntentActivities(launchIntent, PackageManager.ResolveInfoFlags.of(0))
+            val apps = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                pm.getInstalledApplications(PackageManager.ApplicationInfoFlags.of(0))
             } else {
                 @Suppress("DEPRECATION")
-                pm.queryIntentActivities(launchIntent, 0)
+                pm.getInstalledApplications(0)
             }
-            resolve.mapNotNull { info ->
-                val pkg = info.activityInfo.packageName
+            apps.mapNotNull { info ->
+                val pkg = info.packageName
                 if (pkg == context.packageName) return@mapNotNull null
-                val label = info.loadLabel(pm)?.toString() ?: pkg
+                val label = info.loadLabel(pm)?.toString()?.ifBlank { pkg } ?: pkg
                 label to pkg
             }
-                // One row per package: queryIntentActivities returns one
-                // entry per launcher ACTIVITY (Phone + Contacts, OEM
-                // suites), and the picker's LazyColumn keys on the package.
                 .distinctBy { it.second }
                 .sortedBy { it.first.lowercase() }
         } catch (_: Exception) {
@@ -1898,6 +1935,12 @@ class LiteViewModel(app: Application) : AndroidViewModel(app) {
                     refreshSubscriptions()
                     refreshRouting()
                     refreshPerApp()
+                    // 1.0.1.2 (#88): the imported usage and selection
+                    // are new data — refresh the Stats tab and re-read
+                    // the restored selected id, or Stats keeps showing
+                    // pre-import usage until restart.
+                    refreshUsage()
+                    runCatching { _selectedId.value = settings.selectedProfileIdNow() }
                 }
                 onResult(ok)
             }
