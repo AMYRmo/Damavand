@@ -290,15 +290,17 @@ class MainActivity : ComponentActivity() {
         }
         // One auto-connect attempt on launch (spec §7.1) — unless a
         // shortcut/widget action already decided what to do (3.2.0).
-        // Only on a fresh start: a recreation (language change, dark
-        // mode, font scale, multi-window, process death) must not
-        // reconnect a VPN the user turned off, nor replay the intent.
-        if (savedInstanceState == null) {
-            when (consumeLiteAction(intent)) {
-                "connect" -> requestConnect()
-                "disconnect" -> vm.disconnect()
-                else -> runCatching { vm.autoConnectOnce() }
-            }
+        // No savedInstanceState guard (issue #84): after process death
+        // Android restores the saved state, so a fresh widget/tile/
+        // shortcut tap that just created the process would be dropped
+        // with no connect, no toast, no error. The guard is unnecessary
+        // — consumeLiteAction removes the extra, so a config-change
+        // recreation cannot replay it, and autoConnectOnce() is
+        // once-guarded in the ViewModel (which outlives recreations).
+        when (consumeLiteAction(intent)) {
+            "connect" -> requestConnect()
+            "disconnect" -> vm.disconnect()
+            else -> runCatching { vm.autoConnectOnce() }
         }
     }
 
@@ -391,12 +393,19 @@ private fun LiteRoot(
 
     // Android 13+: POST_NOTIFICATIONS is a runtime permission. Without
     // it the connection notification (live speed, Disconnect) never
-    // shows. Ask once per screen session, when a connection starts.
+    // shows. Ask once, when a connection starts — and persist that it
+    // was asked (1.0.1.2, #108): the flag used to live only in
+    // rememberSaveable, so every fresh process asked again.
     val notifContext = androidx.compose.ui.platform.LocalContext.current
     val notifPermissionLauncher = androidx.activity.compose.rememberLauncherForActivityResult(
         ActivityResultContracts.RequestPermission()
     ) { }
-    var notifAsked by androidx.compose.runtime.saveable.rememberSaveable { mutableStateOf(false) }
+    val notifPrefs = notifContext.getSharedPreferences(
+        "lite_tile", android.content.Context.MODE_PRIVATE
+    )
+    var notifAsked by androidx.compose.runtime.saveable.rememberSaveable {
+        mutableStateOf(notifPrefs.getBoolean("notif_asked", false))
+    }
     LaunchedEffect(connection.state) {
         if (connection.state == ConnState.CONNECTING && !notifAsked &&
             Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
@@ -405,6 +414,7 @@ private fun LiteRoot(
             ) != android.content.pm.PackageManager.PERMISSION_GRANTED
         ) {
             notifAsked = true
+            notifPrefs.edit().putBoolean("notif_asked", true).apply()
             notifPermissionLauncher.launch(android.Manifest.permission.POST_NOTIFICATIONS)
         }
     }
