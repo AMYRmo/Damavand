@@ -43,8 +43,14 @@ class LiteWidgetProvider : AppWidgetProvider() {
     ) {
         val views = RemoteViews(context.packageName, R.layout.lite_widget)
         val state = status?.getStringExtra("state")
-        val connected = state == LiteVpnService.STATE_CONNECTED
-        val connecting = state == LiteVpnService.STATE_CONNECTING
+        // 1.0.1.2 (#104): onUpdate arrives with no status (e.g. the
+        // widget was just added while the VPN is connected) — fall back
+        // to the persisted tile state instead of showing "Disconnected".
+        val tile = context.getSharedPreferences("lite_tile", Context.MODE_PRIVATE)
+        val connected = state == LiteVpnService.STATE_CONNECTED ||
+            (state == null && tile.getBoolean("connected", false))
+        val connecting = state == LiteVpnService.STATE_CONNECTING ||
+            (state == null && tile.getBoolean("connecting", false))
         views.setTextViewText(
             R.id.widget_status,
             when {
