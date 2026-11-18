@@ -36,6 +36,7 @@ object StartIntent {
         var autoSelect = false
         var autoId: String? = null
         var aether = false
+        var psiphon = false
         var displayName: String? = null
         when {
             selectedId.startsWith("chain:") -> {
@@ -53,7 +54,7 @@ object StartIntent {
                     return null
                 }
                 val members = profilesForGroup(profiles, groupKey)
-                    .filter { !it.isAether && it.proto != "custom" }
+                    .filter { !it.isAether && !it.isPsiphon && it.proto != "custom" }
                 if (members.isEmpty()) return null
                 if (members.size == 1) {
                     links = listOf(members[0].link)
@@ -71,6 +72,7 @@ object StartIntent {
                 val profile = profiles.firstOrNull { it.id == selectedId } ?: return null
                 links = listOf(profile.link)
                 aether = profile.isAether
+                psiphon = profile.isPsiphon
             }
         }
         return Intent(context, LiteVpnService::class.java).apply {
@@ -87,6 +89,7 @@ object StartIntent {
                 autoId?.let { putExtra(LiteVpnService.EXTRA_AUTO_ID, it) }
             }
             if (aether) putExtra(LiteVpnService.EXTRA_AETHER, true)
+            if (psiphon) putExtra(LiteVpnService.EXTRA_PSIPHON, true)
             displayName?.let { putExtra(LiteVpnService.EXTRA_NAME, it) }
         }
     }
