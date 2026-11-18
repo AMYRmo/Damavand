@@ -668,6 +668,7 @@
     <string name="conn_tunnel_bridge_failed">شروع پل تونل ناموفق بود</string>
     <string name="conn_dropped_reconnecting">اتصال قطع شد — در حال اتصال دوباره…</string>
     <string name="notif_connecting">در حال اتصال…</string>
+    <string name="notif_connected">متصل</string>
     <string name="notif_totals">دانلود: %1$s · آپلود: %2$s</string>
     <string name="log_connecting_selected">وصل به سرور انتخاب‌شده…</string>
     <string name="geo_file_corrupt">فایل دانلودشده خراب است — دوباره تلاش کنید</string>
