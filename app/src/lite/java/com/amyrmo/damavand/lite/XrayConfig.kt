@@ -514,30 +514,32 @@ object XrayConfig {
                         put("Host", p.host.ifEmpty { p.sni.ifEmpty { p.addr } })
                     }
                 }
-                "xhttp" -> putJsonObject("xhttpSettings") {
-                    put("path", p.path.ifEmpty { "/" })
-                    put("host", p.host.ifEmpty { p.sni.ifEmpty { p.addr } })
-                    // 1.0.1.2 (#109): the link's mode (e.g. packet-up)
-                    // and extra, like PattNG — the old code hardcoded
-                    // "auto" and dropped extra.
-                    put("mode", p.xhttpMode.ifEmpty { "auto" })
-                    if (p.xhttpExtra.isNotEmpty()) put("extra", p.xhttpExtra)
-                }
-                // 3.2.16 (#52): httpupgrade + splithttp links imported
-                // but lost path/host (the core fell back to "/" and the
-                // address). Both settings keys exist in the pinned core
-                // (StreamConfig.httpupgradeSettings / splithttpSettings).
+                // 3.2.16 (#52): httpupgrade links imported but lost
+                // path/host (the core fell back to "/" and the
+                // address).
                 "httpupgrade" -> putJsonObject("httpupgradeSettings") {
                     put("path", p.path.ifEmpty { "/" })
                     put("host", p.host.ifEmpty { p.sni.ifEmpty { p.addr } })
                 }
-                "splithttp" -> putJsonObject("splithttpSettings") {
+                // 1.0.1.3: ZedSecure XrayJsonBuilder.streamSettingsBase
+                // verbatim — ONE branch for "xhttp" + "splithttp", the
+                // settings key is always "xhttpSettings", mode defaults
+                // to "auto", and extra is parsed into a JSON OBJECT and
+                // emitted only when it parses (PattNG does the same via
+                // JsonUtil.parseString). 1.0.1.2 had two separate
+                // branches (splithttpSettings is not a real settings
+                // key) and emitted extra as a raw STRING — the fork's
+                // loader unmarshals "extra" into conf.SplitHTTPConfig,
+                // so the string killed the WHOLE core config and Auto
+                // died on proxy@14.
+                "xhttp", "splithttp" -> putJsonObject("xhttpSettings") {
                     put("path", p.path.ifEmpty { "/" })
                     put("host", p.host.ifEmpty { p.sni.ifEmpty { p.addr } })
-                    // 1.0.1.2 (#109): same as xhttp — the link's mode
-                    // and extra, not a hardcoded "auto".
                     put("mode", p.xhttpMode.ifEmpty { "auto" })
-                    if (p.xhttpExtra.isNotEmpty()) put("extra", p.xhttpExtra)
+                    p.xhttpExtra.takeIf { it.isNotBlank() }?.let { raw ->
+                        (runCatching { Json.parseToJsonElement(raw) }.getOrNull() as? JsonObject)
+                            ?.let { put("extra", it) }
+                    }
                 }
                 "grpc" -> putJsonObject("grpcSettings") {
                     put("serviceName", p.serviceName)
