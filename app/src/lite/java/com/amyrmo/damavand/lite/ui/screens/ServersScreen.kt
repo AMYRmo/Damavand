@@ -342,7 +342,7 @@ fun ServersScreen(
         // takes one item between the card row and the rows.
         // 1.0.1.5: except when the group has no usable Auto member —
         // then the card is hidden (see the Auto card above).
-        val autoShown = if (group.profiles.any { !it.isAether && it.proto != "custom" }) 1 else 0
+        val autoShown = if (group.profiles.any { !it.isAether && !it.isPsiphon && it.proto != "custom" }) 1 else 0
         val target = 2 + banner + chains.size + 1 + autoShown + rowPos
         scope.launch {
             kotlinx.coroutines.delay(150)
@@ -792,9 +792,10 @@ fun ServersScreen(
                 // member — an Aether profile or a custom config has no
                 // single outbound, so Auto over a group of only those
                 // (the built-in Psiphon group) would just error.
+                // 1.0.1.6 (Psiphon): a Psiphon profile is no outbound either.
                 val autoGroup = selectedGroup
                 if (autoGroup != null && autoId != null &&
-                    autoGroup.profiles.any { !it.isAether && it.proto != "custom" }) {
+                    autoGroup.profiles.any { !it.isAether && !it.isPsiphon && it.proto != "custom" }) {
                     item(key = "auto-card") {
                         AutoSelectCard(
                             groupLabel = vm.groupLabel(autoGroup.key),
@@ -1122,7 +1123,12 @@ fun ServersScreen(
     if (editing != null) {
         // 3.2.10 (Aether): an Aether profile edits its settings,
         // not a link — the link is just its stable id.
-        if (editing.isAether) {
+        // 1.0.1.6 (Psiphon): a Psiphon profile has no editor — its
+        // country is the profile (the menu hides Edit for it, so this
+        // is only a guard).
+        if (editing.isPsiphon) {
+            // No dialog.
+        } else if (editing.isAether) {
             AetherEditDialog(
                 profile = editing,
                 vm = vm,
@@ -1924,12 +1930,15 @@ private fun ServerRow(
             }
         }
         // Ping chip (3.1.0, PattNG): a colored value chip; tap to re-test.
-        Spacer(Modifier.width(8.dp))
-        PingChip(
-            profile = profile,
-            isTesting = isTesting,
-            onPing = onPing
-        )
+        // 1.0.1.6 (Psiphon): a Psiphon profile has no ping — no chip.
+        if (!profile.isPsiphon) {
+            Spacer(Modifier.width(8.dp))
+            PingChip(
+                profile = profile,
+                isTesting = isTesting,
+                onPing = onPing
+            )
+        }
         // One ⋮ menu per row (3.1.0): edit / duplicate / share /
         // test / move / delete — no standalone trash or refresh icon.
         Spacer(Modifier.width(8.dp))
@@ -2007,11 +2016,17 @@ private fun ProfileMenu(
         },
         text = {
             Column {
-                MenuRow(icon = { EditLineIcon(size = 18.dp, color = LiteColors.text) }, labelRes = R.string.server_menu_edit, onClick = onEdit)
+                // 1.0.1.6 (Psiphon): a Psiphon profile has nothing to
+                // edit (its country IS the profile) and nothing to test.
+                if (!profile.isPsiphon) {
+                    MenuRow(icon = { EditLineIcon(size = 18.dp, color = LiteColors.text) }, labelRes = R.string.server_menu_edit, onClick = onEdit)
+                }
                 MenuRow(icon = { CopyLineIcon(size = 18.dp, color = LiteColors.text) }, labelRes = R.string.server_menu_duplicate, onClick = onDuplicate)
                 MenuRow(icon = { ShareLineIcon(size = 18.dp, color = LiteColors.text) }, labelRes = R.string.server_menu_share, onClick = onShare)
                 MenuRow(icon = { ShareLineIcon(size = 18.dp, color = LiteColors.text) }, labelRes = R.string.server_menu_share_full, onClick = onShareFull)
-                MenuRow(icon = { RefreshLineIcon(size = 18.dp, color = LiteColors.text) }, labelRes = R.string.server_menu_test, onClick = onTest)
+                if (!profile.isPsiphon) {
+                    MenuRow(icon = { RefreshLineIcon(size = 18.dp, color = LiteColors.text) }, labelRes = R.string.server_menu_test, onClick = onTest)
+                }
                 MenuRow(icon = { ChainLineIcon(size = 18.dp, color = LiteColors.text) }, labelRes = R.string.server_menu_move, onClick = onMove)
                 MenuRow(icon = { TrashLineIcon(size = 18.dp, color = LiteColors.error) }, labelRes = R.string.server_menu_delete, danger = true, onClick = onDelete)
             }
