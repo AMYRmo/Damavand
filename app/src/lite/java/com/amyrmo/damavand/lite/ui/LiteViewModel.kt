@@ -31,6 +31,7 @@ import com.amyrmo.damavand.lite.aether.AetherKeysSettings
 import com.amyrmo.damavand.lite.aether.AetherSettings
 import com.amyrmo.damavand.lite.aether.PsiphonServerList
 import com.amyrmo.damavand.lite.BackupManager
+import com.amyrmo.damavand.lite.BuiltInPsiphon
 import com.amyrmo.damavand.lite.GeoDownloader
 import com.amyrmo.damavand.lite.LiteVpnService
 import com.amyrmo.damavand.lite.LocaleHelper
@@ -584,6 +585,17 @@ class LiteViewModel(app: Application) : AndroidViewModel(app) {
         viewModelScope.launch {
             runCatching {
                 if (settings.subAutoUpdateNow()) scheduleSubRefresh()
+            }
+        }
+        // 1.0.1.5 (BuiltInPsiphon): the built-in "Psiphon" group — one
+        // Psiphon-only profile per country — seeds on IO so the launch
+        // never waits on the bundled list unpack; the lists refresh
+        // after it so a fresh install shows the group at once.
+        viewModelScope.launch(Dispatchers.IO) {
+            runCatching { BuiltInPsiphon.ensure(context, repo, geo) }
+            withContext(Dispatchers.Main) {
+                refreshProfiles()
+                refreshSubscriptions()
             }
         }
         // Ask the service for its current state (in case it is already running).
@@ -1294,6 +1306,19 @@ class LiteViewModel(app: Application) : AndroidViewModel(app) {
         if (_subImport.value == SubImportState.Adding) return
         _subImport.value = SubImportState.Adding
         viewModelScope.launch(Dispatchers.IO) {
+            // 1.0.1.5 (BuiltInPsiphon): a shared built-in Psiphon
+            // link is not a fetchable address — it seeds the group
+            // locally, so a friend who receives the shared Psiphon
+            // subscription gets the whole group on import.
+            if (BuiltInPsiphon.isBuiltIn(url.trim())) {
+                runCatching { BuiltInPsiphon.ensure(context, repo, geo) }
+                withContext(Dispatchers.Main) {
+                    _subImport.value = SubImportState.Added
+                    refreshProfiles()
+                    refreshSubscriptions()
+                }
+                return@launch
+            }
             val result = repo.addSubscription(url)
             withContext(Dispatchers.Main) {
                 _subImport.value = when (result) {
@@ -1666,6 +1691,8 @@ class LiteViewModel(app: Application) : AndroidViewModel(app) {
 
     /** Delete a subscription and every profile that came from it. */
     fun deleteSubscription(url: String) {
+        // 1.0.1.5: the built-in Psiphon group cannot be deleted.
+        if (BuiltInPsiphon.isBuiltIn(url)) return
         val isActive = _connection.value.state == ConnState.CONNECTED ||
             _connection.value.state == ConnState.CONNECTING
         val selected = _selectedId.value
