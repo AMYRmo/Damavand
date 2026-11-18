@@ -227,7 +227,9 @@ class ProfileRepository(private val context: Context) {
     private fun markDeleted(link: String) {
         try {
             val ids = loadDeletedLinkIds().toMutableSet()
-            ids.add(Profile.idFor(link))
+            // The fragment-free id (issue #91): a panel rename must
+            // not resurrect this server on the next refresh.
+            ids.add(Profile.idForStable(link))
             atomicWrite(deletedLinksFile, json.encodeToString(ids.toList()))
         } catch (_: Exception) {
         }
@@ -237,12 +239,21 @@ class ProfileRepository(private val context: Context) {
     private fun unmarkDeleted(link: String) {
         try {
             val ids = loadDeletedLinkIds().toMutableSet()
-            if (ids.remove(Profile.idFor(link))) {
+            val changed = ids.remove(Profile.idFor(link)) || ids.remove(Profile.idForStable(link))
+            if (changed) {
                 atomicWrite(deletedLinksFile, json.encodeToString(ids.toList()))
             }
         } catch (_: Exception) {
         }
     }
+
+    /**
+     * True when the link is on the deleted-links blocklist — by its
+     * full-link id (entries written before 1.0.1.2) or its
+     * fragment-free id (issue #91).
+     */
+    private fun isDeletedLink(blocked: Set<String>, link: String): Boolean =
+        Profile.idFor(link) in blocked || Profile.idForStable(link) in blocked
 
     // ---- chains (3.0.0, PattNG PROXYCHAIN) ----
 
@@ -316,6 +327,10 @@ class ProfileRepository(private val context: Context) {
         ) : FetchResult
         /** Nothing could be downloaded from any candidate URL. */
         data object NetworkError : FetchResult
+        /** The server answered, but with an HTTP error (404/403 for a
+         *  dead subscription URL) — not a network failure (1.0.1.2,
+         *  #111). */
+        data class HttpError(val status: Int) : FetchResult
         /** A body downloaded, but it held no usable link at all. */
         data class NoUsableLinks(val skippedUnsupported: Int) : FetchResult
         /** A pasted config link (not a subscription URL) that Lite cannot parse. */
@@ -393,12 +408,29 @@ class ProfileRepository(private val context: Context) {
             is FetchResult.Ok -> {
                 synchronized(fileLock) {
                     val existing = loadProfiles()
-                    val existingLinks = existing.map { it.link }.toHashSet()
                     val blocked = loadDeletedLinkIds()
-                    val fresh = fetched.profiles.filter {
-                        it.link !in existingLinks && it.id !in blocked
+                    val fresh = fetched.profiles.filter { !isDeletedLink(blocked, it.link) }
+                    // 1.0.1.2 (#90): REPLACE this subscription's
+                    // profiles instead of appending — servers removed
+                    // or renamed on the panel used to linger forever,
+                    // and a renamed server duplicated (old link + new
+                    // link side by side). Other subscriptions stay.
+                    // A surviving link keeps its last ping result.
+                    val kept = existing.filter { it.subscriptionUrl != url }
+                    val pingByLink = existing.associate { it.link to it.lastPingMs }
+                    val freshWithPing = fresh.map { p ->
+                        val ping = pingByLink[p.link]
+                        if (ping != null && ping >= 0) p.copy(lastPingMs = ping) else p
                     }
-                    saveProfiles(existing + fresh)
+                    saveProfiles(kept + freshWithPing)
+                    // Prune chains whose members vanished with the
+                    // removed servers (same rule as deleteSubscription).
+                    val alive = (kept + freshWithPing).map { it.id }.toSet()
+                    val pruned = loadChains().mapNotNull { chain ->
+                        val members = chain.memberIds.filter { it in alive }
+                        if (members.size < 2) null else chain.copy(memberIds = members)
+                    }
+                    saveChains(pruned)
                     val info = fetched.userInfo
                     saveSubscriptions(loadSubscriptions().map {
                         if (it.url == url) it.copy(
@@ -465,19 +497,29 @@ class ProfileRepository(private val context: Context) {
      * underneath it — so a subscription loads whether the VPN is on or
      * off, even when one of the two paths is broken (2.0.2). Also
      * returns the parsed `subscription-userinfo` header when the
-     * panel sends one (3.2.0, subscription card).
+     * panel sends one (3.2.0, subscription card). The third element is
+     * the HTTP status when the server answered with an error (1.0.1.2,
+     * #111) — null on transport failure or success.
      */
-    private fun fetchBody(url: String): Pair<String?, SubUserInfo?> {
-        val conn = HttpFetch.openConnection(context, url, 15_000, 30_000, "DamavandLite/2.0.2")
-            ?: return null to null
+    private fun fetchBody(url: String): Triple<String?, SubUserInfo?, Int?> {
+        val outcome = HttpFetch.openConnectionDetailed(context, url, 15_000, 30_000, "DamavandLite/2.0.2")
+        if (outcome is HttpFetch.Outcome.HttpError) return Triple(null, null, outcome.status)
+        val conn = (outcome as? HttpFetch.Outcome.Ok)?.connection
+            ?: return Triple(null, null, null)
         return try {
             val userInfo = parseUserInfo(conn.getHeaderField("subscription-userinfo"))
             // 3.2.27 (ZedSecure SubscriptionHeaders): `profile-title`
             // is its own header, not part of subscription-userinfo.
             val title = decodeProfileTitle(conn.getHeaderField("profile-title"))
-            conn.inputStream.bufferedReader().readText() to userInfo?.copy(title = title)
+            // 1.0.1.2 (#76): the title used to ride only on a
+            // userInfo — with no subscription-userinfo header the
+            // panel's profile-title was dropped entirely. Attach it
+            // even when userInfo is null.
+            val info = userInfo?.copy(title = title)
+                ?: title.takeIf { it.isNotBlank() }?.let { SubUserInfo(title = it) }
+            Triple(conn.inputStream.bufferedReader().readText(), info, null)
         } catch (_: Exception) {
-            null to null
+            Triple(null, null, null)
         } finally {
             conn.disconnect()
         }
@@ -513,10 +555,10 @@ class ProfileRepository(private val context: Context) {
      *  plus `profile-web-page-url=…` / `support-url=…` (3.2.1). */
     private fun parseUserInfo(header: String?): SubUserInfo? {
         if (header.isNullOrBlank()) return null
-        var upload = 0L
-        var download = 0L
-        var total = 0L
-        var expire = 0L
+        var upload: Long? = null
+        var download: Long? = null
+        var total: Long? = null
+        var expire: Long? = null
         var websiteUrl = ""
         var supportUrl = ""
         for (part in header.split(';')) {
@@ -551,16 +593,28 @@ class ProfileRepository(private val context: Context) {
         val candidates = listOfNotNull(normalized, jsDelivrMirror(normalized)).distinct()
         var anyBody = false
         var skipped = 0
+        var lastHttpStatus: Int? = null
         for (candidate in candidates) {
-            val (body, userInfo) = fetchBody(candidate)
+            val (body, userInfo, httpStatus) = fetchBody(candidate)
+            if (httpStatus != null) lastHttpStatus = httpStatus
             if (body == null) continue
             anyBody = true
             val text = decodeSubscriptionBody(body)
             val (profiles, skippedHere) = parseLinks(text, url)
-            skipped = maxOf(skipped, skippedHere)
+            // 1.0.1.2 (#112): the count belongs to THIS candidate's
+            // body — maxOf() across the primary + the jsDelivr mirror
+            // reported a failed candidate's count on a successful
+            // fetch (e.g. an error page's 5 "unsupported" links).
+            skipped = skippedHere
             if (profiles.isNotEmpty()) return FetchResult.Ok(profiles, skipped, userInfo)
         }
-        return if (anyBody) FetchResult.NoUsableLinks(skipped) else FetchResult.NetworkError
+        return if (anyBody) {
+            FetchResult.NoUsableLinks(skipped)
+        } else if (lastHttpStatus != null) {
+            FetchResult.HttpError(lastHttpStatus)
+        } else {
+            FetchResult.NetworkError
+        }
     }
 
     private fun decodeSubscriptionBody(body: String): String {
@@ -690,7 +744,7 @@ class ProfileRepository(private val context: Context) {
                     val existingLinks = existing.map { it.link }.toHashSet()
                     val blocked = loadDeletedLinkIds()
                     val fresh = fetched.profiles.filter {
-                        it.link !in existingLinks && it.id !in blocked
+                        it.link !in existingLinks && !isDeletedLink(blocked, it.link)
                     }
                     saveProfiles(existing + fresh)
                     val subs = loadSubscriptions()
@@ -715,12 +769,16 @@ class ProfileRepository(private val context: Context) {
                         saveSubscriptions(subs.map {
                             if (it.url == trimmed) it.copy(
                                 lastUpdated = System.currentTimeMillis(),
-                                upload = info.upload,
-                                download = info.download,
-                                total = info.total,
-                                expire = info.expire,
+                                upload = info.upload ?: it.upload,
+                                download = info.download ?: it.download,
+                                total = info.total ?: it.total,
+                                expire = info.expire ?: it.expire,
                                 websiteUrl = info.websiteUrl.ifBlank { it.websiteUrl },
                                 supportUrl = info.supportUrl.ifBlank { it.supportUrl },
+                                // 1.0.1.2 (#76): re-adding an existing
+                                // subscription kept every userinfo field
+                                // except the title.
+                                title = info.title.ifBlank { it.title },
                             ) else it
                         })
                     }
@@ -731,8 +789,19 @@ class ProfileRepository(private val context: Context) {
         }
     }
 
+    /** Per-subscription results of a [refreshAll] run. */
+    data class RefreshAllResult(
+        /** Profiles newly added across all subscriptions. */
+        val added: Int,
+        /** The fetch result per subscription URL. */
+        val perSub: Map<String, FetchResult>,
+    )
+
     /** Re-fetch every stored subscription (that has auto-update on) and merge (dedupe by link). */
-    fun refreshAll(): Int {
+    fun refreshAll(): Int = refreshAllDetailed().added
+
+    /** [refreshAll], also reporting each subscription's fetch result (issue #98). */
+    fun refreshAllDetailed(): RefreshAllResult {
         // Fetch everything first (network, OUTSIDE the lock), then
         // merge once under the lock (3.1.1).
         val subs = loadSubscriptions()
@@ -742,18 +811,29 @@ class ProfileRepository(private val context: Context) {
             val existing = loadProfiles()
             val existingLinks = existing.map { it.link }.toHashSet()
             val blocked = loadDeletedLinkIds()
+            val pingByLink = existing.associate { it.link to it.lastPingMs }
             val merged = existing.toMutableList()
-            for ((_, result) in fetched) {
+            for ((sub, result) in fetched) {
                 if (result !is FetchResult.Ok) continue
+                // 1.0.1.2 (#90): REPLACE this subscription's profiles
+                // instead of appending — removed/renamed servers on
+                // the panel used to linger and duplicate.
+                merged.removeAll { it.subscriptionUrl == sub.url }
                 for (p in result.profiles) {
-                    if (p.link !in existingLinks && p.id !in blocked) {
-                        merged.add(p)
-                        existingLinks.add(p.link)
-                        added++
-                    }
+                    if (isDeletedLink(blocked, p.link)) continue
+                    if (p.link !in existingLinks) added++
+                    val ping = pingByLink[p.link]
+                    merged.add(if (ping != null && ping >= 0) p.copy(lastPingMs = ping) else p)
                 }
             }
-            if (added > 0) saveProfiles(merged)
+            if (merged.size != existing.size || added > 0) saveProfiles(merged)
+            // Prune chains whose members vanished with removed servers.
+            val alive = merged.map { it.id }.toSet()
+            val pruned = loadChains().mapNotNull { chain ->
+                val members = chain.memberIds.filter { it in alive }
+                if (members.size < 2) null else chain.copy(memberIds = members)
+            }
+            saveChains(pruned)
             // Re-read under the lock: a subscription added, renamed or
             // deleted while the fetches ran must not be undone by writing
             // back the stale list read before them.
@@ -762,20 +842,32 @@ class ProfileRepository(private val context: Context) {
                 val infoByUrl = fetched.mapNotNull { (sub, result) ->
                     (result as? FetchResult.Ok)?.userInfo?.let { sub.url to it }
                 }.toMap()
+                // 1.0.1.2 (#97): only subscriptions whose fetch actually
+                // succeeded get a new "last updated" stamp — failed
+                // ones and auto-update-off ones kept being stamped
+                // before, which hid that they had never refreshed.
+                val okUrls = fetched.filter { it.second is FetchResult.Ok }.map { it.first.url }.toSet()
                 saveSubscriptions(currentSubs.map { sub ->
-                    val info = infoByUrl[sub.url]
-                    sub.copy(
-                        lastUpdated = System.currentTimeMillis(),
-                        upload = info?.upload ?: sub.upload,
-                        download = info?.download ?: sub.download,
-                        total = info?.total ?: sub.total,
-                        expire = info?.expire ?: sub.expire,
-                        websiteUrl = info?.websiteUrl?.ifBlank { sub.websiteUrl } ?: sub.websiteUrl,
-                        supportUrl = info?.supportUrl?.ifBlank { sub.supportUrl } ?: sub.supportUrl,
-                    )
+                    if (sub.url !in okUrls) sub
+                    else {
+                        val info = infoByUrl[sub.url]
+                        sub.copy(
+                            lastUpdated = System.currentTimeMillis(),
+                            upload = info?.upload ?: sub.upload,
+                            download = info?.download ?: sub.download,
+                            total = info?.total ?: sub.total,
+                            expire = info?.expire ?: sub.expire,
+                            websiteUrl = info?.websiteUrl?.ifBlank { sub.websiteUrl } ?: sub.websiteUrl,
+                            supportUrl = info?.supportUrl?.ifBlank { sub.supportUrl } ?: sub.supportUrl,
+                            // 1.0.1.2 (#76): the background merge copied
+                            // every userinfo field except the title — a
+                            // refresh silently dropped it.
+                            title = info?.title?.ifBlank { sub.title } ?: sub.title,
+                        )
+                    }
                 })
             }
-            return added
+            return RefreshAllResult(added, fetched.associate { it.first.url to it.second })
         }
     }
 }
