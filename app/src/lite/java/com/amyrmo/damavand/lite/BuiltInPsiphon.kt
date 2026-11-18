@@ -1,24 +1,26 @@
 package com.amyrmo.damavand.lite
 
 import android.content.Context
-import com.amyrmo.damavand.lite.aether.AetherPsiphon
-import com.amyrmo.damavand.lite.aether.AetherSettings
 import com.amyrmo.damavand.lite.aether.PsiphonServerList
 import java.io.File
 import java.util.Locale
 
 /**
- * The built-in "Psiphon" subscription (1.0.1.5): one Psiphon-only
- * Aether profile per exit country, so the user picks a country in the
- * Servers tab and connects — no server of their own, no manual
- * Aether profile to build first.
+ * The built-in "Psiphon" subscription (1.0.1.5, standalone core
+ * since 1.0.1.6): one Psiphon profile per exit country, so the user
+ * picks a country in the Servers tab and connects — no server of
+ * their own, no manual profile to build first.
  *
  * How it works: Psiphon needs no server address — the core dials
  * Psiphon's own public servers from the bundled list
- * (psiphon_servers.dat). A "Psiphon-only" Aether profile
- * ([AetherPsiphon.ONLY]) is exactly that: no WARP, the app dials
- * Psiphon itself, with `--psiphon-region <CC>` pinning the exit
- * country (or none for "Any country").
+ * (psiphon_servers.dat). A profile's [Profile.countryCode] pins the
+ * exit country (or none for "Any country"); the standalone core
+ * ([psiphon.PsiphonEngine]) reads it as `EgressRegion`.
+ *
+ * 1.0.1.5 seeded the same group as Psiphon-only Aether profiles;
+ * 1.0.1.6 moved it to the standalone core under the SAME ids, so
+ * [ProfileRepository.addBuiltInProfiles] replaces the old rows on
+ * upgrade instead of keeping them beside the new ones.
  *
  * The group is a plain [Subscription] whose URL is [URL]: a marker,
  * not an address — nothing is ever fetched from it. Its profiles
@@ -93,20 +95,15 @@ object BuiltInPsiphon {
     }
 
     private fun psiphonProfile(id: String, name: String, region: String?): Profile {
-        val settings = AetherSettings(
-            psiphon = AetherPsiphon.ONLY.type,
-            psiphonRegion = region,
-        )
         return Profile(
             id = id,
-            link = "aether://$id",
+            link = "psiphon://$id",
             name = name,
-            proto = "aether",
+            proto = "psiphon",
             address = "",
             port = 0,
             countryCode = region.orEmpty(),
-            core = "Aether",
-            aetherJson = AetherSettings.toJson(settings),
+            core = "Psiphon",
             subscriptionUrl = URL,
         )
     }
