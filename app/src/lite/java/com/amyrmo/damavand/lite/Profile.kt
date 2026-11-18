@@ -34,6 +34,17 @@ data class Profile(
         /** Stable id from the link itself (so re-imports dedupe). */
         fun idFor(link: String): String = link.hashCode().toUInt().toString(16)
 
+        /**
+         * Identity ignoring the #remark fragment (issue #91): the
+         * fragment is only the display name — a panel rename must not
+         * change the profile's identity in the deleted-links blocklist,
+         * or a deleted server is resurrected under its new name on the
+         * next refresh. Profile ids themselves stay fragment-sensitive:
+         * changing idFor would orphan every stored profile, chain and
+         * usage row.
+         */
+        fun idForStable(link: String): String = idFor(link.substringBefore('#'))
+
         /** A standalone Aether profile: a fresh uuid as its stable id and link. */
         fun aether(name: String, aetherJson: String): Profile {
             val id = java.util.UUID.randomUUID().toString()
