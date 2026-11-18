@@ -35,7 +35,6 @@ class GeoDownloader(private val context: Context) {
         data object Missing : State
         data class Downloading(val percent: Int) : State
         data class Ready(val version: String) : State
-        data class UpdateAvailable(val version: String, val newVersion: String) : State
         data class Error(val reason: String, val wasReady: Boolean) : State
     }
 
@@ -71,16 +70,69 @@ class GeoDownloader(private val context: Context) {
                 else -> return false
             }
             geoDir.mkdirs()
-            context.contentResolver.openInputStream(uri)?.use { input ->
-                target.outputStream().use { output -> input.copyTo(output) }
-            } ?: return false
-            if (target.length() == 0L) return false
+            val bytes = context.contentResolver.openInputStream(uri)?.use { it.readBytes() }
+                ?: return false
+            // Validate BEFORE replacing the good file (issue #96): a
+            // wrong file used to overwrite the working geo data and
+            // break every geo-routed connect until re-downloaded.
+            if (bytes.isEmpty() || !isValidProtobuf(bytes)) return false
+            target.writeBytes(bytes)
             writeMeta(Meta(version = "custom", downloadedAt = System.currentTimeMillis()))
             refreshState()
             true
         } catch (_: Exception) {
             false
         }
+    }
+
+    /**
+     * Minimal protobuf validity check (issue #96): walk the bytes as a
+     * sequence of fields (tag varint + wire type) and require the walk
+     * to end exactly at EOF. Both real geo files (GeoIPList /
+     * GeoSiteList) start with a length-delimited field 1 (0x0A); a
+     * text/HTML error page or a truncated download fails this.
+     */
+    private fun isValidProtobuf(bytes: ByteArray): Boolean {
+        if (bytes.size < 8 || bytes[0] != 0x0A.toByte()) return false
+        var pos = 0
+        while (pos < bytes.size) {
+            var tag = 0L
+            var shift = 0
+            while (true) {
+                if (pos >= bytes.size || shift >= 64) return false
+                val b = bytes[pos++].toInt() and 0xFF
+                tag = tag or ((b and 0x7F).toLong() shl shift)
+                if (b and 0x80 == 0) break
+                shift += 7
+            }
+            if (tag == 0L) return false
+            when ((tag and 0x7).toInt()) {
+                0 -> {
+                    while (true) {
+                        if (pos >= bytes.size) return false
+                        if (bytes[pos++].toInt() and 0x80 == 0) break
+                    }
+                }
+                1 -> pos += 8
+                2 -> {
+                    var len = 0L
+                    var s2 = 0
+                    while (true) {
+                        if (pos >= bytes.size || s2 >= 64) return false
+                        val b = bytes[pos++].toInt() and 0xFF
+                        len = len or ((b and 0x7F).toLong() shl s2)
+                        if (b and 0x80 == 0) break
+                        s2 += 7
+                    }
+                    if (len < 0 || len > bytes.size - pos) return false
+                    pos += len.toInt()
+                }
+                5 -> pos += 4
+                else -> return false
+            }
+            if (pos > bytes.size) return false
+        }
+        return pos == bytes.size
     }
 
     /**
@@ -98,6 +150,11 @@ class GeoDownloader(private val context: Context) {
             downloadFrom(url, tmp, null) {}
             when (kind) {
                 "geoip", "geosite" -> {
+                    // Validate BEFORE replacing the good file (issue
+                    // #96): the previous good file stays until the new
+                    // one proves to be a real geo file.
+                    val bytes = tmp.readBytes()
+                    if (bytes.isEmpty() || !isValidProtobuf(bytes)) return false
                     val target = if (kind == "geoip") geoipFile else geositeFile
                     geoDir.mkdirs()
                     tmp.copyTo(target, overwrite = true)
@@ -174,12 +231,16 @@ class GeoDownloader(private val context: Context) {
     private fun filesPresent(): Boolean = geoipFile.exists() && geositeFile.exists()
 
     private fun currentState(): State {
-        val meta = readMeta()
-        return if (geoipFile.exists() && geositeFile.exists() && meta != null) {
-            State.Ready(meta.version)
-        } else {
-            State.Missing
+        if (geoipFile.exists() && geositeFile.exists()) {
+            // 1.0.1.2 (#114): the FILES are what the core uses — a
+            // missing meta file (old files, a restored backup) used to
+            // report "Missing" while geo routing was live. Report Ready
+            // with an unknown version instead.
+            val version = readMeta()?.version
+                ?: context.getString(R.string.geo_version_unknown)
+            return State.Ready(version)
         }
+        return State.Missing
     }
 
     private fun readMeta(): Meta? {
@@ -279,10 +340,9 @@ class GeoDownloader(private val context: Context) {
 
     /**
      * Download one file, trying each (url, shaUrl) source in order.
-     * A source with a null shaUrl is a CDN mirror of the same release
-     * content (jsDelivr serves the GitHub release bytes unchanged), so
-     * no checksum is available there — verification runs only for the
-     * GitHub source. Throws when every source fails.
+     * Every built-in source pins a checksum (issue #95); a source
+     * whose checksum cannot be fetched fails instead of installing
+     * unverified bytes. Throws when every source fails.
      */
     private fun downloadOne(
         sources: List<Pair<String, String?>>,
@@ -327,8 +387,16 @@ class GeoDownloader(private val context: Context) {
             }
         }
         conn.disconnect()
-        // Verify checksum when the release publishes one.
+        // Verify the checksum. Every built-in source pins one (issue
+        // #95); when a checksum was expected but could not be fetched,
+        // the download fails instead of installing unverified bytes.
+        // A null shaUrl means a user-supplied URL with no checksum to
+        // check (custom asset URLs) — those are format-validated by
+        // the caller instead.
         val expected = fetchChecksum(shaUrl)
+        if (shaUrl != null && expected == null) {
+            throw java.io.IOException("checksum unavailable")
+        }
         if (expected != null) {
             val actual = digest.digest().joinToString("") { "%02x".format(it) }
             if (!actual.equals(expected, ignoreCase = true)) {
@@ -367,12 +435,17 @@ class GeoDownloader(private val context: Context) {
          *   (dlc.dat IS the geosite.dat file, renamed on save)
          */
         private val GEOIP_SOURCES = listOf(
-            "https://cdn.jsdelivr.net/gh/Loyalsoldier/v2ray-rules-dat@release/geoip.dat" to null,
+            // 1.0.1.2 (#95): jsDelivr publishes the .sha256sum files
+            // too (verified live) — the primary mirror is now verified
+            // like the GitHub source.
+            "https://cdn.jsdelivr.net/gh/Loyalsoldier/v2ray-rules-dat@release/geoip.dat" to
+                "https://cdn.jsdelivr.net/gh/Loyalsoldier/v2ray-rules-dat@release/geoip.dat.sha256sum",
             "https://github.com/v2fly/geoip/releases/latest/download/geoip.dat" to
                 "https://github.com/v2fly/geoip/releases/latest/download/geoip.dat.sha256sum",
         )
         private val GEOSITE_SOURCES = listOf(
-            "https://cdn.jsdelivr.net/gh/Loyalsoldier/v2ray-rules-dat@release/geosite.dat" to null,
+            "https://cdn.jsdelivr.net/gh/Loyalsoldier/v2ray-rules-dat@release/geosite.dat" to
+                "https://cdn.jsdelivr.net/gh/Loyalsoldier/v2ray-rules-dat@release/geosite.dat.sha256sum",
             "https://github.com/v2fly/domain-list-community/releases/latest/download/dlc.dat" to
                 "https://github.com/v2fly/domain-list-community/releases/latest/download/dlc.dat.sha256sum",
         )
