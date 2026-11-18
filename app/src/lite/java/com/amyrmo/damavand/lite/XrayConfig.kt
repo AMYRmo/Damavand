@@ -84,6 +84,14 @@ object XrayConfig {
         val alpn: String,
         // 3.2.16 (#52): TCP header type (e.g. "http") from the link.
         val headerType: String = "",
+        // 1.0.1.2 (#109): XHTTP mode + extra from the link (PattNG's
+        // xhttpMode/xhttpExtra). The old code hardcoded mode "auto"
+        // and dropped extra entirely.
+        val xhttpMode: String = "",
+        val xhttpExtra: String = "",
+        // 1.0.1.2 (#110): gRPC mode from the link (PattNG's mode) —
+        // multiMode is true only when it is "multi".
+        val grpcMode: String = "",
         // 3.2.7 (PattNG parity): TLS/Reality extras, read from the link
         // exactly like PattNG's FmtBase (fp, insecure/allowInsecure,
         // cs, pbk, sid, spx) and honoured in streamSettings below.
@@ -156,10 +164,19 @@ object XrayConfig {
                 val decoded = b64decode(rest) ?: return null
                 val j = JSONObject(decoded)
                 val vmessNet = j.optString("net", "tcp")
+                // 1.0.1.2 (#101): a vmess link needs a real address and
+                // port — optInt("port") returns 0 for a STRING port
+                // ("443"), which used to import as a ":0" profile that
+                // could never connect (and could kill an Auto group).
+                // Same gate as the generic branch below.
+                val vmessAddr = j.optString("add")
+                val vmessPort = j.optInt("port", 0).takeIf { it != 0 }
+                    ?: j.optString("port").toIntOrNull() ?: 0
+                if (vmessAddr.isEmpty() || vmessPort == 0) return null
                 return Parsed(
                     proto = "vmess",
-                    addr = j.optString("add"),
-                    port = j.optInt("port"),
+                    addr = vmessAddr,
+                    port = vmessPort,
                     id = j.optString("id"),
                     net = vmessNet,
                     tls = j.optString("tls"),
@@ -217,6 +234,13 @@ object XrayConfig {
                 // 3.2.16 (#52): TCP+HTTP-header obfuscation
                 // (headerType=http) — parsed like PattNG's FmtBase.
                 headerType = q["headerType"] ?: "",
+                // 1.0.1.2 (#109): XHTTP mode (auto/packet-up/...) and
+                // extra, from the link — PattNG's xhttpMode/xhttpExtra.
+                xhttpMode = q["mode"] ?: "",
+                xhttpExtra = q["extra"] ?: "",
+                // 1.0.1.2 (#110): the same `mode` param is the gRPC
+                // mode in PattNG (mode == "multi" → multiMode).
+                grpcMode = q["mode"] ?: "",
                 // 3.2.7 (PattNG FmtBase): fingerprint, allow-insecure
                 // (insecure / allowInsecure / allow_insecure), cipher
                 // suites (cs), Reality public key (pbk) + short id
@@ -493,7 +517,11 @@ object XrayConfig {
                 "xhttp" -> putJsonObject("xhttpSettings") {
                     put("path", p.path.ifEmpty { "/" })
                     put("host", p.host.ifEmpty { p.sni.ifEmpty { p.addr } })
-                    put("mode", "auto")
+                    // 1.0.1.2 (#109): the link's mode (e.g. packet-up)
+                    // and extra, like PattNG — the old code hardcoded
+                    // "auto" and dropped extra.
+                    put("mode", p.xhttpMode.ifEmpty { "auto" })
+                    if (p.xhttpExtra.isNotEmpty()) put("extra", p.xhttpExtra)
                 }
                 // 3.2.16 (#52): httpupgrade + splithttp links imported
                 // but lost path/host (the core fell back to "/" and the
@@ -506,11 +534,20 @@ object XrayConfig {
                 "splithttp" -> putJsonObject("splithttpSettings") {
                     put("path", p.path.ifEmpty { "/" })
                     put("host", p.host.ifEmpty { p.sni.ifEmpty { p.addr } })
-                    put("mode", "auto")
+                    // 1.0.1.2 (#109): same as xhttp — the link's mode
+                    // and extra, not a hardcoded "auto".
+                    put("mode", p.xhttpMode.ifEmpty { "auto" })
+                    if (p.xhttpExtra.isNotEmpty()) put("extra", p.xhttpExtra)
                 }
                 "grpc" -> putJsonObject("grpcSettings") {
                     put("serviceName", p.serviceName)
-                    put("multiMode", true)
+                    // 1.0.1.2 (#110): PattNG sends multiMode only when
+                    // the link's mode is "multi" — the old code
+                    // hardcoded true, so a link with no mode (like the
+                    // live :8446 gRPC link) got multiMode=true. Whether
+                    // that link behaves differently needs an on-device
+                    // check — see the 1.0.1.2 notes.
+                    put("multiMode", p.grpcMode == "multi")
                 }
             }
         }
@@ -867,11 +904,26 @@ object XrayConfig {
         settings: XraySettings = XraySettings(),
     ): String? {
         if (links.size < 2) return null
-        val parsed = links.map { parse(it) ?: return null }
-        val tags = parsed.indices.map { "proxy@$it" }
-        val memberOutbounds = parsed.mapIndexed { i, p ->
-            outbound(p, tags[i], null, settings) ?: return null
+        // One bad member must not kill the whole Auto group (issue
+        // #86): skip members that fail to parse or build, and refuse
+        // only when nothing remains. Tags keep their original index
+        // so a surviving member's "proxy@N" tag stays stable; an
+        // initial tag naming a skipped member is dropped.
+        val members = links.mapIndexedNotNull { i, link ->
+            val p = parse(link) ?: run {
+                AppLog.w("XrayConfig", "Auto: skipping unparseable member #$i")
+                return@mapIndexedNotNull null
+            }
+            val ob = outbound(p, "proxy@$i", null, settings) ?: run {
+                AppLog.w("XrayConfig", "Auto: skipping unbuildable member #$i")
+                return@mapIndexedNotNull null
+            }
+            "proxy@$i" to ob
         }
+        if (members.isEmpty()) return null
+        val tags = members.map { it.first }
+        val memberOutbounds = members.map { it.second }
+        val initial = initialTag?.takeIf { it in tags }
         val group = buildJsonObject {
             put("tag", "proxy")
             put("protocol", "autoselect")
@@ -887,7 +939,7 @@ object XrayConfig {
                 put("sweepInterval", "${tuning.sweepIntervalMin.coerceIn(1, 120)}m")
                 put("switchRatio", tuning.switchMarginPercent.coerceIn(5, 90) / 100.0)
                 put("retry", tuning.retry)
-                if (initialTag != null) put("initial", initialTag)
+                if (initial != null) put("initial", initial)
             }
         }
         return assemble(listOf(group) + memberOutbounds, socksPort, geoAvailable, settings)
@@ -967,6 +1019,10 @@ object XrayConfig {
         }
         if (core.invalidListener != null || core.unreachableListener != null) return null
         if (AetherArgs.invalidPort(core) != null) return null
+        // 1.0.1.2 (#107): the Aether listener and the local SOCKS
+        // inbound would bind the same port — refuse the config
+        // instead of failing the connect with a bind error.
+        if (aetherPort == socksPort) return null
         val secondaryPort = aetherPort + AetherArgs.SECONDARY_SOCKS_OFFSET
         if (secondaryPort == socksPort || secondaryPort == socksPort + 1) return null
         val proxy = buildJsonObject {
@@ -1290,6 +1346,12 @@ object XrayConfig {
                     // Custom rules first — they win over the defaults.
                     if (settings.routingMode == "custom") {
                         settings.customRules.filter { it.enabled }.forEach {
+                            // Geo patterns need the geo files: without
+                            // them the core fails to start (issue #81).
+                            // Drop them — the built-in ads rule below
+                            // is gated on geoAvailable the same way.
+                            val p = it.pattern.trim()
+                            if (!geoAvailable && (p.startsWith("geosite:") || p.startsWith("geoip:"))) return@forEach
                             add(customRuleJson(it))
                         }
                     }
@@ -1317,7 +1379,10 @@ object XrayConfig {
                     }
                     // Route-only mode (3.2.0): traffic that matches no
                     // rule goes direct instead of through the proxy.
-                    if (settings.routeOnly) {
+                    // Never in Global mode: there the catch-all would
+                    // send EVERYTHING direct (issue #80) — Global means
+                    // all traffic through the proxy by definition.
+                    if (settings.routeOnly && settings.routingMode != "global") {
                         add(buildJsonObject {
                             put("type", "field")
                             put("outboundTag", "direct")
