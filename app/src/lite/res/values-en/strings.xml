@@ -669,6 +669,7 @@
     <string name="conn_tunnel_bridge_failed">Starting the tunnel bridge failed</string>
     <string name="conn_dropped_reconnecting">Connection dropped — reconnecting…</string>
     <string name="notif_connecting">Connecting…</string>
+    <string name="notif_connected">Connected</string>
     <string name="notif_totals">Download: %1$s · Upload: %2$s</string>
     <string name="log_connecting_selected">Connecting to the selected server…</string>
     <string name="geo_file_corrupt">The downloaded file is corrupt — try again</string>
