@@ -279,7 +279,12 @@ class LiteVpnService : VpnService() {
                 // 3.2.10 (Aether): the link is an Aether profile.
                 val aether = intent.getBooleanExtra(EXTRA_AETHER, false)
                 displayName = intent.getStringExtra(EXTRA_NAME)
-                if (!running) startTunnel(links ?: emptyList(), candidates, testUrl, autoSelect, autoId, aether)
+                // 1.0.1.2 (#94): a start request while a session runs
+                // switches to it (V2rayNG: connect → stop → start)
+                // instead of being silently dropped — Tasker and
+                // shortcuts could never switch servers.
+                if (running) stopTunnel()
+                startTunnel(links ?: emptyList(), candidates, testUrl, autoSelect, autoId, aether)
             }
             ACTION_STOP -> {
                 intentionalStop = true
@@ -500,6 +505,30 @@ class LiteVpnService : VpnService() {
 
     // ---- connect ----
 
+    /**
+     * Flushes the usage the poller has not recorded yet (3.1.0/3.2.0:
+     * the poller records every 10 ticks, so up to 10 s can be pending).
+     * The volume belongs to the exit profile (the last link). Used by
+     * stopTunnel and, since 1.0.1.2 (#106), by startTunnel before it
+     * zeroes the session counters on a reconnect.
+     */
+    private fun recordUsageRemainder() {
+        if (connected && totalDown + totalUp > recordedUsage && currentLinks.isNotEmpty()) {
+            try {
+                val exitLink = currentLinks.last()
+                val profileId = usageProfileId
+                    ?: ProfileRepository(applicationContext)
+                        .loadProfiles().firstOrNull { it.link == exitLink }?.id
+                if (profileId != null) {
+                    RoutingStore(applicationContext)
+                        .recordUsage(profileId, totalDown + totalUp - recordedUsage)
+                    recordedUsage = totalDown + totalUp
+                }
+            } catch (_: Exception) {
+            }
+        }
+    }
+
     private fun startTunnel(
         links: List<String>,
         candidates: List<String> = emptyList(),
@@ -529,6 +558,11 @@ class LiteVpnService : VpnService() {
         ip = ""
         isp = ""
         pingMs = -1
+        // 1.0.1.2 (#106): a kill-switch reconnect re-enters startTunnel
+        // WITHOUT stopTunnel — flush the unrecorded remainder first,
+        // or up to 10 s of Stats usage (and the notification session
+        // total) is lost when the counters below are zeroed.
+        recordUsageRemainder()
         downSpeed = 0; upSpeed = 0; totalDown = 0; totalUp = 0
         lastDetail = ""
         lastError = null
@@ -870,9 +904,14 @@ class LiteVpnService : VpnService() {
     /**
      * Starts the Aether core process after Xray is up and waits for its
      * listener to answer a SOCKS greeting; false when it never comes up.
-     * Runs on the connect worker thread (awaitListening blocks up to 30 s).
+     * Runs on the connect worker thread.
+     * 1.0.1.2 (#64): PattNG loops awaitListening(30 s) while the core
+     * runs — a scan can take minutes, and the old single wait SIGTERMed
+     * a still-scanning core at 30 s. Keep waiting in 30 s slices while
+     * the core is alive; only fail when it has EXITED (or this connect
+     * was superseded — then leave the new session's core alone).
      */
-    private fun startAether(core: AetherCore): Boolean {
+    private fun startAether(core: AetherCore, gen: Int): Boolean {
         // 3.2.11: the Psiphon client is packaged again — this refusal
         // only fires when the binary is missing on the device's ABI.
         if (AetherArgs.psiphonModeOf(core.arguments) != AetherPsiphon.OFF && !AetherEngine.isPsiphonSupported(this)) {
@@ -882,14 +921,18 @@ class LiteVpnService : VpnService() {
         // Tor without the transport binary still runs — direct Tor,
         // just no bridges where Tor is blocked; the core says so itself.
         AetherEngine.start(this, core) { onAetherExit() }
-        if (!AetherEngine.awaitListening(30_000)) {
-            val reason = AetherEngine.stoppedMessage()
-            lastDetail = if (reason != null) getString(R.string.conn_aether_stopped, reason)
-            else getString(R.string.conn_aether_failed)
-            AetherEngine.stop()
-            return false
+        while (true) {
+            if (AetherEngine.awaitListening(30_000)) return true
+            if (!sessionLive(gen)) return false
+            if (Thread.currentThread().isInterrupted) break
+            if (!AetherEngine.isRunning) break
+            // Still scanning — wait another 30 s slice.
         }
-        return true
+        val reason = AetherEngine.stoppedMessage()
+        lastDetail = if (reason != null) getString(R.string.conn_aether_stopped, reason)
+        else getString(R.string.conn_aether_failed)
+        AetherEngine.stop()
+        return false
     }
 
     /** The Aether core ended on its own while connected — the tunnel is dead. */
@@ -1036,17 +1079,32 @@ class LiteVpnService : VpnService() {
                 }
                 // Local DNS off: the tun uses the system DNS.
                 if (localDns) dnsServers.filter { withIpv6 || !it.contains(":") }.forEach { addDnsServer(it) }
-                // The app itself (Xray core) must bypass the tunnel.
-                runCatching { addDisallowedApplication(packageName) }
                 // Per-app proxy (3.1.0, PattNG): bypass mode excludes
                 // the listed apps; allow-only mode includes only them.
+                // 1.0.1.2 (#64): PattNG's configurePerAppProxy NEVER
+                // disallows the app itself in allow-only mode — the
+                // app bypasses by simply not being in the allow list.
+                // The old code disallowed it FIRST, so every
+                // addAllowedApplication threw (allow + disallow lists
+                // cannot mix) and the allow list was silently ignored.
                 when (perApp.mode) {
                     "allow_only" -> {
-                        perApp.packages.forEach { pkg ->
-                            runCatching { addAllowedApplication(pkg) }
+                        // An empty allow list means "not configured":
+                        // with zero addAllowedApplication calls Android
+                        // would route NO app through the tunnel, the
+                        // opposite of Root mode (issue #83). Only apply
+                        // the allow list when it names at least one app;
+                        // with an empty list the app itself still bypasses.
+                        if (perApp.packages.isNotEmpty()) {
+                            perApp.packages.forEach { pkg ->
+                                runCatching { addAllowedApplication(pkg) }
+                            }
+                        } else {
+                            runCatching { addDisallowedApplication(packageName) }
                         }
                     }
                     else -> {
+                        runCatching { addDisallowedApplication(packageName) }
                         perApp.packages.forEach { pkg ->
                             runCatching { addDisallowedApplication(pkg) }
                         }
@@ -1058,10 +1116,16 @@ class LiteVpnService : VpnService() {
             AppLog.e("LiteVpnService", "establish failed", e)
             null
         }
-        val descriptor = if (proxyOnlyMode || rootMode) {
+        val descriptor: ParcelFileDescriptor?
+        // Whether the tun that was actually established carries IPv6
+        // (issue #82): the IPv6 establish can fall back to IPv4-only,
+        // so the setting alone does not say what the tun has.
+        var tunHasIpv6 = false
+        descriptor = if (proxyOnlyMode || rootMode) {
             null
         } else {
-            establishTun(ipv6Enabled) ?: if (ipv6Enabled) establishTun(false) else null
+            establishTun(ipv6Enabled)?.also { tunHasIpv6 = ipv6Enabled }
+                ?: if (ipv6Enabled) establishTun(false) else null
         }
         if (!sessionLive(gen)) {
             // Disconnected while this worker was setting up: never hand
@@ -1110,7 +1174,7 @@ class LiteVpnService : VpnService() {
             }
             // 3.2.10 (Aether): Xray is up — start the core now, before
             // the tun bridge forwards traffic into the SOCKS inbound.
-            if (aetherCore != null && !startAether(aetherCore)) {
+            if (aetherCore != null && !startAether(aetherCore, gen)) {
                 broadcastStatus(); stopTunnel(); return
             }
             if (!tunMode) {
@@ -1127,7 +1191,9 @@ class LiteVpnService : VpnService() {
                 // when !proxyOnlyMode; in proxy-only mode the fd is unused.
                 if (!HevTunCore.start(
                         this, descriptor!!, activeSocksPort, settings.mtu,
-                        settings.ifaceAddr, null, false, pipeline = true,
+                        settings.ifaceAddr,
+                        if (tunHasIpv6) "fc00::10:10:14:1" else null,
+                        pipeline = true,
                         logLevel = hevLog, rwTimeout = hevTimeout,
                         socksUser = settings.socksUser, socksPass = settings.socksPass,
                     )
@@ -1142,7 +1208,7 @@ class LiteVpnService : VpnService() {
                 broadcastStatus(); stopTunnel(); return
             }
             // 3.2.10 (Aether): Xray is up — start the core now.
-            if (aetherCore != null && !startAether(aetherCore)) {
+            if (aetherCore != null && !startAether(aetherCore, gen)) {
                 broadcastStatus(); stopTunnel(); return
             }
         }
@@ -1285,15 +1351,30 @@ class LiteVpnService : VpnService() {
 
     /** A trace answer carries no ISP (Oblivion GeoService._lookupIsp): take the first ISP provider that has one. */
     private fun mergeIsp(trace: ExitGeo): ExitGeo {
+        var isp = ""
+        var city = ""
+        var country = ""
         for (url in ISP_PROVIDERS) {
             val geo = try {
                 fetchGeo(url)
             } catch (_: Exception) {
                 null
             } ?: continue
-            if (geo.isp.isNotBlank()) return trace.copy(isp = geo.isp)
+            if (isp.isBlank()) isp = geo.isp
+            if (city.isBlank()) city = geo.city
+            if (country.isBlank()) country = geo.country
+            if (isp.isNotBlank() && city.isNotBlank() && country.isNotBlank()) break
         }
-        return trace
+        // 1.0.1.2 (#78): the trace's colo= (e.g. FRA) is a
+        // data-centre code, not a city — take the real city (and
+        // country name) from the ISP provider instead of presenting
+        // colo as the city. With no real city known, the city stays
+        // empty and the pill shows just the country.
+        return trace.copy(
+            isp = isp.ifBlank { trace.isp },
+            city = city,
+            country = country.ifBlank { trace.country },
+        )
     }
 
     private fun parseJsonGeo(url: String, body: String): ExitGeo? {
@@ -1351,8 +1432,19 @@ class LiteVpnService : VpnService() {
      * screen is off, tick every 10 s for tunnel health-check only and do
      * not repaint the notification (it freezes). On screen-on the UI
      * re-reads the live values on resume.
+     *
+     * 1.0.1.2 (#93): Battery Saver runs the poller at the screen-off
+     * cadence (10 s) even with the screen on, and skips the
+     * notification repaint + Auto status poll. The tunnel probe keeps
+     * its 10 s cadence so a dead tunnel is still dropped in ~30 s.
      */
     private fun startPoller() {
+        // Read once per session: a mid-session toggle applies on the next connect.
+        val batterySaver = try {
+            kotlinx.coroutines.runBlocking { SettingsStore(applicationContext).batterySaverNow() }
+        } catch (_: Exception) {
+            false
+        }
         poller = Thread({
             var lastDown = 0L
             var lastUp = 0L
@@ -1363,7 +1455,7 @@ class LiteVpnService : VpnService() {
             while (running && connected) {
                 val screenOn = pm.isInteractive
                 try {
-                    Thread.sleep(if (screenOn) 1000 else 10_000)
+                    Thread.sleep(if (screenOn && !batterySaver) 1000 else 10_000)
                 } catch (_: InterruptedException) {
                     break
                 }
@@ -1383,7 +1475,8 @@ class LiteVpnService : VpnService() {
                     tick++
                     // 3.2.8 (Auto): poll the group's live status — the
                     // notification follows the live exit member.
-                    if (autoMode && autoSessionActive) {
+                    // Skipped under Battery Saver (issue #93).
+                    if (autoMode && autoSessionActive && !batterySaver) {
                         pollAutoSelect()
                     }
                     // Live per-server usage (3.2.0): attribute the session
@@ -1407,7 +1500,9 @@ class LiteVpnService : VpnService() {
                     if (tick % 30 == 0) {
                         AppLog.e("LiteVpnService", "raw stats: ${XrayController.rawStats()}")
                     }
-                    if (tick % 10 == 0) {
+                    // Battery Saver (issue #93): ticks are 10 s, so the
+                    // probe runs every tick to keep its 10 s cadence.
+                    if (tick % 10 == 0 || batterySaver) {
                         // Health-check only (3.2.0): the probe is a full
                         // HTTPS fetch through the tunnel, so its ms must
                         // never become the displayed ping — it only fills
@@ -1438,7 +1533,8 @@ class LiteVpnService : VpnService() {
                         }
                     }
                     // Screen off: freeze the notification (health-check only).
-                    if (pm.isInteractive) {
+                    // Battery Saver (issue #93): same freeze while on.
+                    if (pm.isInteractive && !batterySaver) {
                         updateNotification()
                         broadcastStatus()
                     }
@@ -1593,19 +1689,7 @@ class LiteVpnService : VpnService() {
         // Per-server usage (3.1.0): attribute the session volume to
         // the exit profile (the last link) before tearing down.
         // 3.2.0: only the remainder not yet recorded live (see poller).
-        if (connected && totalDown + totalUp > recordedUsage && currentLinks.isNotEmpty()) {
-            try {
-                val exitLink = currentLinks.last()
-                val profileId = usageProfileId
-                    ?: ProfileRepository(applicationContext)
-                        .loadProfiles().firstOrNull { it.link == exitLink }?.id
-                if (profileId != null) {
-                    RoutingStore(applicationContext)
-                        .recordUsage(profileId, totalDown + totalUp - recordedUsage)
-                }
-            } catch (_: Exception) {
-            }
-        }
+        recordUsageRemainder()
         if (!running && tun == null) {
             // 3.2.16 (#51): a stale tile tap (or a Tasker stop) lands
             // here with no tunnel up — still reset the persisted tile
