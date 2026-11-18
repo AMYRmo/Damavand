@@ -97,6 +97,25 @@ object BackupManager {
             settings.put("use_hev_tun", store.useHev.first())
             settings.put("root_mode", store.rootMode.first())
             settings.put("root_lan_share", store.rootLanShare.first())
+            // 1.0.1.2 (#87): the selected profile, Auto picks, the
+            // connection toggles and the Aether/IPv6/asset settings
+            // were missing — a restore silently changed what the app
+            // connects with and which profile boot/tile picks.
+            store.selectedProfileId.first()?.let { settings.put("selected_profile_id", it) }
+            store.lastWinnerLink.first()?.let { settings.put("last_winner_link", it) }
+            settings.put("auto_last_pick", store.autoLastPickRawNow())
+            settings.put("mux", store.mux.first())
+            settings.put("sniffing", store.sniffing.first())
+            settings.put("fragment", store.fragment.first())
+            settings.put("routing_mode", store.routingMode.first())
+            settings.put("perapp_mode", store.perAppMode.first())
+            settings.put("ipv6_enabled", store.ipv6Enabled.first())
+            settings.put("prefer_ipv6", store.preferIpv6.first())
+            settings.put("aether_listen_port", store.aetherListenPort.first())
+            settings.put("aether_keys_settings", store.aetherKeysSettings.first())
+            settings.put("asset_geoip_url", store.assetGeoipUrl.first())
+            settings.put("asset_geosite_url", store.assetGeositeUrl.first())
+            settings.put("asset_psiphon_url", store.assetPsiphonUrl.first())
         }
         return JSONObject()
             .put("version", VERSION)
@@ -106,35 +125,155 @@ object BackupManager {
             .put("routing", readObj("routing.json"))
             .put("perapp", readObj("perapp.json"))
             .put("usage", readObj("usage.json"))
+            // 1.0.1.2 (#87): the deleted-links blocklist — without it
+            // a restore resurrects profiles the user deleted on the
+            // next subscription refresh.
+            .put("deleted_links", read("deleted-links.json"))
+            // 1.0.1.2 (#87): the Aether work dir (identity + configs)
+            // as base64, so Aether identities survive a restore.
+            .put("aether_files", aetherFiles(File(filesDir, "aether")))
             .put("settings", settings)
             .toString(2)
+    }
+
+    /**
+     * The Aether work dir as {relative path: base64}. Files over 1 MB
+     * are skipped (downloaded Psiphon data is re-fetched on demand).
+     */
+    private fun aetherFiles(dir: File): JSONObject {
+        val out = JSONObject()
+        try {
+            if (!dir.isDirectory) return out
+            dir.walkTopDown().filter { it.isFile }.forEach { f ->
+                try {
+                    if (f.length() > 1_048_576L) return@forEach
+                    val rel = f.relativeTo(dir).path.replace(File.separatorChar, '/')
+                    out.put(rel, android.util.Base64.encodeToString(f.readBytes(), android.util.Base64.NO_WRAP))
+                } catch (_: Exception) {
+                }
+            }
+        } catch (_: Exception) {
+        }
+        return out
+    }
+
+    /**
+     * Type-check every known settings key; throws on a wrong type, so
+     * importJson can validate the whole bundle before writing anything
+     * (issue #88). Unknown keys are ignored (forward compatibility).
+     */
+    private fun validateSettings(settings: JSONObject) {
+        val booleans = setOf(
+            "kill_switch", "auto_connect", "battery_saver", "sub_auto_update",
+            "socks_udp", "socks_share_lan", "socks_dynamic_port", "http_proxy",
+            "fake_dns", "local_dns", "route_only", "mux_xudp_quic", "proxy_only",
+            "show_speed_notif", "confirm_delete", "show_all_groups",
+            "auto_start_boot", "sub_auto_test", "sub_auto_sort",
+            "sub_auto_remove_invalid", "double_column", "auto_retry",
+            "dynamic_color", "local_proxy", "use_hev_tun", "root_mode",
+            "root_lan_share", "mux", "sniffing", "fragment",
+            "ipv6_enabled", "prefer_ipv6",
+        )
+        val strings = setOf(
+            "test_url", "dns_servers", "socks_port", "socks_user", "socks_pass",
+            "mtu", "iface_addr", "core_loglevel", "domain_strategy",
+            "mux_concurrency", "mux_xudp_concurrency", "domestic_dns",
+            "dns_hosts", "real_ping_concurrency", "ip_api_url", "language",
+            "hev_loglevel", "hev_rw_timeout", "theme_mode", "selected_group",
+            "auto_probe_url", "auto_check_seconds", "auto_sweep_minutes",
+            "auto_switch_margin", "aether_listen_port", "aether_keys_settings",
+            "asset_geoip_url", "asset_geosite_url", "asset_psiphon_url",
+            "routing_mode", "perapp_mode", "selected_profile_id",
+            "last_winner_link", "auto_last_pick",
+        )
+        for (key in booleans) {
+            val v = settings.opt(key)
+            if (v != null && v !== JSONObject.NULL && v !is Boolean) {
+                throw IllegalArgumentException("setting $key is not a boolean")
+            }
+        }
+        for (key in strings) {
+            val v = settings.opt(key)
+            if (v != null && v !== JSONObject.NULL && v !is String) {
+                throw IllegalArgumentException("setting $key is not a string")
+            }
+        }
+        val bg = settings.opt("balancer_groups")
+        if (bg != null && bg !== JSONObject.NULL && bg !is JSONArray) {
+            throw IllegalArgumentException("balancer_groups is not an array")
+        }
+        val picks = settings.opt("auto_last_pick")
+        if (picks is String) JSONObject(picks) // throws when not an object
     }
 
     /**
      * Replace the app's data with the bundle. Returns false when the
      * text is not a Lite backup at all; a bundle that parses is
      * applied even if some section is missing.
+     *
+     * 1.0.1.2 (#88): the import is atomic — the whole bundle,
+     * including every settings value, is validated BEFORE anything
+     * is written, and the data files are staged to temp files and
+     * swapped in only when all of them staged. A malformed bundle
+     * used to report failure AFTER the live profiles were already
+     * replaced, with no rollback.
      */
     fun importJson(context: Context, text: String): Boolean {
         return try {
             val bundle = JSONObject(text)
             if (bundle.optInt("version", 0) < 1) return false
             if (!bundle.has("profiles") && !bundle.has("subscriptions")) return false
+            val settings = bundle.optJSONObject("settings")
+            if (settings != null) validateSettings(settings)
             val filesDir = context.filesDir
-            fun write(name: String, value: Any?) {
+            // Stage every file to a temp first; a failure here leaves
+            // the live data untouched.
+            val staged = mutableListOf<Pair<File, File>>()
+            fun stage(name: String, value: Any?) {
                 if (value == null) return
-                try {
-                    File(filesDir, name).writeText(value.toString())
-                } catch (_: Exception) {
+                val tmp = File(filesDir, "$name.tmp")
+                tmp.writeText(value.toString())
+                staged += tmp to File(filesDir, name)
+            }
+            try {
+                stage("profiles.json", bundle.optJSONArray("profiles"))
+                stage("chains.json", bundle.optJSONArray("chains"))
+                stage("subscriptions.json", bundle.optJSONArray("subscriptions"))
+                stage("routing.json", bundle.optJSONObject("routing"))
+                stage("perapp.json", bundle.optJSONObject("perapp"))
+                stage("usage.json", bundle.optJSONObject("usage"))
+                stage("deleted-links.json", bundle.optJSONArray("deleted_links"))
+            } catch (_: Exception) {
+                staged.forEach { (tmp, _) -> runCatching { tmp.delete() } }
+                return false
+            }
+            // All staged — swap them in.
+            staged.forEach { (tmp, target) ->
+                if (!tmp.renameTo(target)) {
+                    tmp.copyTo(target, overwrite = true)
+                    tmp.delete()
                 }
             }
-            write("profiles.json", bundle.optJSONArray("profiles"))
-            write("chains.json", bundle.optJSONArray("chains"))
-            write("subscriptions.json", bundle.optJSONArray("subscriptions"))
-            write("routing.json", bundle.optJSONObject("routing"))
-            write("perapp.json", bundle.optJSONObject("perapp"))
-            write("usage.json", bundle.optJSONObject("usage"))
-            val settings = bundle.optJSONObject("settings")
+            // 1.0.1.2 (#87): the Aether work dir. Paths are confined
+            // to the aether dir — a crafted bundle must not write
+            // outside it.
+            bundle.optJSONObject("aether_files")?.let { obj ->
+                val dir = File(filesDir, "aether")
+                val keys = obj.keys()
+                while (keys.hasNext()) {
+                    val rel = keys.next()
+                    val b64 = obj.optString(rel)
+                    if (b64.isEmpty()) continue
+                    try {
+                        val target = File(dir, rel)
+                        if (!target.canonicalPath.startsWith(dir.canonicalPath + File.separator)) continue
+                        val bytes = android.util.Base64.decode(b64, android.util.Base64.DEFAULT)
+                        target.parentFile?.mkdirs()
+                        target.writeBytes(bytes)
+                    } catch (_: Exception) {
+                    }
+                }
+            }
             if (settings != null) {
                 runBlocking {
                     val store = SettingsStore(context)
@@ -199,6 +338,32 @@ object BackupManager {
                     if (settings.has("use_hev_tun")) store.setUseHev(settings.getBoolean("use_hev_tun"))
                     if (settings.has("root_mode")) store.setRootMode(settings.getBoolean("root_mode"))
                     if (settings.has("root_lan_share")) store.setRootLanShare(settings.getBoolean("root_lan_share"))
+                    // 1.0.1.2 (#87).
+                    if (settings.has("selected_profile_id")) store.setSelectedProfileId(settings.optString("selected_profile_id").takeIf { it.isNotEmpty() })
+                    if (settings.has("last_winner_link")) store.setLastWinnerLink(settings.optString("last_winner_link").takeIf { it.isNotEmpty() })
+                    if (settings.has("auto_last_pick")) {
+                        try {
+                            val picks = JSONObject(settings.optString("auto_last_pick") ?: "{}")
+                            val keys = picks.keys()
+                            while (keys.hasNext()) {
+                                val id = keys.next()
+                                store.setAutoLastPick(id, picks.optString(id))
+                            }
+                        } catch (_: Exception) {
+                        }
+                    }
+                    if (settings.has("mux")) store.setMux(settings.getBoolean("mux"))
+                    if (settings.has("sniffing")) store.setSniffing(settings.getBoolean("sniffing"))
+                    if (settings.has("fragment")) store.setFragment(settings.getBoolean("fragment"))
+                    if (settings.has("routing_mode")) store.setRoutingMode(settings.getString("routing_mode") ?: "bypass_lan")
+                    if (settings.has("perapp_mode")) store.setPerAppMode(settings.getString("perapp_mode") ?: "bypass")
+                    if (settings.has("ipv6_enabled")) store.setIpv6Enabled(settings.getBoolean("ipv6_enabled"))
+                    if (settings.has("prefer_ipv6")) store.setPreferIpv6(settings.getBoolean("prefer_ipv6"))
+                    if (settings.has("aether_listen_port")) store.setAetherListenPort(settings.getString("aether_listen_port"))
+                    if (settings.has("aether_keys_settings")) store.setAetherKeysSettings(settings.getString("aether_keys_settings"))
+                    if (settings.has("asset_geoip_url")) store.setAssetGeoipUrl(settings.getString("asset_geoip_url"))
+                    if (settings.has("asset_geosite_url")) store.setAssetGeositeUrl(settings.getString("asset_geosite_url"))
+                    if (settings.has("asset_psiphon_url")) store.setAssetPsiphonUrl(settings.getString("asset_psiphon_url"))
                 }
             }
             true
