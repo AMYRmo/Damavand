@@ -168,6 +168,10 @@ class LiteVpnService : VpnService() {
     @Volatile private var upSpeed: Long = 0
     @Volatile private var totalDown: Long = 0
     @Volatile private var totalUp: Long = 0
+    // 1.0.1.4: the app's Battery Saver, read once per session in
+    // startTunnel (same rule as the poller cadence) — while it is on,
+    // the notification shows only "Connected", never frozen zeros.
+    @Volatile private var batterySaverOn: Boolean = false
     @Volatile private var lastDetail = ""
     @Volatile private var lastError: String? = null
     @Volatile private var connectedAt: Long = 0
@@ -423,6 +427,20 @@ class LiteVpnService : VpnService() {
                 .addAction(0, getString(R.string.notif_disconnect), stopPending)
                 .build()
         }
+        // 1.0.1.4: with the app's Battery Saver on, the notification
+        // shows only "Connected" — no speeds, no totals, no volume
+        // chip. The 1.0.1.2 freeze left the numbers stuck at 0, which
+        // reads as broken; a static Connected never lies.
+        if (batterySaverOn) {
+            return b
+                .setContentTitle(currentProfileName.ifBlank { getString(R.string.app_name) })
+                .setContentText(getString(R.string.notif_connected))
+                .setShowWhen(connectedAt > 0)
+                .setWhen(if (connectedAt > 0) connectedAt else System.currentTimeMillis())
+                .setUsesChronometer(connectedAt > 0)
+                .addAction(0, getString(R.string.notif_disconnect), stopPending)
+                .build()
+        }
         val speeds = "↓ ${formatRateLatin(downSpeed)} · ↑ ${formatRateLatin(upSpeed)}"
         val totals = getString(R.string.notif_totals, formatBytes(totalDown), formatBytes(totalUp))
         // 3.2.0: with speeds off, the notification shows the totals only.
@@ -576,6 +594,14 @@ class LiteVpnService : VpnService() {
         currentTestUrl = testUrl
         recordedUsage = 0
         usageProfileId = null
+        // 1.0.1.4: read once per session, BEFORE the first
+        // notification is built below — a mid-session toggle applies
+        // on the next connect.
+        batterySaverOn = try {
+            kotlinx.coroutines.runBlocking { SettingsStore(applicationContext).batterySaverNow() }
+        } catch (_: Exception) {
+            false
+        }
         startForeground(NOTIF_ID, notification())
         broadcastStatus()
 
@@ -1439,12 +1465,9 @@ class LiteVpnService : VpnService() {
      * its 10 s cadence so a dead tunnel is still dropped in ~30 s.
      */
     private fun startPoller() {
-        // Read once per session: a mid-session toggle applies on the next connect.
-        val batterySaver = try {
-            kotlinx.coroutines.runBlocking { SettingsStore(applicationContext).batterySaverNow() }
-        } catch (_: Exception) {
-            false
-        }
+        // 1.0.1.4: single source of truth — read once per session in
+        // startTunnel, before the first notification is built.
+        val batterySaver = batterySaverOn
         poller = Thread({
             var lastDown = 0L
             var lastUp = 0L
