@@ -551,6 +551,9 @@
     <string name="conn_aether_failed">Starting the Aether core failed</string>
     <string name="conn_aether_stopped">The Aether core stopped: %1$s</string>
     <string name="conn_aether_no_psiphon">Psiphon mode is not supported in this build — the Psiphon client is not packaged</string>
+    <string name="conn_psiphon_failed">Starting the Psiphon core failed</string>
+    <string name="conn_psiphon_stopped">The Psiphon core stopped: %1$s</string>
+    <string name="conn_psiphon_chain">A chain cannot contain a Psiphon profile — Psiphon connects on its own</string>
     <string name="aether_root_unsupported">Aether cannot be combined with root mode — turn root mode off first</string>
     <string name="chain_two_aether">A chain cannot contain more than one Aether profile — only one Aether per chain</string>
     <string name="aether_add_title">New Aether</string>
