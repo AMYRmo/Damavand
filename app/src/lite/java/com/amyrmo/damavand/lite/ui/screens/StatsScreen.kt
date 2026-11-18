@@ -42,6 +42,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.amyrmo.damavand.lite.Profile
 import com.amyrmo.damavand.lite.R
 import com.amyrmo.damavand.lite.ui.ConnState
 import com.amyrmo.damavand.lite.ui.ConnectionUiState
@@ -69,7 +70,17 @@ fun StatsScreen(vm: LiteViewModel, connection: ConnectionUiState, scrollState: S
     var showResetConfirm by remember { mutableStateOf(false) }
     val connected = connection.state == ConnState.CONNECTED
 
-    androidx.compose.runtime.LaunchedEffect(Unit) { vm.refreshUsage() }
+    // 1.0.1.2 (#99): re-read the usage file while the tab is open —
+    // the service records usage every 10 s, but nothing reloaded the
+    // VM's snapshot, so the per-server rows froze at the values from
+    // when the tab opened (and stayed stale after a disconnect too).
+    androidx.compose.runtime.LaunchedEffect(Unit) {
+        vm.refreshUsage()
+        while (true) {
+            kotlinx.coroutines.delay(10_000)
+            vm.refreshUsage()
+        }
+    }
 
     Column(
         modifier = Modifier
@@ -223,7 +234,11 @@ fun StatsScreen(vm: LiteViewModel, connection: ConnectionUiState, scrollState: S
             fontFamily = Vazirmatn
         )
         Spacer(Modifier.height(8.dp))
-        val usageRows = remember(usageDays, range, profiles) {
+        val deletedLabel = stringResource(R.string.stats_usage_deleted)
+        // 1.0.1.2 (#74): the total covers ALL rows in range, not just
+        // the five shown — the old rangeTotal summed the displayed
+        // rows only.
+        val (usageRows, rangeTotal) = remember(usageDays, range, profiles, deletedLabel) {
             val cutoff = java.time.LocalDate.now()
                 .minusDays((range.days - 1).toLong()).toString()
             val totals = HashMap<String, Long>()
@@ -233,14 +248,29 @@ fun StatsScreen(vm: LiteViewModel, connection: ConnectionUiState, scrollState: S
                     totals[id] = (totals[id] ?: 0L) + bytes
                 }
             }
-            totals.entries
+            // 1.0.1.2 (#100): usage of deleted profiles used to vanish
+            // from the rows AND the total. Keep it as one "deleted"
+            // row so the total stays honest.
+            val orphanBytes = totals.entries
+                .filter { (id, _) -> profiles.none { it.id == id } }
+                .sumOf { it.value }
+            val rows = totals.entries
                 .mapNotNull { (id, bytes) ->
                     profiles.firstOrNull { it.id == id }?.let { it to bytes }
                 }
-                .sortedByDescending { it.second }
-                .take(5)
+                .toMutableList()
+            if (orphanBytes > 0) {
+                rows += Profile(
+                    id = "__deleted__",
+                    link = "",
+                    name = deletedLabel,
+                    proto = "",
+                    address = "",
+                    port = 0,
+                ) to orphanBytes
+            }
+            rows.sortedByDescending { it.second }.take(5) to totals.values.sum()
         }
-        val rangeTotal = remember(usageRows) { usageRows.sumOf { it.second } }
         Column(
             modifier = Modifier
                 .fillMaxWidth()
