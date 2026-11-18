@@ -385,6 +385,11 @@ class ProfileRepository(private val context: Context) {
      * so a refresh can never resurrect them.
      */
     fun deleteSubscription(url: String) {
+        // 1.0.1.5 (BuiltInPsiphon): the built-in Psiphon group is
+        // part of the app, not a subscription the user added — it
+        // cannot be deleted. The UI hides Delete for it too; this
+        // is the backstop for every other call path.
+        if (BuiltInPsiphon.isBuiltIn(url)) return
         synchronized(fileLock) {
             saveSubscriptions(loadSubscriptions().filter { it.url != url })
             val remaining = loadProfiles().filter { it.subscriptionUrl != url }
@@ -402,6 +407,11 @@ class ProfileRepository(private val context: Context) {
 
     /** Re-fetch ONE subscription and merge (dedupe by link). */
     fun refreshOne(url: String): FetchResult {
+        // 1.0.1.5 (BuiltInPsiphon): the built-in group has no address
+        // to fetch from — refreshing it is a no-op, and must never
+        // reach fetchSubscription (which would fail) or the REPLACE
+        // below (which would wipe its profiles).
+        if (BuiltInPsiphon.isBuiltIn(url)) return FetchResult.Ok(emptyList(), 0)
         // Network first, OUTSIDE the lock — the merge below is the
         // only part that touches files (3.1.1).
         return when (val fetched = fetchSubscription(url)) {
@@ -786,6 +796,26 @@ class ProfileRepository(private val context: Context) {
                 }
             }
             else -> fetched
+        }
+    }
+
+    /**
+     * Adds a built-in subscription and its profiles (1.0.1.5,
+     * BuiltInPsiphon): no fetch, no merge by link — the subscription
+     * is added when missing and only the profiles whose stable id is
+     * not already stored are appended, so a later run only adds the
+     * countries the bundled list gained.
+     */
+    fun addBuiltInProfiles(subscription: Subscription, profiles: List<Profile>) {
+        synchronized(fileLock) {
+            val subs = loadSubscriptions()
+            if (subs.none { it.url == subscription.url }) {
+                saveSubscriptions(subs + subscription)
+            }
+            val existing = loadProfiles()
+            val knownIds = existing.map { it.id }.toHashSet()
+            val fresh = profiles.filter { it.id !in knownIds }
+            if (fresh.isNotEmpty()) saveProfiles(existing + fresh)
         }
     }
 
