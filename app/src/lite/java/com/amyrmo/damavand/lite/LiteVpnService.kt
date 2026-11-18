@@ -20,6 +20,7 @@ import androidx.core.app.NotificationCompat
 import com.amyrmo.damavand.lite.aether.AetherArgs
 import com.amyrmo.damavand.lite.aether.AetherCore
 import com.amyrmo.damavand.lite.aether.AetherEngine
+import com.amyrmo.damavand.lite.psiphon.PsiphonEngine
 import com.amyrmo.damavand.lite.aether.AetherExit
 import com.amyrmo.damavand.lite.aether.AetherPsiphon
 import com.amyrmo.damavand.lite.aether.AetherSettings
@@ -99,6 +100,8 @@ class LiteVpnService : VpnService() {
         // 3.2.10 (Aether): the single link is an Aether profile
         // ("aether://<uuid>") — no pre-test, the core measures itself.
         const val EXTRA_AETHER = "aether"
+        // 1.0.1.6 (Psiphon): the link is a standalone Psiphon profile.
+        const val EXTRA_PSIPHON = "psiphon"
         // 3.2.0: the display name for a group (notification title).
         const val EXTRA_NAME = "name"
         /** 3.1.0: the URL a real tunnel test fetches. */
@@ -196,6 +199,8 @@ class LiteVpnService : VpnService() {
     // Aether mode (3.2.10, PattNG): the link is an Aether profile;
     // the config is buildAether and the core process runs beside Xray.
     @Volatile private var aetherMode: Boolean = false
+    // 1.0.1.6 (Psiphon): the session runs on the standalone Psiphon core, not Xray.
+    @Volatile private var psiphonMode: Boolean = false
     @Volatile private var autoSessionActive: Boolean = false
     private var networkWatch: android.net.ConnectivityManager.NetworkCallback? = null
     // Show live speeds in the notification (3.2.0 setting, cached per connect).
@@ -282,13 +287,15 @@ class LiteVpnService : VpnService() {
                 val autoId = intent.getStringExtra(EXTRA_AUTO_ID)
                 // 3.2.10 (Aether): the link is an Aether profile.
                 val aether = intent.getBooleanExtra(EXTRA_AETHER, false)
+                // 1.0.1.6 (Psiphon): the link is a standalone Psiphon profile.
+                val psiphon = intent.getBooleanExtra(EXTRA_PSIPHON, false)
                 displayName = intent.getStringExtra(EXTRA_NAME)
                 // 1.0.1.2 (#94): a start request while a session runs
                 // switches to it (V2rayNG: connect → stop → start)
                 // instead of being silently dropped — Tasker and
                 // shortcuts could never switch servers.
                 if (running) stopTunnel()
-                startTunnel(links ?: emptyList(), candidates, testUrl, autoSelect, autoId, aether)
+                startTunnel(links ?: emptyList(), candidates, testUrl, autoSelect, autoId, aether, psiphon)
             }
             ACTION_STOP -> {
                 intentionalStop = true
@@ -554,6 +561,7 @@ class LiteVpnService : VpnService() {
         autoSelect: Boolean = false,
         autoId: String? = null,
         aether: Boolean = false,
+        psiphon: Boolean = false,
     ) {
         // 3.2.23: never overlap two connects (see the field comment).
         if (!connectInFlight.compareAndSet(false, true)) {
@@ -569,6 +577,7 @@ class LiteVpnService : VpnService() {
         autoMode = autoSelect
         this.autoId = autoId
         aetherMode = aether
+        psiphonMode = psiphon
         autoSessionActive = false
         AutoSelect.end()
         location = ""
@@ -722,7 +731,8 @@ class LiteVpnService : VpnService() {
             else -> {
                 // 3.2.10 (Aether): an Aether profile has no ping and
                 // no server to test — it never wins the fallback pick.
-                val profiles = repo.loadProfiles().filter { !it.isAether }
+                // 1.0.1.6 (Psiphon): same for a Psiphon profile.
+                val profiles = repo.loadProfiles().filter { !it.isAether && !it.isPsiphon }
                 val ranked = profiles.sortedBy { it.lastPingMs.takeIf { p -> p > 0 } ?: Long.MAX_VALUE }
                 ranked.firstOrNull()?.link?.let { listOf(it) } ?: emptyList()
             }
@@ -735,10 +745,13 @@ class LiteVpnService : VpnService() {
         }
         currentLinks = chosen
         broadcastLog(getString(R.string.log_connecting_selected))
-        if (aetherMode) {
+        if (aetherMode || psiphonMode) {
             // 3.2.10 (Aether): no pre-test — PattNG doesn't pre-test
             // Aether either; the core measures its own endpoints and
             // the connect fails at awaitListening when it never comes up.
+            // 1.0.1.6 (Psiphon): same — the core dials Psiphon's own
+            // servers, and the connect fails at awaitReady when no
+            // tunnel comes up.
             connectWinner(chosen, gen)
             return
         }
@@ -751,6 +764,17 @@ class LiteVpnService : VpnService() {
             val profiles = repo.loadProfiles()
             chosen.any { link -> profiles.firstOrNull { it.link == link }?.isAether == true }
         }.getOrDefault(false)
+        // 1.0.1.6 (Psiphon): a chain cannot hold a Psiphon hop yet —
+        // the core is the tunnel itself, not an Xray hop. Refused
+        // with its own message, like two Aether hops are.
+        val chainHasPsiphon = chosen.size > 1 && runCatching {
+            val profiles = repo.loadProfiles()
+            chosen.any { link -> profiles.firstOrNull { it.link == link }?.isPsiphon == true }
+        }.getOrDefault(false)
+        if (chainHasPsiphon) {
+            lastDetail = getString(R.string.conn_psiphon_chain)
+            broadcastStatus(); stopTunnel(); return
+        }
         if (links.isNotEmpty() && !chainHasAether && !realTest(chosen, testUrl)) {
             lastDetail = getString(R.string.conn_server_no_response)
             broadcastStatus()
@@ -961,6 +985,51 @@ class LiteVpnService : VpnService() {
         return false
     }
 
+    /**
+     * Starts the standalone Psiphon core (1.0.1.6) and waits for its
+     * tunnel to come up; false when it never does. Runs on the
+     * connect worker thread. Like [startAether], it loops
+     * awaitReady(30 s) while the core runs — a first connect can
+     * take minutes on a bad network — and only fails when the core
+     * has EXITED (or this connect was superseded).
+     */
+    private fun startPsiphon(gen: Int, region: String?): Boolean {
+        // 1.0.1.6: the Psiphon client is packaged again — this refusal
+        // only fires when the binary is missing on the device's ABI.
+        if (!PsiphonEngine.isSupported(this)) {
+            lastDetail = getString(R.string.conn_aether_no_psiphon)
+            return false
+        }
+        PsiphonEngine.start(this, activeSocksPort, region) { onPsiphonExit() }
+        while (true) {
+            if (PsiphonEngine.awaitReady(30_000)) return true
+            if (!sessionLive(gen)) return false
+            if (Thread.currentThread().isInterrupted) break
+            if (!PsiphonEngine.isRunning) break
+            // Still dialling — wait another 30 s slice.
+        }
+        val reason = PsiphonEngine.stoppedMessage()
+        lastDetail = if (reason != null) getString(R.string.conn_psiphon_stopped, reason)
+        else getString(R.string.conn_psiphon_failed)
+        PsiphonEngine.stop()
+        return false
+    }
+
+    /** The Psiphon core ended on its own while connected — the tunnel is dead. */
+    private fun onPsiphonExit() {
+        // Same shape as onAetherExit: run the teardown on the main
+        // thread, and never stop a newer session's core.
+        android.os.Handler(android.os.Looper.getMainLooper()).post {
+            if (!connected || intentionalStop) return@post
+            if (PsiphonEngine.isRunning) return@post
+            val reason = PsiphonEngine.stoppedMessage()
+            lastDetail = if (reason != null) getString(R.string.conn_psiphon_stopped, reason)
+            else getString(R.string.conn_core_failed, "")
+            broadcastStatus()
+            stopTunnel()
+        }
+    }
+
     /** The Aether core ended on its own while connected — the tunnel is dead. */
     private fun onAetherExit() {
         // 3.2.23: the core reports its exit on its own watch thread;
@@ -990,7 +1059,7 @@ class LiteVpnService : VpnService() {
         // VPN+HEV mode (HEV forwards into it), in proxy-only mode (it
         // IS the service) and when LAN sharing is on — PattNG's
         // effectiveLocalProxy rule.
-        val (useHev, localProxyOn) = try {
+        val (useHev0, localProxyOn) = try {
             kotlinx.coroutines.runBlocking {
                 val s = SettingsStore(applicationContext)
                 s.useHevNow() to s.localProxyNow()
@@ -998,6 +1067,9 @@ class LiteVpnService : VpnService() {
         } catch (_: Exception) {
             true to true
         }
+        // 1.0.1.6 (Psiphon): the core has no tun inbound of its own —
+        // the tun is always bridged through HEV, as with Xray+HEV.
+        val useHev = useHev0 || psiphonMode
         val tunMode = !proxyOnlyMode && !rootMode && !useHev
         val effectiveLocalProxy = localProxyOn ||
             (useHev && !proxyOnlyMode) || proxyOnlyMode || baseSettings.socksShareLan || rootMode
@@ -1005,6 +1077,22 @@ class LiteVpnService : VpnService() {
         // 3.2.10 (Aether): the config is buildAether and the core
         // process runs beside Xray — it starts after Xray below.
         val aetherResult = if (aetherMode) buildAetherConfig(links, settings, geoReady) else null
+        // 1.0.1.6 (Psiphon): a standalone Psiphon profile needs no
+        // Xray config at all — the core IS the tunnel, and the tun
+        // bridges straight into its SOCKS listener. Its exit country
+        // is the profile's country code (empty = "Any country").
+        val psiphonProfile = if (psiphonMode) {
+            ProfileRepository(applicationContext).loadProfiles()
+                .firstOrNull { it.link == links.firstOrNull() && it.isPsiphon }
+        } else {
+            null
+        }
+        if (psiphonMode && psiphonProfile == null) {
+            lastDetail = getString(R.string.conn_config_failed)
+            broadcastStatus(); stopTunnel(); return
+        }
+        val psiphonRegion = psiphonProfile?.countryCode?.trim()
+            ?.takeIf { it.length == 2 }?.uppercase()
         // 3.2.13 (PattNG chain + Aether): a chain with exactly one
         // Aether hop runs on one core beside Xray, like a standalone
         // Aether profile; two Aether hops need two cores and one runs.
@@ -1018,6 +1106,10 @@ class LiteVpnService : VpnService() {
             broadcastStatus(); stopTunnel(); return
         }
         val cfg = when {
+            // 1.0.1.6 (Psiphon): no Xray config — the core is
+            // Psiphon; the empty string is never handed to
+            // XrayController, the Psiphon branches below skip it.
+            psiphonMode -> ""
             aetherMode -> aetherResult?.first
             chainAether is ChainAetherResult.Ok -> chainAether.config
             autoMode -> {
@@ -1164,21 +1256,34 @@ class LiteVpnService : VpnService() {
             broadcastStatus(); stopTunnel(); return
         }
         if (rootMode) {
-            // 3.2.10 (PattNG root mode): no tun — the core starts first,
-            // then the root rules steer system traffic into its SOCKS
-            // inbound (PattNG's CoreRootService order). The SOCKS inbound
-            // is forced on above (effectiveLocalProxy), because the
-            // root-run hev forwards into it.
-            if (!XrayController.start(cfg, 0)) {
-                lastDetail = getString(R.string.conn_core_failed, XrayController.lastError ?: "")
-                broadcastStatus(); stopTunnel(); return
-            }
-            // hev must dial the SOCKS inbound this core really has: the
-            // per-session port (random with dynamic port on) and the
-            // same credentials the inbound was built with.
-            if (!RootProxyManager.start(this, activeSocksPort, settings.socksUser, settings.socksPass)) {
-                lastDetail = getString(R.string.conn_root_failed)
-                broadcastStatus(); stopTunnel(); return
+            if (psiphonMode) {
+                // 1.0.1.6 (Psiphon): no tun, no Xray — the core starts
+                // first, then the root rules steer system traffic into
+                // its SOCKS listener, which takes no credentials.
+                if (!startPsiphon(gen, psiphonRegion)) {
+                    broadcastStatus(); stopTunnel(); return
+                }
+                if (!RootProxyManager.start(this, activeSocksPort, "", "")) {
+                    lastDetail = getString(R.string.conn_root_failed)
+                    broadcastStatus(); stopTunnel(); return
+                }
+            } else {
+                // 3.2.10 (PattNG root mode): no tun — the core starts first,
+                // then the root rules steer system traffic into its SOCKS
+                // inbound (PattNG's CoreRootService order). The SOCKS inbound
+                // is forced on above (effectiveLocalProxy), because the
+                // root-run hev forwards into it.
+                if (!XrayController.start(cfg, 0)) {
+                    lastDetail = getString(R.string.conn_core_failed, XrayController.lastError ?: "")
+                    broadcastStatus(); stopTunnel(); return
+                }
+                // hev must dial the SOCKS inbound this core really has: the
+                // per-session port (random with dynamic port on) and the
+                // same credentials the inbound was built with.
+                if (!RootProxyManager.start(this, activeSocksPort, settings.socksUser, settings.socksPass)) {
+                    lastDetail = getString(R.string.conn_root_failed)
+                    broadcastStatus(); stopTunnel(); return
+                }
             }
         } else if (!proxyOnlyMode) {
             // A kill-switch reconnect keeps the previous tun open until
@@ -1190,18 +1295,26 @@ class LiteVpnService : VpnService() {
             if (previousTun != null && previousTun !== descriptor) {
                 try { previousTun.close() } catch (_: Exception) {}
             }
-            // Xray-tun mode (3.2.9): hand the VPN fd to the core — Go
-            // dups it at start, so the descriptor stays owned here and
-            // closes normally in stopTunnel. HEV mode keeps the bridge.
-            val tunFd = if (tunMode) descriptor!!.fd else 0
-            if (!XrayController.start(cfg, tunFd)) {
-                lastDetail = getString(R.string.conn_core_failed, XrayController.lastError ?: "")
-                broadcastStatus(); stopTunnel(); return
-            }
-            // 3.2.10 (Aether): Xray is up — start the core now, before
-            // the tun bridge forwards traffic into the SOCKS inbound.
-            if (aetherCore != null && !startAether(aetherCore, gen)) {
-                broadcastStatus(); stopTunnel(); return
+            // 1.0.1.6 (Psiphon): no Xray — start the core now, before
+            // the tun bridge forwards traffic into its SOCKS listener.
+            if (psiphonMode) {
+                if (!startPsiphon(gen, psiphonRegion)) {
+                    broadcastStatus(); stopTunnel(); return
+                }
+            } else {
+                // Xray-tun mode (3.2.9): hand the VPN fd to the core — Go
+                // dups it at start, so the descriptor stays owned here and
+                // closes normally in stopTunnel. HEV mode keeps the bridge.
+                val tunFd = if (tunMode) descriptor!!.fd else 0
+                if (!XrayController.start(cfg, tunFd)) {
+                    lastDetail = getString(R.string.conn_core_failed, XrayController.lastError ?: "")
+                    broadcastStatus(); stopTunnel(); return
+                }
+                // 3.2.10 (Aether): Xray is up — start the core now, before
+                // the tun bridge forwards traffic into the SOCKS inbound.
+                if (aetherCore != null && !startAether(aetherCore, gen)) {
+                    broadcastStatus(); stopTunnel(); return
+                }
             }
             if (!tunMode) {
                 // 3.2.0: hev log level + rw timeout from settings.
@@ -1221,7 +1334,10 @@ class LiteVpnService : VpnService() {
                         if (tunHasIpv6) "fc00::10:10:14:1" else null,
                         pipeline = true,
                         logLevel = hevLog, rwTimeout = hevTimeout,
-                        socksUser = settings.socksUser, socksPass = settings.socksPass,
+                        // 1.0.1.6 (Psiphon): its SOCKS listener takes no
+                        // credentials, unlike Xray's inbound.
+                        socksUser = if (psiphonMode) "" else settings.socksUser,
+                        socksPass = if (psiphonMode) "" else settings.socksPass,
                     )
                 ) {
                     lastDetail = getString(R.string.conn_tunnel_bridge_failed)
@@ -1229,13 +1345,21 @@ class LiteVpnService : VpnService() {
                 }
             }
         } else {
-            if (!XrayController.start(cfg)) {
-                lastDetail = getString(R.string.conn_core_failed, XrayController.lastError ?: "")
-                broadcastStatus(); stopTunnel(); return
-            }
-            // 3.2.10 (Aether): Xray is up — start the core now.
-            if (aetherCore != null && !startAether(aetherCore, gen)) {
-                broadcastStatus(); stopTunnel(); return
+            // 1.0.1.6 (Psiphon): no tun, no Xray — the core IS the
+            // service, on its SOCKS listener.
+            if (psiphonMode) {
+                if (!startPsiphon(gen, psiphonRegion)) {
+                    broadcastStatus(); stopTunnel(); return
+                }
+            } else {
+                if (!XrayController.start(cfg)) {
+                    lastDetail = getString(R.string.conn_core_failed, XrayController.lastError ?: "")
+                    broadcastStatus(); stopTunnel(); return
+                }
+                // 3.2.10 (Aether): Xray is up — start the core now.
+                if (aetherCore != null && !startAether(aetherCore, gen)) {
+                    broadcastStatus(); stopTunnel(); return
+                }
             }
         }
         connected = true
@@ -1682,7 +1806,7 @@ class LiteVpnService : VpnService() {
                     // meanwhile refuses the claim outright.
                     handoverGate.runClaimed(
                         { sessionLive(gen) && currentLinks.isNotEmpty() },
-                        { startTunnel(currentLinks, currentCandidates, currentTestUrl, autoMode, autoId, aetherMode) },
+                        { startTunnel(currentLinks, currentCandidates, currentTestUrl, autoMode, autoId, aetherMode, psiphonMode) },
                     )
                 } catch (_: Exception) {
                 }
@@ -1729,6 +1853,9 @@ class LiteVpnService : VpnService() {
         // 3.2.10 (Aether): end the core process with the session.
         try { AetherEngine.stop() } catch (_: Exception) {}
         aetherMode = false
+        // 1.0.1.6 (Psiphon): end the core process with the session.
+        try { PsiphonEngine.stop() } catch (_: Exception) {}
+        psiphonMode = false
         try { worker?.interrupt() } catch (_: Exception) {}
         try { poller?.interrupt() } catch (_: Exception) {}
         worker = null; poller = null
@@ -1760,6 +1887,7 @@ class LiteVpnService : VpnService() {
                 try { RootProxyManager.stop(this) } catch (_: Exception) {}
             }
             try { AetherEngine.stop() } catch (_: Exception) {}
+            try { PsiphonEngine.stop() } catch (_: Exception) {}
             try { HevTunCore.stop() } catch (_: Exception) {}
             try { XrayController.stop() } catch (_: Exception) {}
         }
@@ -1779,6 +1907,9 @@ class LiteVpnService : VpnService() {
         // it is killed without a clean stopTunnel.
         try { AetherEngine.stop() } catch (_: Exception) {}
         aetherMode = false
+        // 1.0.1.6 (Psiphon): the core dies with the service too.
+        try { PsiphonEngine.stop() } catch (_: Exception) {}
+        psiphonMode = false
         // 3.2.10 (PattNG root mode): rules out before the core dies,
         // even when the service is killed without a clean stopTunnel.
         if (rootMode) {
