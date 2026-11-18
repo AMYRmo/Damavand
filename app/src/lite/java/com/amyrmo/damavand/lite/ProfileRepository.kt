@@ -673,6 +673,40 @@ class ProfileRepository(private val context: Context) {
                 )
                 continue
             }
+            // 1.0.1.6 (Psiphon): a psiphon:// share link parses into a
+            // standalone Psiphon profile — the same parser serves the
+            // subscription body, the manual add, the Add subscription
+            // dialog and the URL scheme alike, so a pasted psiphon://
+            // link is accepted everywhere a config link is. The id
+            // carries the region (`builtin-psiphon-<cc>`, or
+            // `builtin-psiphon-any` for "Any country").
+            if (line.substringBefore("://").lowercase() == "psiphon") {
+                val id = line.substringAfter("://").substringBefore('#').trim()
+                if (id.isEmpty()) continue
+                val code = id.removePrefix("builtin-psiphon-").uppercase()
+                val region = if (id == "builtin-psiphon-any") null
+                else code.takeIf { it.length == 2 && it.all(Char::isLetter) }
+                val name = when {
+                    region == null && id == "builtin-psiphon-any" ->
+                        context.getString(R.string.aether_psiphon_region_any)
+                    region != null -> "${BuiltInPsiphon.regionName(region)} ($region)"
+                    else -> id
+                }
+                out.add(
+                    Profile(
+                        id = id,
+                        link = "psiphon://$id",
+                        name = name,
+                        proto = "psiphon",
+                        address = "",
+                        port = 0,
+                        countryCode = region.orEmpty(),
+                        core = "Psiphon",
+                        subscriptionUrl = subscriptionUrl,
+                    )
+                )
+                continue
+            }
             val parsed = XrayConfig.parse(line)
             if (parsed == null) {
                 // Count only links whose scheme Lite does not speak at
@@ -681,7 +715,7 @@ class ProfileRepository(private val context: Context) {
                 if (scheme !in setOf(
                         "vless", "vmess", "trojan", "ss",
                         "socks", "http", "hysteria2", "wg", "custom",
-                        "aether"
+                        "aether", "psiphon"
                     )
                 ) skippedUnsupported++
                 continue
@@ -806,16 +840,43 @@ class ProfileRepository(private val context: Context) {
      * not already stored are appended, so a later run only adds the
      * countries the bundled list gained.
      */
+    /**
+     * Adds the built-in group's profiles, replacing any stored row
+     * with the same id whose engine fields changed: 1.0.1.6 moved
+     * the group from Aether to the standalone Psiphon core under the
+     * SAME ids, so an upgrade replaces the old Aether rows instead
+     * of keeping them beside the new ones. A stored name is kept
+     * (the user may have renamed a country), as are its ping fields.
+     */
     fun addBuiltInProfiles(subscription: Subscription, profiles: List<Profile>) {
         synchronized(fileLock) {
             val subs = loadSubscriptions()
             if (subs.none { it.url == subscription.url }) {
                 saveSubscriptions(subs + subscription)
             }
-            val existing = loadProfiles()
-            val knownIds = existing.map { it.id }.toHashSet()
-            val fresh = profiles.filter { it.id !in knownIds }
-            if (fresh.isNotEmpty()) saveProfiles(existing + fresh)
+            val existing = loadProfiles().toMutableList()
+            var changed = false
+            for (fresh in profiles) {
+                val at = existing.indexOfFirst { it.id == fresh.id }
+                if (at < 0) {
+                    existing += fresh
+                    changed = true
+                } else {
+                    val old = existing[at]
+                    if (old.proto != fresh.proto || old.link != fresh.link || old.core != fresh.core ||
+                        old.aetherJson != fresh.aetherJson || old.countryCode != fresh.countryCode ||
+                        old.subscriptionUrl != fresh.subscriptionUrl
+                    ) {
+                        existing[at] = fresh.copy(
+                            name = old.name,
+                            lastPingMs = old.lastPingMs,
+                            lastTestedAt = old.lastTestedAt,
+                        )
+                        changed = true
+                    }
+                }
+            }
+            if (changed) saveProfiles(existing)
         }
     }
 
