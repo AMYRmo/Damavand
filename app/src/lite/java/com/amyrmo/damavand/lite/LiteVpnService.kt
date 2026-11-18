@@ -1332,7 +1332,15 @@ class LiteVpnService : VpnService() {
                         this, descriptor!!, activeSocksPort, settings.mtu,
                         settings.ifaceAddr,
                         if (tunHasIpv6) "fc00::10:10:14:1" else null,
-                        pipeline = true,
+                        // 1.0.1.7 (Psiphon): its SOCKS listener rejects a
+                        // pipelined handshake — after reading the greeting
+                        // it finds the CONNECT request already buffered
+                        // ("Failed to flush buffers: 10 bytes left") and
+                        // kills the connection, so with the tunnel up no
+                        // traffic passes at all. A sequential handshake is
+                        // the only one it accepts; Xray's and Aether's
+                        // listeners take either.
+                        pipeline = !psiphonMode,
                         logLevel = hevLog, rwTimeout = hevTimeout,
                         // 1.0.1.6 (Psiphon): its SOCKS listener takes no
                         // credentials, unlike Xray's inbound.
