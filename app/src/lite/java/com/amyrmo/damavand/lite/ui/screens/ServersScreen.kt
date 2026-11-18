@@ -77,6 +77,7 @@ import com.amyrmo.damavand.lite.Profile
 import com.amyrmo.damavand.lite.Subscription
 import com.amyrmo.damavand.lite.XrayConfig
 import com.amyrmo.damavand.lite.ui.LiteViewModel
+import com.amyrmo.damavand.lite.ui.SubError
 import com.amyrmo.damavand.lite.ui.components.ChainLineIcon
 import com.amyrmo.damavand.lite.ui.components.CheckLineIcon
 import com.amyrmo.damavand.lite.ui.components.BoltVector
@@ -152,6 +153,9 @@ fun ServersScreen(
     // 3.2.21 (Damavand BentoProviderCard): which subscription URLs
     // are updating right now — their card shows a spinner.
     val updatingSubs by vm.updatingSubs.collectAsState()
+    // 1.0.1.2 (#98): the last refresh failure per subscription URL —
+    // the card shows the reason instead of failing silently.
+    val subErrors by vm.subErrors.collectAsState()
     val context = LocalContext.current
 
     var showAddSheet by remember { mutableStateOf(false) }
@@ -753,6 +757,7 @@ fun ServersScreen(
                             subscription = openSub,
                             count = selectedGroup!!.profiles.size,
                             updating = openSub.url in updatingSubs,
+                            error = subErrors[openSub.url],
                             onRefresh = { vm.updateSubscription(openSub.url) },
                             onOpenSubscriptions = onOpenSubscriptions,
                             modifier = Modifier.fillMaxWidth()
@@ -1351,6 +1356,7 @@ private fun SubscriptionCard(
     subscription: Subscription,
     count: Int,
     updating: Boolean,
+    error: SubError? = null,
     onRefresh: () -> Unit,
     onOpenSubscriptions: () -> Unit,
     modifier: Modifier = Modifier,
@@ -1433,6 +1439,20 @@ private fun SubscriptionCard(
                     )
                 }
             }
+        }
+        // 1.0.1.2 (#98): the last refresh failure, if any — a failed
+        // refresh used to end silently with nothing changed.
+        if (error != null) {
+            Spacer(Modifier.height(8.dp))
+            Text(
+                text = if (error.arg != null) stringResource(error.resId, error.arg)
+                else stringResource(error.resId),
+                fontSize = 12.5.sp,
+                color = LiteColors.error,
+                fontFamily = Vazirmatn,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis
+            )
         }
         if (fraction != null) {
             Spacer(Modifier.height(10.dp))
