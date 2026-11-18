@@ -22,7 +22,6 @@ object HevTunCore {
         mtu: Int,
         ipv4: String,
         ipv6: String?,
-        preferIpv6: Boolean,
         pipeline: Boolean = true,
         logLevel: String = DEFAULT_LOG_LEVEL,
         rwTimeout: String = DEFAULT_RW_TIMEOUT,
@@ -44,7 +43,7 @@ object HevTunCore {
             val fd = tun.fd
             val (tcpTimeout, udpTimeout) = parseRwTimeout(rwTimeout)
             val yaml = buildYaml(
-                socksPort, mtu, ipv4, ipv6, preferIpv6,
+                socksPort, mtu, ipv4, ipv6,
                 logLevel = logLevel,
                 tcpTimeoutSeconds = tcpTimeout,
                 udpTimeoutSeconds = udpTimeout,
@@ -83,7 +82,6 @@ object HevTunCore {
         mtu: Int,
         ipv4: String,
         ipv6: String?,
-        preferIpv6: Boolean,
         pipeline: Boolean = true,
         logLevel: String = DEFAULT_LOG_LEVEL,
         tcpTimeoutSeconds: Int = 300,
@@ -94,7 +92,13 @@ object HevTunCore {
         appendLine("tunnel:")
         appendLine("  mtu: $mtu")
         appendLine("  ipv4: $ipv4")
-        if (preferIpv6 && ipv6 != null) appendLine("  ipv6: '$ipv6'")
+        // The tun captures IPv6 traffic (::/0) whenever it has an
+        // IPv6 address, so HEV must be given that address too —
+        // without it the IPv6 packets entering the tun go nowhere
+        // (issue #82). The address is present exactly when the tun
+        // carries IPv6; the "prefer IPv6" toggle stays a ping/routing
+        // preference and no longer gates the bridge.
+        if (ipv6 != null) appendLine("  ipv6: '$ipv6'")
         appendLine("socks5:")
         appendLine("  port: $socksPort")
         appendLine("  address: 127.0.0.1")
