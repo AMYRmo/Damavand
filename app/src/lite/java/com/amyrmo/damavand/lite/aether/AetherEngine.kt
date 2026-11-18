@@ -608,6 +608,9 @@ object AetherEngine {
         val context: Context,
         val onExit: () -> Unit,
     ) {
+        // 1.0.1.2 (#64): read from the lifecycle executor AND the
+        // watch thread — volatile like its siblings below.
+        @Volatile
         var process: Process? = null
 
         @Volatile
