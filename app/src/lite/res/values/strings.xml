@@ -550,6 +550,9 @@
     <string name="conn_aether_failed">شروع هسته Aether ناموفق بود</string>
     <string name="conn_aether_stopped">هسته Aether متوقف شد: %1$s</string>
     <string name="conn_aether_no_psiphon">حالت Psiphon در این نسخه پشتیبانی نمی‌شود — کلاینت Psiphon در اپ نیست</string>
+    <string name="conn_psiphon_failed">شروع هسته سایفون ناموفق بود</string>
+    <string name="conn_psiphon_stopped">هسته سایفون متوقف شد: %1$s</string>
+    <string name="conn_psiphon_chain">یک زنجیره نمی‌تواند پروفایل سایفون داشته باشد — سایفون به‌تنهایی وصل می‌شود</string>
     <string name="aether_root_unsupported">حالت Aether با حالت روت ترکیب نمی‌شود — اول حالت روت را خاموش کنید</string>
     <string name="chain_two_aether">یک زنجیره نمی‌تواند بیش از یک پروفایل Aether داشته باشد — فقط یک Aether در هر زنجیره</string>
     <string name="aether_add_title">Aether جدید</string>
