@@ -30,6 +30,14 @@ data class Profile(
     /** True when this profile runs on the Aether core. */
     val isAether: Boolean get() = proto == "aether" || aetherJson.isNotEmpty()
 
+    /**
+     * True when this profile runs on the standalone Psiphon core
+     * (1.0.1.6): its link is "psiphon://<id>", it has no server of
+     * its own to ping or test, and its exit country is [countryCode]
+     * (empty = "Any country").
+     */
+    val isPsiphon: Boolean get() = proto == "psiphon"
+
     companion object {
         /** Stable id from the link itself (so re-imports dedupe). */
         fun idFor(link: String): String = link.hashCode().toUInt().toString(16)
