@@ -70,6 +70,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.amyrmo.damavand.lite.AutoSelectIds
+import com.amyrmo.damavand.lite.BuiltInPsiphon
 import com.amyrmo.damavand.lite.Chain
 import com.amyrmo.damavand.lite.QrShare
 import com.amyrmo.damavand.lite.R
@@ -339,7 +340,10 @@ fun ServersScreen(
         val rowPos = if (doubleColumn) posInGroup / 2 else posInGroup
         // 3.2.3: the Auto card shows for every group, so it always
         // takes one item between the card row and the rows.
-        val target = 2 + banner + chains.size + 1 + 1 + rowPos
+        // 1.0.1.5: except when the group has no usable Auto member —
+        // then the card is hidden (see the Auto card above).
+        val autoShown = if (group.profiles.any { !it.isAether && it.proto != "custom" }) 1 else 0
+        val target = 2 + banner + chains.size + 1 + autoShown + rowPos
         scope.launch {
             kotlinx.coroutines.delay(150)
             listState.scrollToItem(target)
@@ -710,12 +714,26 @@ fun ServersScreen(
                                                 expanded = chipMenuOpen,
                                                 onDismissRequest = { chipMenuOpen = false }
                                             ) {
+                                                // 1.0.1.5 (BuiltInPsiphon): the built-in
+                                                // group has nothing to refresh from.
+                                                if (!BuiltInPsiphon.isBuiltIn(group.key)) {
+                                                    MenuActionItem(
+                                                        labelRes = R.string.subs_update,
+                                                        enabled = true,
+                                                        onClick = {
+                                                            chipMenuOpen = false
+                                                            vm.updateSubscription(group.key)
+                                                        }
+                                                    )
+                                                }
+                                                // 1.0.1.5: share the subscription's URL
+                                                // through the system sheet.
                                                 MenuActionItem(
-                                                    labelRes = R.string.subs_update,
+                                                    labelRes = R.string.server_menu_share,
                                                     enabled = true,
                                                     onClick = {
                                                         chipMenuOpen = false
-                                                        vm.updateSubscription(group.key)
+                                                        shareText(group.key)
                                                     }
                                                 )
                                                 MenuActionItem(
@@ -770,8 +788,13 @@ fun ServersScreen(
                 // select it, play to connect through it, (i) for the
                 // live members + switch history. The core measures the
                 // members and switches by itself; there is no toggle.
+                // 1.0.1.5: no card when the group has no usable Auto
+                // member — an Aether profile or a custom config has no
+                // single outbound, so Auto over a group of only those
+                // (the built-in Psiphon group) would just error.
                 val autoGroup = selectedGroup
-                if (autoGroup != null && autoId != null) {
+                if (autoGroup != null && autoId != null &&
+                    autoGroup.profiles.any { !it.isAether && it.proto != "custom" }) {
                     item(key = "auto-card") {
                         AutoSelectCard(
                             groupLabel = vm.groupLabel(autoGroup.key),
@@ -1409,34 +1432,39 @@ private fun SubscriptionCard(
                 )
             }
             Spacer(Modifier.width(8.dp))
-            // 3.2.21 (Damavand): while this subscription updates,
-            // a spinner takes the sync button's place.
-            if (updating) {
-                Box(
-                    modifier = Modifier.size(44.dp),
-                    contentAlignment = Alignment.Center
-                ) {
-                    CircularProgressIndicator(
-                        modifier = Modifier.size(22.dp),
-                        color = LiteColors.accent,
-                        strokeWidth = 2.5.dp
-                    )
-                }
-            } else {
-                Box(
-                    modifier = Modifier
-                        .size(44.dp)
-                        .clip(CircleShape)
-                        .background(LiteColors.accent)
-                        .clickable(onClick = onRefresh),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Icon(
-                        imageVector = RefreshVector,
-                        contentDescription = stringResource(R.string.subs_update),
-                        tint = Color.White,
-                        modifier = Modifier.size(22.dp)
-                    )
+            // 1.0.1.5 (BuiltInPsiphon): the built-in group has nothing
+            // to refresh from — no sync button at all, instead of one
+            // that spins and changes nothing.
+            if (!BuiltInPsiphon.isBuiltIn(subscription.url)) {
+                // 3.2.21 (Damavand): while this subscription updates,
+                // a spinner takes the sync button's place.
+                if (updating) {
+                    Box(
+                        modifier = Modifier.size(44.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        CircularProgressIndicator(
+                            modifier = Modifier.size(22.dp),
+                            color = LiteColors.accent,
+                            strokeWidth = 2.5.dp
+                        )
+                    }
+                } else {
+                    Box(
+                        modifier = Modifier
+                            .size(44.dp)
+                            .clip(CircleShape)
+                            .background(LiteColors.accent)
+                            .clickable(onClick = onRefresh),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(
+                            imageVector = RefreshVector,
+                            contentDescription = stringResource(R.string.subs_update),
+                            tint = Color.White,
+                            modifier = Modifier.size(22.dp)
+                        )
+                    }
                 }
             }
         }
