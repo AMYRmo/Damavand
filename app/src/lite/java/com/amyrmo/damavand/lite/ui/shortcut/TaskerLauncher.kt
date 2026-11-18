@@ -74,6 +74,7 @@ object TaskerLauncher {
                 action = LiteVpnService.ACTION_START
                 putExtra(LiteVpnService.EXTRA_LINK, profile.link)
                 if (profile.isAether) putExtra(LiteVpnService.EXTRA_AETHER, true)
+                if (profile.isPsiphon) putExtra(LiteVpnService.EXTRA_PSIPHON, true)
                 putExtra(LiteVpnService.EXTRA_TEST_URL, testUrl)
                 putExtra(LiteVpnService.EXTRA_KILL_SWITCH, killSwitch)
             }
@@ -92,6 +93,7 @@ object TaskerLauncher {
                         profiles.firstOrNull()?.let {
                             putExtra(LiteVpnService.EXTRA_LINK, it.link)
                             if (it.isAether) putExtra(LiteVpnService.EXTRA_AETHER, true)
+                            if (it.isPsiphon) putExtra(LiteVpnService.EXTRA_PSIPHON, true)
                         } ?: run { openApp(context); return false }
                     }
                     putExtra(LiteVpnService.EXTRA_TEST_URL, testUrl)
