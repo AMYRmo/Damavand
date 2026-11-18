@@ -384,6 +384,10 @@ class SettingsStore(private val context: Context) {
         }
     }
 
+    /** The whole auto-pick map as stored (for backups, issue #87). */
+    suspend fun autoLastPickRawNow(): String =
+        context.liteDataStore.data.first()[KEY_AUTO_LAST_PICK] ?: "{}"
+
     /** The Auto tuning snapshot for one connection build. */
     suspend fun autoTuningNow(): AutoSelectTuning = AutoSelectTuning(
         probeUrl = autoProbeUrl.first().trim(),
