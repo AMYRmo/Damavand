@@ -44,5 +44,26 @@ class LiteApp : Application() {
         super.onCreate()
         // Context only — no native code is touched here (see class doc).
         XrayController.setAppContext(this)
+        // 1.0.1.2 (#113): the digit style used to be set only by the
+        // Activity (LocaleHelper.wrap) — when the service ran without
+        // it (tile, Tasker, boot, process restart) the notification
+        // digits stayed Persian even in the English UI. Initialise it
+        // from the persisted language here, at process start.
+        runCatching {
+            val stored = kotlinx.coroutines.runBlocking { SettingsStore(this).languageNow() }
+            com.amyrmo.damavand.lite.ui.theme.LiteFormat.persianDigits =
+                LocaleHelper.resolveLanguage(stored) == "fa"
+        }
+        // 1.0.1.2 (#85): the service runs in this same process, so if
+        // the process is starting fresh the service cannot be running —
+        // a low-memory kill or crash may have left a stale
+        // "connected" tile/shortcut state behind. Reset it here; the
+        // service re-asserts the true state via broadcastStatus() as
+        // soon as it starts a tunnel.
+        runCatching {
+            getSharedPreferences("lite_tile", MODE_PRIVATE)
+                .edit().putBoolean("connected", false)
+                .putBoolean("connecting", false).apply()
+        }
     }
 }
