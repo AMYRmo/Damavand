@@ -121,6 +121,7 @@
     <string name="tasker_blurb_start">شروع %1$s</string>
     <string name="tasker_blurb_stop">توقف %1$s</string>
     <string name="tasker_start_service">شروع سرویس</string>
+    <string name="tasker_select_profile">اول یک پروفایل انتخاب کنید</string>
     <!-- 3.2.11 — URL scheme import (PattNG UrlSchemeActivity) -->
     <string name="import_subscription_success">وارد شد</string>
     <string name="import_subscription_failure">وارد کردن ناموفق بود</string>
@@ -130,7 +131,6 @@
     <string name="geo_ready">آماده</string>
     <string name="geo_update">به‌روزرسانی</string>
     <string name="geo_retry">تلاش دوباره</string>
-    <string name="geo_update_available">نسخه جدید داده موقعیت در دسترس است</string>
     <string name="geo_err_network">دانلود ناموفق بود — اتصال اینترنت را بررسی کنید</string>
     <string name="geo_err_corrupt">فایل دانلودشده خراب است — دوباره تلاش کنید</string>
 
@@ -138,6 +138,7 @@
     <string name="about_version">نسخه</string>
     <string name="about_version_code">کد نسخه %1$s</string>
     <string name="geo_version">نسخه: %1$s</string>
+    <string name="geo_version_unknown">نامشخص</string>
     <string name="about_package">بسته برنامه</string>
     <string name="about_core">هسته</string>
     <string name="about_repo">مخزن</string>
@@ -151,6 +152,7 @@
     <string name="sub_import_add">افزودن</string>
     <string name="sub_import_cancel">لغو</string>
     <string name="sub_import_failed_network">دریافت سابسکریپشن ناموفق بود — اینترنت را بررسی کنید، یا وقتی به اینترنت آزاد وصل هستید دوباره تلاش کنید</string>
+    <string name="sub_import_failed_http">سرور پاسخ داد (خطای %1$d) — لینک اشتراک معتبر نیست یا حذف شده است</string>
     <string name="sub_import_failed_empty">در این سابسکریپشن هیچ کانفیگ قابل‌استفاده‌ای پیدا نشد</string>
     <string name="sub_import_failed_unsupported">%1$d کانفیگ با پروتکل پشتیبانی‌نشده رد شد — دماوند فعلاً VLESS، VMess، Trojan و Shadowsocks را پشتیبانی می‌کند</string>
     <string name="sub_import_failed_single">این لینک کانفیگ معتبر نیست — باید VLESS، VMess، Trojan، Shadowsocks یا Aether باشد</string>
@@ -178,6 +180,7 @@
     <string name="settings_group_misc">متفرقه</string>
     <string name="proxy_only_title">فقط پروکسی</string>
     <string name="proxy_only_desc">بدون تونل سیستمی؛ فقط Xray و SOCKS اجرا می‌شود</string>
+    <string name="proxy_only_perapp_note">در این حالت انتخاب برنامه‌ها اعمال نمی‌شود — چون تانلی ساخته نمی‌شود، همهٔ برنامه‌ها باید خودشان پروکسی را تنظیم کنند</string>
     <string name="route_only_title">فقط مسیرهای مشخص</string>
     <string name="route_only_desc">ترافیکی که هیچ قانونی ندارد مستقیم می‌رود، نه از پروکسی</string>
     <string name="local_dns_title">DNS محلی</string>
@@ -204,6 +207,7 @@
     <string name="prefer_ipv6_desc">وقتی یک هاست هم IPv4 هم IPv6 دارد، IPv6 انتخاب می‌شود</string>
     <string name="aether_listen_port_title">پورت اتر</string>
     <string name="aether_listen_port_desc">پورتی که برنامه برای SOCKS هستهٔ اتر استفاده می‌کند</string>
+    <string name="aether_port_clash">این پورت با پورت SOCKS یکی است؛ پورت دیگری انتخاب کنید</string>
     <string name="mtu_title">MTU</string>
     <string name="mtu_desc">اندازه بسته تونل؛ پیش‌فرض 1500</string>
     <string name="settings_value_range">یک عدد بین %1$d و %2$d وارد کنید</string>
@@ -524,6 +528,7 @@
     <string name="stats_usage_title">مصرف هر سرور</string>
     <string name="stats_usage_empty">هنوز مصرفی ثبت نشده است</string>
     <string name="stats_usage_total">مجموع: %1$s</string>
+    <string name="stats_usage_deleted">حذف‌شده‌ها</string>
     <string name="stats_today">امروز</string>
     <string name="stats_week">این هفته</string>
     <string name="stats_month">این ماه</string>
