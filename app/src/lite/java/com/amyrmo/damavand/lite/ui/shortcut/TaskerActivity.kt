@@ -3,6 +3,7 @@ package com.amyrmo.damavand.lite.ui.shortcut
 import android.content.Intent
 import android.os.Bundle
 import android.text.TextUtils
+import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.foundation.clickable
@@ -104,6 +105,10 @@ class TaskerActivity : ComponentActivity() {
     private fun confirmFinish() {
         val position = selectedPosition
         if (position < 0) {
+            // 1.0.1.2 (#105): Save with nothing selected used to do
+            // nothing at all — say so (the Save button is also disabled
+            // until a row is picked, so this is the backstop).
+            Toast.makeText(this, R.string.tasker_select_profile, Toast.LENGTH_SHORT).show()
             return
         }
 
@@ -141,7 +146,10 @@ class TaskerActivity : ComponentActivity() {
                     )
                 }
                 Spacer(modifier = Modifier.weight(1f))
-                TextButton(onClick = { confirmFinish() }) {
+                TextButton(
+                    onClick = { confirmFinish() },
+                    enabled = selectedPosition >= 0,
+                ) {
                     Text(
                         text = stringResource(R.string.server_edit_save),
                         fontSize = 14.sp,
