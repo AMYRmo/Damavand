@@ -24,20 +24,31 @@ class BootReceiver : BroadcastReceiver() {
         if (intent.action != Intent.ACTION_BOOT_COMPLETED) return
         runBlocking {
             val store = SettingsStore(context)
-            if (!store.autoStartBootNow()) {
-                // No tunnel after this reboot: the tile/shortcuts must
-                // not keep showing the pre-reboot "connected" state.
-                try {
-                    context.getSharedPreferences("lite_tile", Context.MODE_PRIVATE)
-                        .edit().putBoolean("connected", false)
-                        .putBoolean("connecting", false).apply()
-                } catch (_: Exception) {
-                }
+            // No tunnel after this reboot (auto-start off, no selection
+            // left, or the selection no longer resolves): the tile and
+            // shortcuts must not keep showing the pre-reboot
+            // "connected" state (issue #85). Every early return below
+            // resets it first.
+            val selected = if (store.autoStartBootNow()) store.selectedProfileIdNow() else null
+            val svc = selected?.let { StartIntent.build(context, it) }
+            if (svc == null) {
+                resetTile(context)
                 return@runBlocking
             }
-            val selected = store.selectedProfileIdNow() ?: return@runBlocking
-            val svc = StartIntent.build(context, selected) ?: return@runBlocking
-            context.startForegroundService(svc)
+            try {
+                context.startForegroundService(svc)
+            } catch (_: Exception) {
+                resetTile(context)
+            }
+        }
+    }
+
+    private fun resetTile(context: Context) {
+        try {
+            context.getSharedPreferences("lite_tile", Context.MODE_PRIVATE)
+                .edit().putBoolean("connected", false)
+                .putBoolean("connecting", false).apply()
+        } catch (_: Exception) {
         }
     }
 }
