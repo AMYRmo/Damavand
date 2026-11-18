@@ -121,6 +121,9 @@ fun SettingsScreen(
     val realPingConcurrency by vm.realPingConcurrency.collectAsState(initial = "5")
     val ipApiUrl by vm.ipApiUrl.collectAsState(initial = "https://ipinfo.io/json")
     val proxyOnly by vm.proxyOnly.collectAsState(initial = false)
+    // 1.0.1.2 (#102): warn when proxy-only is on with a per-app list —
+    // the selection is silently ignored in that mode.
+    val perAppPackages by vm.perAppPackages.collectAsState()
     val showSpeedNotif by vm.showSpeedNotif.collectAsState(initial = true)
     val confirmDelete by vm.confirmDelete.collectAsState(initial = true)
     val language by vm.language.collectAsState(initial = "auto")
@@ -274,6 +277,20 @@ fun SettingsScreen(
                 checked = proxyOnly,
                 onCheckedChange = { vm.setProxyOnly(it) }
             )
+            // 1.0.1.2 (#102): proxy-only builds no tun, so the per-app
+            // selection never applies — say so instead of failing silently.
+            if (proxyOnly && perAppPackages.isNotEmpty()) {
+                GroupDivider()
+                Text(
+                    text = stringResource(R.string.proxy_only_perapp_note),
+                    fontSize = 12.sp,
+                    color = LiteColors.error,
+                    fontFamily = Vazirmatn,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp, vertical = 12.dp)
+                )
+            }
             GroupDivider()
             SwitchRow(
                 titleRes = R.string.route_only_title,
@@ -903,7 +920,15 @@ fun SettingsScreen(
             )
             "socks_port" -> Quadruple(
                 R.string.socks_port_title, R.string.socks_port_desc, socksPort,
-                { v: String -> vm.setSocksPort(v) }
+                { v: String ->
+                    // 1.0.1.2 (#107): the SOCKS inbound and the Aether
+                    // listener must not share a port — refuse and say why.
+                    if (v.toIntOrNull() != null && v.toIntOrNull() == aetherListenPort.toIntOrNull()) {
+                        Toast.makeText(context, R.string.aether_port_clash, Toast.LENGTH_SHORT).show()
+                    } else {
+                        vm.setSocksPort(v)
+                    }
+                }
             )
             "socks_user" -> Quadruple(
                 R.string.socks_user_title, R.string.socks_user_desc, socksUser,
@@ -923,7 +948,15 @@ fun SettingsScreen(
             )
             "aether_listen_port" -> Quadruple(
                 R.string.aether_listen_port_title, R.string.aether_listen_port_desc, aetherListenPort,
-                { v: String -> vm.setAetherListenPort(v) }
+                { v: String ->
+                    // 1.0.1.2 (#107): the Aether listener and the SOCKS
+                    // inbound must not share a port — refuse and say why.
+                    if (v.toIntOrNull() != null && v.toIntOrNull() == socksPort.toIntOrNull()) {
+                        Toast.makeText(context, R.string.aether_port_clash, Toast.LENGTH_SHORT).show()
+                    } else {
+                        vm.setAetherListenPort(v)
+                    }
+                }
             )
             "domestic_dns" -> Quadruple(
                 R.string.domestic_dns_title, R.string.domestic_dns_desc, domesticDns,
@@ -1568,15 +1601,6 @@ private fun GeoRow(
                             fontFamily = Vazirmatn
                         )
                     }
-                    is GeoDownloader.State.UpdateAvailable -> {
-                        Spacer(Modifier.height(2.dp))
-                        Text(
-                            text = stringResource(R.string.geo_update_available),
-                            fontSize = 12.sp,
-                            color = LiteColors.textSecondary,
-                            fontFamily = Vazirmatn
-                        )
-                    }
                     is GeoDownloader.State.Error -> {
                         Spacer(Modifier.height(2.dp))
                         Text(
@@ -1614,17 +1638,22 @@ private fun GeoRow(
                         )
                     }
                 }
+                // 1.0.1.2 (#115): the UpdateAvailable state was never
+                // emitted (no remote version is ever compared), and it
+                // was also the only re-download path. Ready now offers
+                // the update pill itself, so geo can be refreshed.
                 is GeoDownloader.State.Ready -> {
-                    Text(
-                        text = stringResource(R.string.geo_ready),
-                        fontSize = 13.sp,
-                        fontWeight = FontWeight.SemiBold,
-                        color = LiteColors.green,
-                        fontFamily = Vazirmatn
-                    )
-                }
-                is GeoDownloader.State.UpdateAvailable -> {
-                    GeoPillButton(labelRes = R.string.geo_update, onClick = onDownload)
+                    Column(horizontalAlignment = Alignment.End) {
+                        Text(
+                            text = stringResource(R.string.geo_ready),
+                            fontSize = 13.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            color = LiteColors.green,
+                            fontFamily = Vazirmatn
+                        )
+                        Spacer(Modifier.height(8.dp))
+                        GeoPillButton(labelRes = R.string.geo_update, onClick = onDownload)
+                    }
                 }
                 is GeoDownloader.State.Error -> {
                     Column(horizontalAlignment = Alignment.End) {
