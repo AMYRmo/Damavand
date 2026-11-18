@@ -43,7 +43,10 @@ fun FlagBadge(
     modifier: Modifier = Modifier,
     size: Dp = 30.dp
 ) {
-    val code = countryCode?.uppercase()
+    // 1.0.1.2 (#72): only a 2-letter ISO code is a flag — "" (unknown)
+    // is not null, so it used to render an empty grey chip, and
+    // non-2-letter values (Cloudflare trace's "T1") made odd badges.
+    val code = countryCode?.uppercase()?.takeIf { it.length == 2 }
     val assetName = code?.lowercase()
     val context = LocalContext.current
 
