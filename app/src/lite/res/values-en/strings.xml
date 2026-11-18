@@ -121,6 +121,7 @@
     <string name="tasker_blurb_start">Start %1$s</string>
     <string name="tasker_blurb_stop">Stop %1$s</string>
     <string name="tasker_start_service">Start service</string>
+    <string name="tasker_select_profile">Pick a profile first</string>
     <!-- 3.2.11 — URL scheme import (PattNG UrlSchemeActivity) -->
     <string name="import_subscription_success">Imported</string>
     <string name="import_subscription_failure">Import failed</string>
@@ -130,7 +131,6 @@
     <string name="geo_ready">Ready</string>
     <string name="geo_update">Update</string>
     <string name="geo_retry">Retry</string>
-    <string name="geo_update_available">A new version of the location data is available</string>
     <string name="geo_err_network">Download failed — check your internet connection</string>
     <string name="geo_err_corrupt">The downloaded file is corrupt — try again</string>
 
@@ -138,6 +138,7 @@
     <string name="about_version">Version</string>
     <string name="about_version_code">Version code %1$s</string>
     <string name="geo_version">Version: %1$s</string>
+    <string name="geo_version_unknown">unknown</string>
     <string name="about_package">App package</string>
     <string name="about_core">Core</string>
     <string name="about_repo">Repository</string>
@@ -151,6 +152,7 @@
     <string name="sub_import_add">Add</string>
     <string name="sub_import_cancel">Cancel</string>
     <string name="sub_import_failed_network">Fetching the subscription failed — check the internet, or try again when connected to open internet</string>
+    <string name="sub_import_failed_http">The server answered (HTTP %1$d) — the subscription link is invalid or was removed</string>
     <string name="sub_import_failed_empty">No usable config was found in this subscription</string>
     <string name="sub_import_failed_unsupported">%1$d configs with unsupported protocols were skipped — Damavand currently supports VLESS, VMess, Trojan and Shadowsocks</string>
     <string name="sub_import_failed_single">This is not a valid config link — it must be VLESS, VMess, Trojan, Shadowsocks or Aether</string>
@@ -178,6 +180,7 @@
     <string name="settings_group_misc">Misc</string>
     <string name="proxy_only_title">Proxy only</string>
     <string name="proxy_only_desc">No system tunnel; only Xray and SOCKS run</string>
+    <string name="proxy_only_perapp_note">In this mode the per-app selection does not apply — no tunnel is created, so every app must set the proxy itself</string>
     <string name="route_only_title">Only specified routes</string>
     <string name="route_only_desc">Traffic with no rule goes direct, not through the proxy</string>
     <string name="local_dns_title">Local DNS</string>
@@ -204,6 +207,7 @@
     <string name="prefer_ipv6_desc">When a host has both IPv4 and IPv6, pick IPv6</string>
     <string name="aether_listen_port_title">Aether port</string>
     <string name="aether_listen_port_desc">The port the app dials for the Aether core SOCKS listener</string>
+    <string name="aether_port_clash">This port is the same as the SOCKS port; pick another one</string>
     <string name="mtu_title">MTU</string>
     <string name="mtu_desc">Tunnel packet size; default 1500</string>
     <string name="settings_value_range">Enter a number from %1$d to %2$d</string>
@@ -525,6 +529,7 @@
     <string name="stats_usage_title">Usage per server</string>
     <string name="stats_usage_empty">No usage recorded yet</string>
     <string name="stats_usage_total">Total: %1$s</string>
+    <string name="stats_usage_deleted">Deleted</string>
     <string name="stats_today">Today</string>
     <string name="stats_week">This week</string>
     <string name="stats_month">This month</string>
