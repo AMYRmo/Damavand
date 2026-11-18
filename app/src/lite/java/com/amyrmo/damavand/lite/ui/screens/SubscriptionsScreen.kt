@@ -1,5 +1,6 @@
 package com.amyrmo.damavand.lite.ui.screens
 
+import android.content.Intent
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -33,6 +34,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
@@ -41,6 +43,7 @@ import androidx.compose.ui.text.style.TextDirection
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.amyrmo.damavand.lite.BuiltInPsiphon
 import com.amyrmo.damavand.lite.R
 import com.amyrmo.damavand.lite.Subscription
 import com.amyrmo.damavand.lite.ui.LiteViewModel
@@ -61,11 +64,24 @@ import java.util.Locale
  */
 @Composable
 fun SubscriptionsScreen(vm: LiteViewModel, onBack: () -> Unit) {
+    val context = LocalContext.current
     val subscriptions by vm.subscriptions.collectAsState()
     val profiles by vm.profiles.collectAsState()
     var menuSub by remember { mutableStateOf<Subscription?>(null) }
     var renameSub by remember { mutableStateOf<Subscription?>(null) }
     var deleteSub by remember { mutableStateOf<Subscription?>(null) }
+
+    // 1.0.1.5: share a subscription's URL through the system sheet,
+    // so the user can send a sub to a friend who pastes it into
+    // Damavand (or any client) — including the built-in Psiphon
+    // link, which seeds the whole group on import.
+    fun shareText(text: String) {
+        val intent = Intent(Intent.ACTION_SEND).apply {
+            type = "text/plain"
+            putExtra(Intent.EXTRA_TEXT, text)
+        }
+        context.startActivity(Intent.createChooser(intent, null))
+    }
 
     Column(
         modifier = Modifier
@@ -120,50 +136,64 @@ fun SubscriptionsScreen(vm: LiteViewModel, onBack: () -> Unit) {
             },
             text = {
                 Column {
-                    MenuActionRow(
-                        labelRes = R.string.sub_menu_update,
-                        onClick = { vm.updateSubscription(target.url); menuSub = null }
-                    )
+                    // 1.0.1.5 (BuiltInPsiphon): the built-in group has
+                    // nothing to refresh from, no auto-update to
+                    // toggle, and cannot be deleted — only rename and
+                    // share apply to it.
+                    if (!BuiltInPsiphon.isBuiltIn(target.url)) {
+                        MenuActionRow(
+                            labelRes = R.string.sub_menu_update,
+                            onClick = { vm.updateSubscription(target.url); menuSub = null }
+                        )
+                    }
                     MenuActionRow(
                         labelRes = R.string.sub_menu_rename,
                         onClick = { renameSub = target; menuSub = null }
                     )
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .defaultMinSize(minHeight = 48.dp)
-                            .padding(vertical = 6.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Text(
-                            text = stringResource(R.string.sub_auto_update_label),
-                            fontSize = 14.sp,
-                            fontWeight = FontWeight.SemiBold,
-                            color = LiteColors.text,
-                            fontFamily = Vazirmatn,
-                            modifier = Modifier.weight(1f)
-                        )
-                        Switch(
-                            checked = target.autoUpdate,
-                            onCheckedChange = {
-                                vm.setSubscriptionAutoUpdate(target.url, it)
-                                menuSub = null
-                            },
-                            colors = SwitchDefaults.colors(
-                                checkedThumbColor = Color.White,
-                                checkedTrackColor = LiteColors.accent,
-                                checkedBorderColor = Color.Transparent,
-                                uncheckedThumbColor = LiteColors.text,
-                                uncheckedTrackColor = LiteColors.surface2,
-                                uncheckedBorderColor = LiteColors.hairlineStrong
+                    MenuActionRow(
+                        labelRes = R.string.server_menu_share,
+                        onClick = { shareText(target.url); menuSub = null }
+                    )
+                    if (!BuiltInPsiphon.isBuiltIn(target.url)) {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .defaultMinSize(minHeight = 48.dp)
+                                .padding(vertical = 6.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(
+                                text = stringResource(R.string.sub_auto_update_label),
+                                fontSize = 14.sp,
+                                fontWeight = FontWeight.SemiBold,
+                                color = LiteColors.text,
+                                fontFamily = Vazirmatn,
+                                modifier = Modifier.weight(1f)
                             )
+                            Switch(
+                                checked = target.autoUpdate,
+                                onCheckedChange = {
+                                    vm.setSubscriptionAutoUpdate(target.url, it)
+                                    menuSub = null
+                                },
+                                colors = SwitchDefaults.colors(
+                                    checkedThumbColor = Color.White,
+                                    checkedTrackColor = LiteColors.accent,
+                                    checkedBorderColor = Color.Transparent,
+                                    uncheckedThumbColor = LiteColors.text,
+                                    uncheckedTrackColor = LiteColors.surface2,
+                                    uncheckedBorderColor = LiteColors.hairlineStrong
+                                )
+                            )
+                        }
+                    }
+                    if (!BuiltInPsiphon.isBuiltIn(target.url)) {
+                        MenuActionRow(
+                            labelRes = R.string.sub_menu_delete,
+                            danger = true,
+                            onClick = { deleteSub = target; menuSub = null }
                         )
                     }
-                    MenuActionRow(
-                        labelRes = R.string.sub_menu_delete,
-                        danger = true,
-                        onClick = { deleteSub = target; menuSub = null }
-                    )
                 }
             },
             confirmButton = {},
@@ -331,16 +361,20 @@ private fun SubscriptionRow(
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis
             )
-            Spacer(Modifier.height(4.dp))
-            Text(
-                text = sub.url,
-                fontSize = 11.sp,
-                color = LiteColors.textMuted,
-                fontFamily = Vazirmatn,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-                style = TextStyle(textDirection = TextDirection.Ltr)
-            )
+            // 1.0.1.5 (BuiltInPsiphon): the built-in group has no URL
+            // to show — it is not a subscription the user added.
+            if (!BuiltInPsiphon.isBuiltIn(sub.url)) {
+                Spacer(Modifier.height(4.dp))
+                Text(
+                    text = sub.url,
+                    fontSize = 11.sp,
+                    color = LiteColors.textMuted,
+                    fontFamily = Vazirmatn,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    style = TextStyle(textDirection = TextDirection.Ltr)
+                )
+            }
             Spacer(Modifier.height(4.dp))
             Text(
                 text = stringResource(R.string.subs_profiles_count, LiteFormat.toPersian(profileCount.toString())) +
@@ -351,16 +385,20 @@ private fun SubscriptionRow(
             )
         }
         Spacer(Modifier.width(8.dp))
-        CircleIconButton(
-            buttonSize = 36.dp,
-            glyphSize = 16.dp,
-            filled = false,
-            onClick = onRefresh,
-            glyphColor = LiteColors.text,
-            icon = RefreshVector,
-            contentDescription = stringResource(R.string.cd_refresh)
-        )
-        Spacer(Modifier.width(8.dp))
+        // 1.0.1.5 (BuiltInPsiphon): the built-in group has nothing
+        // to refresh from — no refresh button.
+        if (!BuiltInPsiphon.isBuiltIn(sub.url)) {
+            CircleIconButton(
+                buttonSize = 36.dp,
+                glyphSize = 16.dp,
+                filled = false,
+                onClick = onRefresh,
+                glyphColor = LiteColors.text,
+                icon = RefreshVector,
+                contentDescription = stringResource(R.string.cd_refresh)
+            )
+            Spacer(Modifier.width(8.dp))
+        }
         CircleIconButton(
             buttonSize = 36.dp,
             glyphSize = 18.dp,
