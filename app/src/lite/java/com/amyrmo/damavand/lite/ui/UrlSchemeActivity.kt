@@ -37,6 +37,15 @@ class UrlSchemeActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         try {
+            // 1.0.1.2 (#92): a .dmv file opened from a file manager
+            // (scheme content/file, not a damavand:// deep link).
+            val data = intent.data
+            if (intent.action == Intent.ACTION_VIEW &&
+                (data?.scheme == "content" || data?.scheme == "file")
+            ) {
+                importFile(data)
+                return
+            }
             // The import runs first and the main screen opens after it:
             // finishing here would cancel the import with the activity.
             // The translucent theme keeps this activity invisible meanwhile.
@@ -114,6 +123,54 @@ class UrlSchemeActivity : ComponentActivity() {
                     ).show()
                     openMain()
                 }
+            }
+        }
+    }
+
+    /**
+     * A .dmv file (1.0.1.2, #92): a Lite backup bundle, or plain link
+     * text — one config per line, or a single raw Xray JSON config.
+     */
+    private fun importFile(uri: Uri?) {
+        if (uri == null) {
+            toastFailure()
+            openMain()
+            return
+        }
+        lifecycleScope.launch(Dispatchers.IO) {
+            val text = try {
+                contentResolver.openInputStream(uri)?.bufferedReader()?.readText()
+            } catch (_: Exception) {
+                null
+            }
+            val ok = if (text.isNullOrBlank()) {
+                false
+            } else {
+                val trimmed = text.trim()
+                val isBackup = try {
+                    val obj = org.json.JSONObject(trimmed)
+                    obj.optInt("version", 0) >= 1 &&
+                        (obj.has("profiles") || obj.has("subscriptions"))
+                } catch (_: Exception) {
+                    false
+                }
+                if (isBackup) {
+                    com.amyrmo.damavand.lite.BackupManager.importJson(applicationContext, trimmed)
+                } else {
+                    val repo = ProfileRepository(applicationContext)
+                    repo.addSingleLinks(normalize(trimmed)) is ProfileRepository.FetchResult.Ok
+                }
+            }
+            withContext(Dispatchers.Main) {
+                Toast.makeText(
+                    this@UrlSchemeActivity,
+                    getString(
+                        if (ok) R.string.import_subscription_success
+                        else R.string.import_subscription_failure
+                    ),
+                    Toast.LENGTH_SHORT
+                ).show()
+                openMain()
             }
         }
     }
