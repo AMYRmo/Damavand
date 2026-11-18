@@ -176,6 +176,10 @@ class LiteViewModel(app: Application) : AndroidViewModel(app) {
     val chainPick: StateFlow<List<String>> = _chainPick.asStateFlow()
 
     fun toggleChainPick(id: String) {
+        // 1.0.1.6 (Psiphon): a Psiphon profile is the tunnel itself,
+        // not a chain hop — it cannot be picked into a chain (the
+        // service refuses such a chain too, with its own message).
+        if (_profiles.value.firstOrNull { it.id == id }?.isPsiphon == true) return
         _chainPick.update { pick ->
             if (id in pick) pick - id else pick + id
         }
@@ -642,6 +646,8 @@ class LiteViewModel(app: Application) : AndroidViewModel(app) {
         displayName: String? = null,
         // 3.2.10 (Aether): the single link is an Aether profile.
         aether: Boolean = false,
+        // 1.0.1.6 (Psiphon): the single link is a standalone Psiphon profile.
+        psiphon: Boolean = false,
     ) {
         if (_connection.value.state == ConnState.CONNECTING &&
             System.currentTimeMillis() - lastConnectAt < 30_000
@@ -673,6 +679,9 @@ class LiteViewModel(app: Application) : AndroidViewModel(app) {
                 // 3.2.10 (Aether): the service builds the Aether
                 // config and starts the core beside Xray.
                 if (aether) putExtra(LiteVpnService.EXTRA_AETHER, true)
+                // 1.0.1.6 (Psiphon): the service starts the
+                // standalone Psiphon core instead of Xray.
+                if (psiphon) putExtra(LiteVpnService.EXTRA_PSIPHON, true)
                 displayName?.let { putExtra(LiteVpnService.EXTRA_NAME, it) }
             }
             context.startService(intent)
@@ -711,11 +720,17 @@ class LiteViewModel(app: Application) : AndroidViewModel(app) {
                 startService(listOf(profile.link), aether = true)
                 return
             }
+            // 1.0.1.6 (Psiphon): no pre-test, no ping — the core
+            // dials Psiphon's own servers.
+            if (profile.isPsiphon) {
+                startService(listOf(profile.link), psiphon = true)
+                return
+            }
             startService(listOf(profile.link))
             return
         }
         val candidates = _profiles.value
-            .filter { !it.isAether && it.lastPingMs > 0 }
+            .filter { !it.isAether && !it.isPsiphon && it.lastPingMs > 0 }
             .sortedBy { it.lastPingMs }
             .take(5)
             .map { it.link }
@@ -723,8 +738,8 @@ class LiteViewModel(app: Application) : AndroidViewModel(app) {
             startService(emptyList(), candidates)
         } else {
             // 3.2.10 (Aether): never the fallback pick — it has no
-            // ping and no server to test.
-            val link = profile?.takeIf { !it.isAether }?.link ?: fastestProfile?.link ?: return
+            // ping and no server to test. 1.0.1.6 (Psiphon): same.
+            val link = profile?.takeIf { !it.isAether && !it.isPsiphon }?.link ?: fastestProfile?.link ?: return
             startService(listOf(link))
         }
     }
@@ -749,8 +764,8 @@ class LiteViewModel(app: Application) : AndroidViewModel(app) {
         if (_connection.value.state == ConnState.CONNECTING) return
         if (_connection.value.state == ConnState.CONNECTED) return
         // 3.2.10 (Aether): Aether profiles have no server to ping —
-        // they never join the sweep.
-        val list = profilesForGroup(effectiveGroupKey()).filter { !it.isAether }
+        // they never join the sweep. 1.0.1.6 (Psiphon): same.
+        val list = profilesForGroup(effectiveGroupKey()).filter { !it.isAether && !it.isPsiphon }
         if (list.isEmpty()) {
             _connection.update {
                 it.copy(state = ConnState.ERROR, detail = strings.getString(R.string.fastest_none))
@@ -844,7 +859,8 @@ class LiteViewModel(app: Application) : AndroidViewModel(app) {
         // single outbound, and buildAutoSelect refuses the WHOLE group
         // when one member does not build — so one Aether/custom profile
         // in "All" (or a sub) made every Auto connect fail.
-        val members = profilesForGroup(groupKey).filter { !it.isAether && it.proto != "custom" }
+        // 1.0.1.6 (Psiphon): a Psiphon profile is no outbound either.
+        val members = profilesForGroup(groupKey).filter { !it.isAether && !it.isPsiphon && it.proto != "custom" }
         if (members.isEmpty()) {
             _connection.update {
                 it.copy(state = ConnState.ERROR, detail = strings.getString(R.string.fastest_none))
@@ -1016,9 +1032,10 @@ class LiteViewModel(app: Application) : AndroidViewModel(app) {
             _connection.value.state == ConnState.CONNECTING
         ) return
         // 3.2.10 (Aether): Aether profiles have no server to test.
+        // 1.0.1.6 (Psiphon): same.
         // 3.2.12 (Amir): same scoping as testAll — only the selected
         // group's configs, not every config in the app.
-        val list = profilesForGroup(effectiveGroupKey()).filter { !it.isAether }
+        val list = profilesForGroup(effectiveGroupKey()).filter { !it.isAether && !it.isPsiphon }
         if (list.isEmpty()) return
         _isTesting.value = true
         _testProgress.value = 0 to list.size
@@ -1183,7 +1200,8 @@ class LiteViewModel(app: Application) : AndroidViewModel(app) {
         val badIds = _profiles.value.filter {
             // 3.2.10 (Aether): an Aether profile's link is not a
             // share link — it is never invalid by the parser.
-            !it.isAether && (XrayConfig.parse(it.link) == null ||
+            // 1.0.1.6 (Psiphon): same for a Psiphon profile.
+            !it.isAether && !it.isPsiphon && (XrayConfig.parse(it.link) == null ||
                 (it.lastPingMs == -1L && it.lastTestedAt > 0))
         }.map { it.id }.toSet()
         deleteProfiles(badIds)
@@ -1223,6 +1241,9 @@ class LiteViewModel(app: Application) : AndroidViewModel(app) {
 
     /** Ping one profile (3.0.0, PattNG per-config test). */
     fun testOne(profile: Profile) {
+        // 1.0.1.6 (Psiphon): a Psiphon profile has no server to
+        // ping and no delay tester — there is nothing to test.
+        if (profile.isPsiphon) return
         if (profile.id in _testingIds.value) return
         _testingIds.update { it + profile.id }
         viewModelScope.launch(Dispatchers.IO) {
@@ -1530,7 +1551,7 @@ class LiteViewModel(app: Application) : AndroidViewModel(app) {
                 if (node.isNotEmpty()) {
                     val matches = profiles.value.filter { it.name == node }
                     val exitProfile = matches.singleOrNull()
-                    if (exitProfile == null || exitProfile.isAether) {
+                    if (exitProfile == null || exitProfile.isAether || exitProfile.isPsiphon) {
                         _aetherKeysNotice.value = strings.getString(R.string.aether_keys_exit_missing, node)
                         return@launch
                     }
