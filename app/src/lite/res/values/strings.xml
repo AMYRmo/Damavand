@@ -30,6 +30,8 @@
     <string name="action_disconnect">قطع اتصال</string>
     <string name="action_cancel">لغو</string>
     <string name="home_design_portal">پورتال</string>
+    <string name="home_design_title">رابط صفحه اصلی</string>
+    <string name="home_design_desc">دماوند یا پورتال</string>
     <string name="ring_auto_fastest">سریع‌ترین سرور به‌صورت خودکار انتخاب می‌شود</string>
     <string name="ring_step_keys">مذاکره کلیدها</string>
     <string name="ring_step_route">بررسی مسیر</string>
