@@ -73,4 +73,32 @@ object LiteFormat {
     /** Percent 0–100 — "۷۳٪" in Persian, "73%" in English. */
     fun formatPercent(percent: Int): String =
         "${toPersian(percent.toString())}${if (persianDigits) "٪" else "%"}"
+
+    /** Seconds → "MM:SS" (or "H:MM:SS" past one hour). The caller
+     *  converts digits via [toPersian] (the Portal door does). */
+    fun formatElapsed(seconds: Int): String {
+        val s = seconds.coerceAtLeast(0)
+        val h = s / 3600
+        val m = (s % 3600) / 60
+        val sec = s % 60
+        return if (h > 0) "%d:%02d:%02d".format(h, m, sec)
+        else "%02d:%02d".format(m, sec)
+    }
+
+    /** Bytes/sec → (value, unit): ("12.4", "Mbps") / ("1.2", "Gbps").
+     *  The value is raw Latin digits — the caller converts via
+     *  [toPersian] (the Portal FlowMeter does). */
+    fun formatRate(bytesPerSec: Long): Pair<String, String> {
+        val mbps = bytesPerSec * 8.0 / 1_000_000.0
+        val raw = if (mbps >= 1000) mbps / 1000 else mbps
+        val rounded = (raw * 10).toLong() / 10.0
+        val value = if (rounded == rounded.toLong().toDouble()) rounded.toLong().toString()
+        else String.format(java.util.Locale.US, "%.1f", rounded)
+        val unit = if (mbps >= 1000) {
+            if (persianDigits) "گیگابیت" else "Gbps"
+        } else {
+            if (persianDigits) "مگابیت" else "Mbps"
+        }
+        return value to unit
+    }
 }
