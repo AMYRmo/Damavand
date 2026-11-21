@@ -45,7 +45,6 @@ import com.amyrmo.damavand.lite.ui.ConnectionUiState
 import com.amyrmo.damavand.lite.ui.LiteViewModel
 import com.amyrmo.damavand.lite.ui.components.LiteBottomBar
 import com.amyrmo.damavand.lite.ui.components.LiteHeader
-import com.amyrmo.damavand.lite.ui.screens.HomeDesignSwitch
 import com.amyrmo.damavand.lite.ui.screens.LogsScreen
 import com.amyrmo.damavand.lite.ui.screens.PerAppScreen
 import com.amyrmo.damavand.lite.ui.screens.PortalHomeScreen
@@ -65,7 +64,7 @@ import com.amyrmo.damavand.lite.ui.theme.resolveDark
 /**
  * Damavand Lite — single activity, four Summit tabs (Home / Servers /
  * Stats / Settings). No onboarding, no login. The Home tab has two
- * interfaces — Damavand (Summit) and Portal — switched on the connect page.
+ * interfaces — Damavand (Summit) and Portal — chosen in Settings.
  * Android back from any tab goes to Home; back from Home exits.
  *
  * 2.0.0: only the VISIBLE tab is composed. The 1.1.x build composed all
@@ -524,9 +523,8 @@ private fun TabContent(
 ) {
     when (tab) {
         0 -> Column(Modifier.fillMaxSize()) {
-            // 1.0.1.9 (Portal): the switcher is shared chrome above the
-            // home content — identical on both interfaces.
-            HomeDesignSwitch(selected = homeDesign, onSelect = { vm.setHomeDesign(it) })
+            // 1.0.1.9 (Portal): the home-interface choice now lives in
+            // Settings — the connect page shows the chosen interface.
             Box(Modifier.weight(1f)) {
                 if (homeDesign == HOME_DESIGN_PORTAL) {
                     PortalHomeScreen(
