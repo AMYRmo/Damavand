@@ -83,6 +83,9 @@ data class ConnectionUiState(
     val upSpeed: Long = 0,
     val totalDown: Long = 0,
     val totalUp: Long = 0,
+    // 1.0.1.9 (Portal): seconds since this CONNECTED session started
+    // (the door timer); 0 while disconnected.
+    val elapsedSeconds: Int = 0,
 )
 
 /**
@@ -305,6 +308,8 @@ class LiteViewModel(app: Application) : AndroidViewModel(app) {
     // 3.2.9 (PattNG, the rest): dynamic color, local proxy, HEV tun.
     val dynamicColor = settings.dynamicColor
     val localProxy = settings.localProxy
+    // 1.0.1.9 (Portal): which home interface the connect page shows.
+    val homeDesign = settings.homeDesign
     val useHev = settings.useHev
 
     fun selectGroup(key: String?) =
@@ -335,6 +340,7 @@ class LiteViewModel(app: Application) : AndroidViewModel(app) {
     fun setAutoRetry(v: Boolean) = viewModelScope.launch { settings.setAutoRetry(v) }
     fun setDynamicColor(v: Boolean) = viewModelScope.launch { settings.setDynamicColor(v) }
     fun setLocalProxy(v: Boolean) = viewModelScope.launch { settings.setLocalProxy(v) }
+    fun setHomeDesign(v: String) = viewModelScope.launch { settings.setHomeDesign(v) }
     fun setUseHev(v: Boolean) = viewModelScope.launch { settings.setUseHev(v) }
     val autoStartBoot = settings.autoStartBoot
     val subAutoTest = settings.subAutoTest
@@ -528,6 +534,10 @@ class LiteViewModel(app: Application) : AndroidViewModel(app) {
         data class Failed(val resId: Int, val count: Int = 0) : SubImportState
     }
 
+    // 1.0.1.9 (Portal): when the current CONNECTED session started,
+    // so the door timer (elapsedSeconds) can tick from broadcasts.
+    private var sessionStartMs = 0L
+
     private val statusReceiver = object : BroadcastReceiver() {
         override fun onReceive(c: Context?, intent: Intent?) {
             if (intent?.action != LiteVpnService.ACTION_STATUS) return
@@ -538,6 +548,16 @@ class LiteViewModel(app: Application) : AndroidViewModel(app) {
             }
             val ping = intent.getLongExtra("ping", -1)
             val detail = intent.getStringExtra("detail") ?: ""
+            // 1.0.1.9 (Portal door timer): broadcasts arrive with each
+            // poller tick (1 s while the screen is on), so the elapsed
+            // seconds can be derived here — no extra ticker job.
+            val elapsedSeconds = if (state == ConnState.CONNECTED) {
+                if (sessionStartMs == 0L) sessionStartMs = System.currentTimeMillis()
+                ((System.currentTimeMillis() - sessionStartMs) / 1000).toInt()
+            } else {
+                sessionStartMs = 0L
+                0
+            }
             _connection.update {
                 it.copy(
                     state = if (state == ConnState.DISCONNECTED && detail.isNotBlank()) ConnState.ERROR else state,
@@ -551,6 +571,7 @@ class LiteViewModel(app: Application) : AndroidViewModel(app) {
                     upSpeed = intent.getLongExtra("upSpeed", 0),
                     totalDown = intent.getLongExtra("totalDown", 0),
                     totalUp = intent.getLongExtra("totalUp", 0),
+                    elapsedSeconds = elapsedSeconds,
                 )
             }
             if (state == ConnState.CONNECTED && ping > 0) {
