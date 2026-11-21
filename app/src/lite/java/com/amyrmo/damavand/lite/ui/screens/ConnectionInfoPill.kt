@@ -71,11 +71,6 @@ fun ConnectionInfoPill(
     chain: Chain? = null,
     chainMembers: List<Profile> = emptyList(),
 ) {
-    var expanded by remember { mutableStateOf(false) }
-    val chevronRotation by animateFloatAsState(
-        targetValue = if (expanded) 180f else 0f,
-        label = "info-chevron",
-    )
     Column(
         modifier = modifier
             .fillMaxWidth()
@@ -84,6 +79,36 @@ fun ConnectionInfoPill(
             .border(1.dp, LiteColors.hairline, RoundedCornerShape(22.dp))
             .padding(horizontal = 12.dp, vertical = 8.dp)
     ) {
+        ConnectionInfoContent(
+            connection = connection,
+            onRefresh = onRefresh,
+            profile = profile,
+            chain = chain,
+            chainMembers = chainMembers,
+        )
+    }
+}
+
+/**
+ * The pill's contents without the card chrome — the location row,
+ * the connected profile's identity, and the expandable details.
+ * Portal's home reuses it inside its merged location+speeds card;
+ * [ConnectionInfoPill] wraps it in the standalone card.
+ */
+@Composable
+fun ConnectionInfoContent(
+    connection: ConnectionUiState,
+    onRefresh: () -> Unit,
+    profile: Profile? = null,
+    chain: Chain? = null,
+    chainMembers: List<Profile> = emptyList(),
+) {
+    var expanded by remember { mutableStateOf(false) }
+    val chevronRotation by animateFloatAsState(
+        targetValue = if (expanded) 180f else 0f,
+        label = "info-chevron",
+    )
+    Column(Modifier.fillMaxWidth()) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             FlagBadge(countryCode = connection.countryCode, size = 24.dp)
             Spacer(Modifier.width(10.dp))
