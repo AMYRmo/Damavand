@@ -490,7 +490,7 @@ fun PortalHomeScreen(
                             horizontalAlignment = Alignment.CenterHorizontally,
                         ) {
                             PortalCaption(state, compact, onStatusTap = { vm.refreshLocation() })
-                            Spacer(Modifier.height(14.dp))
+                            Spacer(Modifier.height(10.dp))
                             // 1.0.1.13: ALL home cards are ONE card now —
                             // location + profile + speeds + proxy + server
                             // share a single surface, so Home shows one
@@ -504,7 +504,7 @@ fun PortalHomeScreen(
                                     .fillMaxWidth()
                                     .border(1.dp, LiteColors.hairline, RoundedCornerShape(22.dp)),
                             ) {
-                                Column(Modifier.padding(horizontal = 12.dp, vertical = 6.dp)) {
+                                Column(Modifier.padding(horizontal = 12.dp, vertical = 4.dp)) {
                                     AnimatedVisibility(visible = live) {
                                         Column {
                                             ConnectionInfoContent(
@@ -514,9 +514,9 @@ fun PortalHomeScreen(
                                                 chain = selectedChain,
                                                 chainMembers = chainMembers,
                                             )
-                                            Spacer(Modifier.height(6.dp))
+                                            Spacer(Modifier.height(4.dp))
                                             HorizontalDivider(color = LiteColors.hairline)
-                                            Spacer(Modifier.height(6.dp))
+                                            Spacer(Modifier.height(4.dp))
                                         }
                                     }
                                     FlowMeter(
@@ -527,9 +527,9 @@ fun PortalHomeScreen(
                                         totalUpload = connection.totalUp,
                                     )
                                     if (localProxyAddress != null && live) {
-                                        Spacer(Modifier.height(6.dp))
+                                        Spacer(Modifier.height(4.dp))
                                         HorizontalDivider(color = LiteColors.hairline)
-                                        Spacer(Modifier.height(6.dp))
+                                        Spacer(Modifier.height(4.dp))
                                         Box(
                                             Modifier
                                                 .fillMaxWidth()
@@ -559,9 +559,9 @@ fun PortalHomeScreen(
                                             )
                                         }
                                     }
-                                    Spacer(Modifier.height(6.dp))
+                                    Spacer(Modifier.height(4.dp))
                                     HorizontalDivider(color = LiteColors.hairline)
-                                    Spacer(Modifier.height(6.dp))
+                                    Spacer(Modifier.height(4.dp))
                                     PortalTicket(
                                         name = profile?.name,
                                         detail = profile?.let { "${it.address}:${it.port}" },
@@ -1155,7 +1155,7 @@ private fun FlowMeter(
         modifier
             .fillMaxWidth()
             .height(IntrinsicSize.Min)
-            .padding(vertical = 2.dp),
+            .padding(vertical = 0.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
             FlowHalf(
@@ -1201,7 +1201,7 @@ private fun FlowHalf(
         modifier.padding(horizontal = 14.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Box(Modifier.size(32.dp), contentAlignment = Alignment.Center) {
+        Box(Modifier.size(28.dp), contentAlignment = Alignment.Center) {
             Box(
                 Modifier
                     .matchParentSize()
@@ -1209,7 +1209,7 @@ private fun FlowHalf(
                     .clip(PortalShapes.Cookie4Sided.toPortalShape())
                     .background(badge),
             )
-            Icon(painterResource(icon), contentDescription = null, tint = onBadge, modifier = Modifier.size(16.dp))
+            Icon(painterResource(icon), contentDescription = null, tint = onBadge, modifier = Modifier.size(14.dp))
         }
         Spacer(Modifier.width(10.dp))
         Column(Modifier.weight(1f)) {
@@ -1218,7 +1218,7 @@ private fun FlowHalf(
                 style = TextStyle(
                     fontFamily = Vazirmatn,
                     fontWeight = FontWeight.Medium,
-                    fontSize = 12.sp,
+                    fontSize = 11.sp,
                 ),
                 color = LiteColors.textSecondary,
                 maxLines = 1,
@@ -1230,7 +1230,7 @@ private fun FlowHalf(
                     style = TextStyle(
                         fontFamily = Vazirmatn,
                         fontWeight = FontWeight.Bold,
-                        fontSize = 20.sp,
+                        fontSize = 18.sp,
                     ),
                     color = if (busy) LiteColors.text else LiteColors.textSecondary,
                     maxLines = 1,
@@ -1253,7 +1253,7 @@ private fun FlowHalf(
                 style = TextStyle(
                     fontFamily = Vazirmatn,
                     fontWeight = FontWeight.Normal,
-                    fontSize = 11.sp,
+                    fontSize = 10.sp,
                 ),
                 color = LiteColors.textSecondary,
                 maxLines = 1,
@@ -1280,14 +1280,15 @@ private fun PortalTicket(
     // 1.0.1.13: no own card — the merged home card provides the
     // surface; this is just the server row inside it.
     // 1.0.1.14: compact — smaller badge and chevron, tighter padding.
+    // 1.0.1.15: even smaller — the card has to read as small, not just tight.
     Row(
         modifier
             .fillMaxWidth()
             .clickable(interactionSource = source, indication = null, onClick = onClick)
-            .padding(vertical = 2.dp),
+            .padding(vertical = 0.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-            Box(Modifier.size(40.dp), contentAlignment = Alignment.Center) {
+            Box(Modifier.size(36.dp), contentAlignment = Alignment.Center) {
                 Box(
                     Modifier
                         .matchParentSize()
@@ -1299,7 +1300,7 @@ private fun PortalTicket(
                     painterResource(if (locked) R.drawable.ic_encrypted else R.drawable.ic_public),
                     contentDescription = null,
                     tint = Color.White,
-                    modifier = Modifier.size(20.dp),
+                    modifier = Modifier.size(18.dp),
                 )
             }
             Spacer(Modifier.width(14.dp))
@@ -1309,7 +1310,7 @@ private fun PortalTicket(
                     style = TextStyle(
                         fontFamily = Vazirmatn,
                         fontWeight = FontWeight.Bold,
-                        fontSize = 16.sp,
+                        fontSize = 15.sp,
                     ),
                     color = LiteColors.text,
                     maxLines = 1,
@@ -1325,7 +1326,7 @@ private fun PortalTicket(
                     style = TextStyle(
                         fontFamily = Vazirmatn,
                         fontWeight = FontWeight.Normal,
-                        fontSize = 12.sp,
+                        fontSize = 11.sp,
                     ),
                     color = LiteColors.text.copy(alpha = 0.75f),
                     maxLines = 1,
@@ -1334,14 +1335,14 @@ private fun PortalTicket(
             }
             Spacer(Modifier.width(8.dp))
             Box(
-                Modifier.size(32.dp).clip(CircleShape).background(LiteColors.text.copy(alpha = 0.08f)),
+                Modifier.size(28.dp).clip(CircleShape).background(LiteColors.text.copy(alpha = 0.08f)),
                 contentAlignment = Alignment.Center,
             ) {
                 Icon(
                     painterResource(R.drawable.ic_chevron_right),
                     contentDescription = null,
                     tint = LiteColors.text,
-                    modifier = Modifier.size(18.dp),
+                    modifier = Modifier.size(16.dp),
                 )
             }
         }
