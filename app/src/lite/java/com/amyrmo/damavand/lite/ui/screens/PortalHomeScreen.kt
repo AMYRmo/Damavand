@@ -1,8 +1,5 @@
 package com.amyrmo.damavand.lite.ui.screens
 
-@file:OptIn(ExperimentalMaterial3ExpressiveApi::class)
-import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
-
 import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
@@ -49,10 +46,8 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Icon
-import androidx.compose.material3.MaterialShapes
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.toShape
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.State
@@ -73,14 +68,17 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.geometry.center
 import androidx.compose.ui.graphics.BlendMode
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.CompositingStrategy
 import androidx.compose.ui.graphics.Matrix
+import androidx.compose.ui.graphics.Outline
 import androidx.compose.ui.graphics.Paint
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.PathEffect
+import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.PointMode
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
@@ -107,13 +105,17 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Constraints
+import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.IntOffset
+import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.isFinite
 import androidx.compose.ui.unit.sp
+import androidx.graphics.shapes.CornerRounding
 import androidx.graphics.shapes.Morph
 import androidx.graphics.shapes.RoundedPolygon
+import androidx.graphics.shapes.TransformResult
 import com.amyrmo.damavand.lite.AutoSelectIds
 import com.amyrmo.damavand.lite.HOME_DESIGN_DAMAVAND
 import com.amyrmo.damavand.lite.HOME_DESIGN_PORTAL
@@ -151,14 +153,259 @@ import kotlin.random.Random
  * one or the other by the persisted home_design setting.
  */
 
+// 1.0.1.8 (Portal): Material 3 Expressive's MaterialShapes / toShape /
+// Morph.toPath live in material3 1.5.0, which pulls Compose 1.12 and needs
+// compileSdk 37 + AGP 9 — the project is on compileSdk 36 / AGP 8.10, so the
+// retry went red on 22 dependency errors. These are the same shapes rebuilt
+// directly on androidx.graphics.shapes 1.0.1 (already a dependency): same
+// polygons, same rounding, same morphing, copied from MaterialShapes.kt.
+private val cornerRound15 = CornerRounding(radius = .15f)
+private val cornerRound50 = CornerRounding(radius = .5f)
+
+private data class PointNRound(
+    val o: Offset,
+    val r: CornerRounding = CornerRounding.Unrounded,
+)
+
+private fun customPolygon(
+    pnr: List<PointNRound>,
+    reps: Int,
+    center: Offset = Offset(0.5f, 0.5f),
+    mirroring: Boolean = false,
+): RoundedPolygon {
+    val actualPoints = doRepeat(pnr, reps, center, mirroring)
+    return RoundedPolygon(
+        vertices =
+            FloatArray(actualPoints.size * 2) { ix ->
+                actualPoints[ix / 2].o.let { if (ix % 2 == 0) it.x else it.y }
+            },
+        perVertexRounding = buildList { for (p in actualPoints) add(p.r) },
+        centerX = center.x,
+        centerY = center.y,
+    )
+}
+
+@Suppress("PrimitiveInCollection")
+private fun doRepeat(
+    points: List<PointNRound>,
+    reps: Int,
+    center: Offset,
+    mirroring: Boolean,
+) =
+    if (mirroring) {
+        buildList {
+            val angles = points.map { (it.o - center).angleDegrees() }
+            val distances = points.map { (it.o - center).getDistance() }
+            val actualReps = reps * 2
+            val sectionAngle = 360f / actualReps
+            repeat(actualReps) {
+                points.indices.forEach { index ->
+                    val i = if (it % 2 == 0) index else points.lastIndex - index
+                    if (i > 0 || it % 2 == 0) {
+                        val a =
+                            (sectionAngle * it +
+                                    if (it % 2 == 0) angles[i]
+                                    else sectionAngle - angles[i] + 2 * angles[0])
+                                .toRadians()
+                        val finalPoint = Offset(cos(a), sin(a)) * distances[i] + center
+                        add(PointNRound(finalPoint, points[i].r))
+                    }
+                }
+            }
+        }
+    } else {
+        points.size.let { np ->
+            (0 until np * reps).map {
+                val point = points[it % np].o.rotateDegrees((it / np) * 360f / reps, center)
+                PointNRound(point, points[it % np].r)
+            }
+        }
+    }
+
+private fun Offset.rotateDegrees(angle: Float, center: Offset = Offset.Zero) =
+    (angle.toRadians()).let { a ->
+        val off = this - center
+        Offset(off.x * cos(a) - off.y * sin(a), off.x * sin(a) + off.y * cos(a)) + center
+    }
+
+private fun Float.toRadians(): Float {
+    return this / 360f * 2 * PI.toFloat()
+}
+
+private fun Offset.angleDegrees() = atan2(y, x) * 180f / PI.toFloat()
+
+private fun RoundedPolygon.scaled(sx: Float, sy: Float): RoundedPolygon =
+    transformed { x, y -> TransformResult(x * sx, y * sy) }
+
+private fun RoundedPolygon.rotated(degrees: Float): RoundedPolygon {
+    val r = degrees.toRadians()
+    val c = cos(r)
+    val s = sin(r)
+    return transformed { x, y -> TransformResult(x * c - y * s, x * s + y * c) }
+}
+
+private object PortalShapes {
+    val Circle: RoundedPolygon = RoundedPolygon.circle(numVertices = 10).normalized()
+    val Oval: RoundedPolygon = RoundedPolygon.circle().scaled(1f, 0.64f).rotated(-45f).normalized()
+    val Pill: RoundedPolygon = customPolygon(
+        listOf(
+            PointNRound(Offset(0.961f, 0.039f), CornerRounding(0.426f)),
+            PointNRound(Offset(1.001f, 0.428f)),
+            PointNRound(Offset(1.000f, 0.609f), CornerRounding(1.000f)),
+        ),
+        reps = 2,
+        mirroring = true,
+    ).normalized()
+    val Pentagon: RoundedPolygon = customPolygon(
+        listOf(
+            PointNRound(Offset(0.500f, -0.009f), CornerRounding(0.172f)),
+            PointNRound(Offset(1.030f, 0.365f), CornerRounding(0.164f)),
+            PointNRound(Offset(0.828f, 0.970f), CornerRounding(0.169f)),
+        ),
+        reps = 1,
+        mirroring = true,
+    ).normalized()
+    val Sunny: RoundedPolygon = RoundedPolygon.star(
+        numVerticesPerRadius = 8,
+        innerRadius = .8f,
+        rounding = cornerRound15,
+    ).normalized()
+    val Cookie4Sided: RoundedPolygon = customPolygon(
+        listOf(
+            PointNRound(Offset(1.237f, 1.236f), CornerRounding(0.258f)),
+            PointNRound(Offset(0.500f, 0.918f), CornerRounding(0.233f)),
+        ),
+        reps = 4,
+    ).normalized()
+    val Cookie9Sided: RoundedPolygon = RoundedPolygon.star(
+        numVerticesPerRadius = 9,
+        innerRadius = .8f,
+        rounding = cornerRound50,
+    ).rotated(-90f).normalized()
+    val Cookie12Sided: RoundedPolygon = RoundedPolygon.star(
+        numVerticesPerRadius = 12,
+        innerRadius = .8f,
+        rounding = cornerRound50,
+    ).rotated(-90f).normalized()
+    val Burst: RoundedPolygon = customPolygon(
+        listOf(
+            PointNRound(Offset(0.500f, -0.006f), CornerRounding(0.006f)),
+            PointNRound(Offset(0.592f, 0.158f), CornerRounding(0.006f)),
+        ),
+        reps = 12,
+    ).normalized()
+    val SoftBurst: RoundedPolygon = customPolygon(
+        listOf(
+            PointNRound(Offset(0.193f, 0.277f), CornerRounding(0.053f)),
+            PointNRound(Offset(0.176f, 0.055f), CornerRounding(0.053f)),
+        ),
+        reps = 10,
+    ).normalized()
+}
+
+// Compose-Path versions of graphics-shapes' toPath helpers (those only build
+// android.graphics.Path). Same cubic walk as Shapes.android.kt's Morph.toPath.
+private fun Morph.toComposePath(progress: Float, path: Path): Path {
+    path.rewind()
+    var firstX = 0f
+    var firstY = 0f
+    var prevControl0X = 0f
+    var prevControl0Y = 0f
+    var prevControl1X = 0f
+    var prevControl1Y = 0f
+    var prevAnchor1X = 0f
+    var prevAnchor1Y = 0f
+    var first = true
+    forEachCubic(progress) {
+        if (first) {
+            path.moveTo(it.anchor0X, it.anchor0Y)
+            firstX = it.anchor0X
+            firstY = it.anchor0Y
+            first = false
+        } else {
+            path.cubicTo(
+                prevControl0X,
+                prevControl0Y,
+                prevControl1X,
+                prevControl1Y,
+                prevAnchor1X,
+                prevAnchor1Y,
+            )
+        }
+        prevControl0X = it.control0X
+        prevControl0Y = it.control0Y
+        prevControl1X = it.control1X
+        prevControl1Y = it.control1Y
+        prevAnchor1X = it.anchor1X
+        prevAnchor1Y = it.anchor1Y
+    }
+    if (!first) {
+        path.cubicTo(prevControl0X, prevControl0Y, prevControl1X, prevControl1Y, firstX, firstY)
+    }
+    path.close()
+    return path
+}
+
+private fun RoundedPolygon.toComposePath(): Path {
+    val path = Path()
+    var first = true
+    for (cubic in cubics) {
+        if (first) {
+            path.moveTo(cubic.anchor0X, cubic.anchor0Y)
+            first = false
+        }
+        path.cubicTo(
+            cubic.control0X,
+            cubic.control0Y,
+            cubic.control1X,
+            cubic.control1Y,
+            cubic.anchor1X,
+            cubic.anchor1Y,
+        )
+    }
+    path.close()
+    return path
+}
+
+// Same as MaterialShapes' RoundedPolygon.toShape, on the local toComposePath.
+@Composable
+private fun RoundedPolygon.toPortalShape(): Shape {
+    return remember(this) {
+        object : Shape {
+            private val shapePath: Path = toComposePath()
+            private var workPath: Path? = null
+            private var lastSize = Size.Unspecified
+
+            override fun createOutline(
+                size: Size,
+                layoutDirection: LayoutDirection,
+                density: Density,
+            ): Outline {
+                if (size != lastSize || workPath == null) {
+                    lastSize = size
+                    workPath = Path()
+                } else {
+                    workPath!!.rewind()
+                }
+                val path = workPath!!
+                path.addPath(shapePath)
+                val scaleMatrix = Matrix().apply { scale(x = size.width, y = size.height) }
+                path.transform(scaleMatrix)
+                path.translate(size.center - path.getBounds().center)
+                return Outline.Generic(path)
+            }
+        }
+    }
+}
+
 private val SearchShapes: List<RoundedPolygon> = listOf(
-    MaterialShapes.SoftBurst,
-    MaterialShapes.Cookie9Sided,
-    MaterialShapes.Pentagon,
-    MaterialShapes.Pill,
-    MaterialShapes.Sunny,
-    MaterialShapes.Cookie4Sided,
-    MaterialShapes.Oval,
+    PortalShapes.SoftBurst,
+    PortalShapes.Cookie9Sided,
+    PortalShapes.Pentagon,
+    PortalShapes.Pill,
+    PortalShapes.Sunny,
+    PortalShapes.Cookie4Sided,
+    PortalShapes.Oval,
 )
 
 private const val SEARCH_STEP_SECONDS = 0.72f
@@ -600,7 +847,7 @@ private fun WallOfLight(
     }
 }
 
-@OptIn(ExperimentalMaterial3ExpressiveApi::class, ExperimentalFoundationApi::class)
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 private fun PortalDoor(
     state: ConnState,
@@ -619,13 +866,13 @@ private fun PortalDoor(
         snapshotFlow { (clock.value / SEARCH_STEP_SECONDS).toInt() }.collect { step = it }
     }
     val target: RoundedPolygon = when (state) {
-        ConnState.CONNECTED -> MaterialShapes.Circle
-        ConnState.ERROR -> MaterialShapes.Burst
+        ConnState.CONNECTED -> PortalShapes.Circle
+        ConnState.ERROR -> PortalShapes.Burst
         ConnState.CONNECTING -> SearchShapes[step.mod(SearchShapes.size)]
-        ConnState.DISCONNECTED -> MaterialShapes.Cookie12Sided
+        ConnState.DISCONNECTED -> PortalShapes.Cookie12Sided
     }
-    var from by remember { mutableStateOf(MaterialShapes.Cookie12Sided) }
-    var to by remember { mutableStateOf(MaterialShapes.Cookie12Sided) }
+    var from by remember { mutableStateOf(PortalShapes.Cookie12Sided) }
+    var to by remember { mutableStateOf(PortalShapes.Cookie12Sided) }
     var progress by remember { mutableFloatStateOf(1f) }
     LaunchedEffect(target) {
         if (target === to) return@LaunchedEffect
@@ -743,7 +990,7 @@ private fun PortalDoor(
     ) {
         Canvas(Modifier.matchParentSize()) {
             work.rewind()
-            morph.toPath(progress.coerceIn(0f, 1f), work)
+            morph.toComposePath(progress.coerceIn(0f, 1f), work)
             work.transform(Matrix().apply { scale(size.width, size.height) })
             val bounds = work.getBounds()
             work.translate(center - bounds.center)
@@ -932,7 +1179,7 @@ private fun FlowHalf(
                     Modifier
                         .matchParentSize()
                         .graphicsLayer { rotationZ = badgeTurn }
-                        .clip(MaterialShapes.Cookie4Sided.toShape())
+                        .clip(PortalShapes.Cookie4Sided.toPortalShape())
                         .background(badge),
                 )
                 Icon(painterResource(icon), contentDescription = null, tint = onBadge, modifier = Modifier.size(18.dp))
@@ -1025,7 +1272,7 @@ private fun PortalTicket(
                     Modifier
                         .matchParentSize()
                         .graphicsLayer { rotationZ = turn }
-                        .clip(MaterialShapes.Cookie9Sided.toShape())
+                        .clip(PortalShapes.Cookie9Sided.toPortalShape())
                         .background(LiteColors.accent),
                 )
                 Icon(
