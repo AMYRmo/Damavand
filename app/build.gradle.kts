@@ -104,6 +104,10 @@ android {
 
 dependencies {
     implementation(platform("androidx.compose:compose-bom:2024.09.00"))
+    // BOM-managed material3 (1.3.0) — restored 2026-11-21: the 1.5.0 pin revert
+    // accidentally dropped this line entirely, and CI run 44879547946 went red
+    // on 123 unresolved material3 references.
+    implementation("androidx.compose.material3:material3")
     implementation("androidx.compose.ui:ui")
     implementation("androidx.compose.ui:ui-graphics")
     implementation("androidx.compose.ui:ui-tooling-preview")
