@@ -23,6 +23,7 @@ import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.ScrollState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -58,6 +59,7 @@ import androidx.compose.runtime.State
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -598,7 +600,7 @@ private fun WallOfLight(
     }
 }
 
-@OptIn(ExperimentalMaterial3ExpressiveApi::class)
+@OptIn(ExperimentalMaterial3ExpressiveApi::class, ExperimentalFoundationApi::class)
 @Composable
 private fun PortalDoor(
     state: ConnState,
@@ -1258,23 +1260,30 @@ fun HomeDesignSwitch(selected: String, onSelect: (String) -> Unit) {
                 label = stringResource(R.string.app_name),
                 selected = selected == HOME_DESIGN_DAMAVAND,
                 onClick = { onSelect(HOME_DESIGN_DAMAVAND) },
+                modifier = Modifier.weight(1f),
             )
             HomeDesignChoice(
                 label = stringResource(R.string.home_design_portal),
                 selected = selected == HOME_DESIGN_PORTAL,
                 onClick = { onSelect(HOME_DESIGN_PORTAL) },
+                modifier = Modifier.weight(1f),
             )
         }
     }
 }
 
 @Composable
-private fun HomeDesignChoice(label: String, selected: Boolean, onClick: () -> Unit) {
+private fun HomeDesignChoice(
+    label: String,
+    selected: Boolean,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
     Surface(
         onClick = onClick,
         shape = RoundedCornerShape(20.dp),
         color = if (selected) LiteColors.accent else Color.Transparent,
-        modifier = Modifier.weight(1f),
+        modifier = modifier,
     ) {
         Text(
             text = label,
