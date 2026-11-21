@@ -116,6 +116,8 @@ import androidx.graphics.shapes.CornerRounding
 import androidx.graphics.shapes.Morph
 import androidx.graphics.shapes.RoundedPolygon
 import androidx.graphics.shapes.TransformResult
+import androidx.graphics.shapes.circle
+import androidx.graphics.shapes.star
 import com.amyrmo.damavand.lite.AutoSelectIds
 import com.amyrmo.damavand.lite.HOME_DESIGN_DAMAVAND
 import com.amyrmo.damavand.lite.HOME_DESIGN_PORTAL
