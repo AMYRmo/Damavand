@@ -18,6 +18,18 @@
 
     <!-- Ring -->
     <string name="ring_tap_to_connect">برای اتصال بزنید</string>
+    <!-- 1.0.1.8 (Portal home interface) -->
+    <string name="home_download">دانلود</string>
+    <string name="home_upload">آپلود</string>
+    <string name="home_select_config">انتخاب کانفیگ</string>
+    <string name="home_no_config_body">هنوز کانفیگی انتخاب نکردی</string>
+    <string name="home_tap_to_change">برای تغییر بزن</string>
+    <string name="home_local_proxy">پروکسی · %1$s</string>
+    <string name="copied">کپی شد</string>
+    <string name="action_connect">اتصال</string>
+    <string name="action_disconnect">قطع اتصال</string>
+    <string name="action_cancel">لغو</string>
+    <string name="home_design_portal">پورتال</string>
     <string name="ring_auto_fastest">سریع‌ترین سرور به‌صورت خودکار انتخاب می‌شود</string>
     <string name="ring_step_keys">مذاکره کلیدها</string>
     <string name="ring_step_route">بررسی مسیر</string>
