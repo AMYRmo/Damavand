@@ -15,6 +15,11 @@ import kotlinx.coroutines.flow.map
 
 private val Context.liteDataStore: DataStore<Preferences> by preferencesDataStore(name = "lite_settings")
 
+/** Home interface choice (1.0.1.9 Portal port): "damavand" is the
+ *  current Summit home, "portal" is the old v1 Portal home design. */
+const val HOME_DESIGN_DAMAVAND = "damavand"
+const val HOME_DESIGN_PORTAL = "portal"
+
 /**
  * Lite settings (DataStore). Defaults follow the design spec:
  * kill switch OFF, auto-connect OFF, battery saver ON, subscription
@@ -39,6 +44,8 @@ class SettingsStore(private val context: Context) {
         val KEY_PERAPP_MODE = stringPreferencesKey("perapp_mode")
         // 3.2.0 (PattNG parity): SOCKS / VPN / core / mux / DNS / misc.
         val KEY_SOCKS_PORT = stringPreferencesKey("socks_port")
+        // 1.0.1.9 (Portal): which home interface the connect page shows.
+        val KEY_HOME_DESIGN = stringPreferencesKey("home_design")
         val KEY_SOCKS_USER = stringPreferencesKey("socks_user")
         val KEY_SOCKS_PASS = stringPreferencesKey("socks_pass")
         val KEY_SOCKS_UDP = booleanPreferencesKey("socks_udp")
@@ -126,6 +133,8 @@ class SettingsStore(private val context: Context) {
     val perAppMode: Flow<String> = context.liteDataStore.data.map { it[KEY_PERAPP_MODE] ?: "bypass" }
     // 3.2.0.
     val socksPort: Flow<String> = context.liteDataStore.data.map { it[KEY_SOCKS_PORT] ?: "1080" }
+    // 1.0.1.9 (Portal): persisted home-interface choice, default Damavand.
+    val homeDesign: Flow<String> = context.liteDataStore.data.map { it[KEY_HOME_DESIGN] ?: HOME_DESIGN_DAMAVAND }
     val socksUser: Flow<String> = context.liteDataStore.data.map { it[KEY_SOCKS_USER] ?: "" }
     val socksPass: Flow<String> = context.liteDataStore.data.map { it[KEY_SOCKS_PASS] ?: "" }
     val socksUdp: Flow<Boolean> = context.liteDataStore.data.map { it[KEY_SOCKS_UDP] ?: true }
@@ -243,6 +252,7 @@ class SettingsStore(private val context: Context) {
 
     // 3.2.0 (PattNG parity).
     suspend fun setSocksPort(v: String) = context.liteDataStore.edit { it[KEY_SOCKS_PORT] = v }
+    suspend fun setHomeDesign(v: String) = context.liteDataStore.edit { it[KEY_HOME_DESIGN] = v }
     suspend fun setSocksUser(v: String) = context.liteDataStore.edit { it[KEY_SOCKS_USER] = v }
     suspend fun setSocksPass(v: String) = context.liteDataStore.edit { it[KEY_SOCKS_PASS] = v }
     suspend fun setSocksUdp(v: Boolean) = context.liteDataStore.edit { it[KEY_SOCKS_UDP] = v }
@@ -343,6 +353,7 @@ class SettingsStore(private val context: Context) {
     suspend fun dnsServersNow(): String = dnsServers.first()
     // 3.2.0.
     suspend fun socksPortNow(): Int = socksPort.first().toIntOrNull()?.coerceIn(1, 65535) ?: 1080
+    suspend fun homeDesignNow(): String = homeDesign.first()
     suspend fun mtuNow(): Int = mtu.first().toIntOrNull()?.coerceIn(576, 9000) ?: 1500
     suspend fun ifaceAddrNow(): String = ifaceAddr.first().trim().ifEmpty { "10.8.0.2" }
     suspend fun proxyOnlyNow(): Boolean = proxyOnly.first()
