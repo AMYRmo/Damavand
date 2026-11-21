@@ -27,7 +27,6 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsPressedAsState
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
@@ -1116,6 +1115,10 @@ private fun PortalCaption(state: ConnState, compact: Boolean, onStatusTap: () ->
     }
 }
 
+// 1.0.1.11: the speed section is ONE card now — a single surface
+// holding Download and Upload side by side, split by a hairline
+// divider. (1.0.1.10 had split them into two standalone cards;
+// that was the wrong reading of "یه تیکه کن".)
 @Composable
 private fun FlowMeter(
     live: Boolean,
@@ -1125,34 +1128,45 @@ private fun FlowMeter(
     totalUpload: Long,
     modifier: Modifier = Modifier,
 ) {
-    // 1.0.1.10: the two halves are standalone cards now — uniform
-    // corners and a real gap, instead of one card split in two.
-    Row(
-        modifier.fillMaxWidth().height(IntrinsicSize.Min),
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
+    Surface(
+        shape = RoundedCornerShape(22.dp),
+        color = LiteColors.surface2,
+        modifier = modifier.fillMaxWidth(),
     ) {
-        FlowHalf(
-            icon = R.drawable.ic_download,
-            label = stringResource(R.string.home_download),
-            bps = downloadBps,
-            total = totalDownload,
-            live = live,
-            badge = LiteColors.green.copy(alpha = 0.18f),
-            onBadge = LiteColors.green,
-            shape = RoundedCornerShape(22.dp),
-            modifier = Modifier.weight(1f).fillMaxHeight(),
-        )
-        FlowHalf(
-            icon = R.drawable.ic_upload,
-            label = stringResource(R.string.home_upload),
-            bps = uploadBps,
-            total = totalUpload,
-            live = live,
-            badge = LiteColors.accent.copy(alpha = 0.18f),
-            onBadge = LiteColors.accent,
-            shape = RoundedCornerShape(22.dp),
-            modifier = Modifier.weight(1f).fillMaxHeight(),
-        )
+        Row(
+            Modifier
+                .fillMaxWidth()
+                .height(IntrinsicSize.Min)
+                .padding(vertical = 12.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            FlowHalf(
+                icon = R.drawable.ic_download,
+                label = stringResource(R.string.home_download),
+                bps = downloadBps,
+                total = totalDownload,
+                live = live,
+                badge = LiteColors.green.copy(alpha = 0.18f),
+                onBadge = LiteColors.green,
+                modifier = Modifier.weight(1f),
+            )
+            Box(
+                Modifier
+                    .fillMaxHeight()
+                    .width(1.dp)
+                    .background(LiteColors.hairline),
+            )
+            FlowHalf(
+                icon = R.drawable.ic_upload,
+                label = stringResource(R.string.home_upload),
+                bps = uploadBps,
+                total = totalUpload,
+                live = live,
+                badge = LiteColors.accent.copy(alpha = 0.18f),
+                onBadge = LiteColors.accent,
+                modifier = Modifier.weight(1f),
+            )
+        }
     }
 }
 
@@ -1165,31 +1179,52 @@ private fun FlowHalf(
     live: Boolean,
     badge: Color,
     onBadge: Color,
-    shape: RoundedCornerShape,
-    modifier: Modifier,
+    modifier: Modifier = Modifier,
 ) {
     val (value, unit) = LiteFormat.formatRate(if (live) bps else 0L)
     val busy = live && bps > 0L
     val badgeTurn by animateFloatAsState(if (busy) 45f else 0f, tween(400), label = "flow-turn")
-    Surface(shape = shape, color = LiteColors.surface2, modifier = modifier) {
-        Row(
-            Modifier.padding(horizontal = 14.dp, vertical = 12.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Box(Modifier.size(36.dp), contentAlignment = Alignment.Center) {
-                Box(
-                    Modifier
-                        .matchParentSize()
-                        .graphicsLayer { rotationZ = badgeTurn }
-                        .clip(PortalShapes.Cookie4Sided.toPortalShape())
-                        .background(badge),
-                )
-                Icon(painterResource(icon), contentDescription = null, tint = onBadge, modifier = Modifier.size(18.dp))
-            }
-            Spacer(Modifier.width(10.dp))
-            Column(Modifier.weight(1f)) {
+    Row(
+        modifier.padding(horizontal = 14.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Box(Modifier.size(36.dp), contentAlignment = Alignment.Center) {
+            Box(
+                Modifier
+                    .matchParentSize()
+                    .graphicsLayer { rotationZ = badgeTurn }
+                    .clip(PortalShapes.Cookie4Sided.toPortalShape())
+                    .background(badge),
+            )
+            Icon(painterResource(icon), contentDescription = null, tint = onBadge, modifier = Modifier.size(18.dp))
+        }
+        Spacer(Modifier.width(10.dp))
+        Column(Modifier.weight(1f)) {
+            Text(
+                label,
+                style = TextStyle(
+                    fontFamily = Vazirmatn,
+                    fontWeight = FontWeight.Medium,
+                    fontSize = 12.sp,
+                ),
+                color = LiteColors.textSecondary,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+            Row(verticalAlignment = Alignment.Bottom) {
                 Text(
-                    label,
+                    LiteFormat.toPersian(value),
+                    style = TextStyle(
+                        fontFamily = Vazirmatn,
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 22.sp,
+                    ),
+                    color = if (busy) LiteColors.text else LiteColors.textSecondary,
+                    maxLines = 1,
+                )
+                Spacer(Modifier.width(3.dp))
+                Text(
+                    unit,
                     style = TextStyle(
                         fontFamily = Vazirmatn,
                         fontWeight = FontWeight.Medium,
@@ -1197,43 +1232,19 @@ private fun FlowHalf(
                     ),
                     color = LiteColors.textSecondary,
                     maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                )
-                Row(verticalAlignment = Alignment.Bottom) {
-                    Text(
-                        LiteFormat.toPersian(value),
-                        style = TextStyle(
-                            fontFamily = Vazirmatn,
-                            fontWeight = FontWeight.Bold,
-                            fontSize = 22.sp,
-                        ),
-                        color = if (busy) LiteColors.text else LiteColors.textSecondary,
-                        maxLines = 1,
-                    )
-                    Spacer(Modifier.width(3.dp))
-                    Text(
-                        unit,
-                        style = TextStyle(
-                            fontFamily = Vazirmatn,
-                            fontWeight = FontWeight.Medium,
-                            fontSize = 12.sp,
-                        ),
-                        color = LiteColors.textSecondary,
-                        maxLines = 1,
-                        modifier = Modifier.padding(bottom = 3.dp),
-                    )
-                }
-                Text(
-                    LiteFormat.toPersian(LiteFormat.formatVolume(total)),
-                    style = TextStyle(
-                        fontFamily = Vazirmatn,
-                        fontWeight = FontWeight.Normal,
-                        fontSize = 11.sp,
-                    ),
-                    color = LiteColors.textSecondary,
-                    maxLines = 1,
+                    modifier = Modifier.padding(bottom = 3.dp),
                 )
             }
+            Text(
+                LiteFormat.toPersian(LiteFormat.formatVolume(total)),
+                style = TextStyle(
+                    fontFamily = Vazirmatn,
+                    fontWeight = FontWeight.Normal,
+                    fontSize = 11.sp,
+                ),
+                color = LiteColors.textSecondary,
+                maxLines = 1,
+            )
         }
     }
 }
