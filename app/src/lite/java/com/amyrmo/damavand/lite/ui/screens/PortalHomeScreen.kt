@@ -1125,9 +1125,11 @@ private fun FlowMeter(
     totalUpload: Long,
     modifier: Modifier = Modifier,
 ) {
+    // 1.0.1.10: the two halves are standalone cards now — uniform
+    // corners and a real gap, instead of one card split in two.
     Row(
         modifier.fillMaxWidth().height(IntrinsicSize.Min),
-        horizontalArrangement = Arrangement.spacedBy(3.dp),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
     ) {
         FlowHalf(
             icon = R.drawable.ic_download,
@@ -1137,7 +1139,7 @@ private fun FlowMeter(
             live = live,
             badge = LiteColors.green.copy(alpha = 0.18f),
             onBadge = LiteColors.green,
-            shape = RoundedCornerShape(topStart = 26.dp, bottomStart = 26.dp, topEnd = 6.dp, bottomEnd = 6.dp),
+            shape = RoundedCornerShape(22.dp),
             modifier = Modifier.weight(1f).fillMaxHeight(),
         )
         FlowHalf(
@@ -1148,7 +1150,7 @@ private fun FlowMeter(
             live = live,
             badge = LiteColors.accent.copy(alpha = 0.18f),
             onBadge = LiteColors.accent,
-            shape = RoundedCornerShape(topStart = 6.dp, bottomStart = 6.dp, topEnd = 26.dp, bottomEnd = 26.dp),
+            shape = RoundedCornerShape(22.dp),
             modifier = Modifier.weight(1f).fillMaxHeight(),
         )
     }
