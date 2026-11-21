@@ -45,8 +45,10 @@ import com.amyrmo.damavand.lite.ui.ConnectionUiState
 import com.amyrmo.damavand.lite.ui.LiteViewModel
 import com.amyrmo.damavand.lite.ui.components.LiteBottomBar
 import com.amyrmo.damavand.lite.ui.components.LiteHeader
+import com.amyrmo.damavand.lite.ui.screens.HomeDesignSwitch
 import com.amyrmo.damavand.lite.ui.screens.LogsScreen
 import com.amyrmo.damavand.lite.ui.screens.PerAppScreen
+import com.amyrmo.damavand.lite.ui.screens.PortalHomeScreen
 import com.amyrmo.damavand.lite.ui.screens.RoutingScreen
 import com.amyrmo.damavand.lite.ui.screens.ScannerScreen
 import com.amyrmo.damavand.lite.ui.screens.ServersScreen
@@ -62,7 +64,8 @@ import com.amyrmo.damavand.lite.ui.theme.resolveDark
 
 /**
  * Damavand Lite — single activity, four Summit tabs (Home / Servers /
- * Stats / Settings). No onboarding, no login, no design picker.
+ * Stats / Settings). No onboarding, no login. The Home tab has two
+ * interfaces — Damavand (Summit) and Portal — switched on the connect page.
  * Android back from any tab goes to Home; back from Home exits.
  *
  * 2.0.0: only the VISIBLE tab is composed. The 1.1.x build composed all
@@ -379,6 +382,8 @@ private fun LiteRoot(
     val connection by vm.connection.collectAsState()
     val profiles by vm.profiles.collectAsState()
     val selectedId by vm.selectedId.collectAsState()
+    // 1.0.1.9 (Portal): which home interface the connect page shows.
+    val homeDesign by vm.homeDesign.collectAsState(initial = HOME_DESIGN_DAMAVAND)
 
     // Scroll states hoisted here so each tab keeps its position while
     // only the visible tab is composed (see class doc).
@@ -464,6 +469,7 @@ private fun LiteRoot(
                         connection = connection,
                         profiles = profiles,
                         selectedId = selectedId,
+                        homeDesign = homeDesign,
                         onConnectRequest = onConnectRequest,
                         onFastestRequest = onFastestRequest,
                         onGoToServers = { tab = 1 },
@@ -500,6 +506,7 @@ private fun TabContent(
     connection: ConnectionUiState,
     profiles: List<Profile>,
     selectedId: String?,
+    homeDesign: String,
     onConnectRequest: () -> Unit,
     onFastestRequest: () -> Unit,
     onGoToServers: () -> Unit,
@@ -516,17 +523,36 @@ private fun TabContent(
     settingsScroll: androidx.compose.foundation.ScrollState,
 ) {
     when (tab) {
-        0 -> SummitHomeScreen(
-            vm = vm,
-            connection = connection,
-            profiles = profiles,
-            selectedId = selectedId,
-            onConnectRequest = onConnectRequest,
-            onFastestRequest = onFastestRequest,
-            onGoToServers = onGoToServers,
-            onGoToSettingsGeo = onGoToSettingsGeo,
-            scrollState = homeScroll,
-        )
+        0 -> Column(Modifier.fillMaxSize()) {
+            // 1.0.1.9 (Portal): the switcher is shared chrome above the
+            // home content — identical on both interfaces.
+            HomeDesignSwitch(selected = homeDesign, onSelect = { vm.setHomeDesign(it) })
+            Box(Modifier.weight(1f)) {
+                if (homeDesign == HOME_DESIGN_PORTAL) {
+                    PortalHomeScreen(
+                        vm = vm,
+                        connection = connection,
+                        profiles = profiles,
+                        selectedId = selectedId,
+                        onConnectRequest = onConnectRequest,
+                        onGoToServers = onGoToServers,
+                        scrollState = homeScroll,
+                    )
+                } else {
+                    SummitHomeScreen(
+                        vm = vm,
+                        connection = connection,
+                        profiles = profiles,
+                        selectedId = selectedId,
+                        onConnectRequest = onConnectRequest,
+                        onFastestRequest = onFastestRequest,
+                        onGoToServers = onGoToServers,
+                        onGoToSettingsGeo = onGoToSettingsGeo,
+                        scrollState = homeScroll,
+                    )
+                }
+            }
+        }
         1 -> ServersScreen(
             vm = vm,
             profiles = profiles,
