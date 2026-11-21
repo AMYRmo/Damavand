@@ -30,6 +30,8 @@
     <string name="action_disconnect">Disconnect</string>
     <string name="action_cancel">Cancel</string>
     <string name="home_design_portal">Portal</string>
+    <string name="home_design_title">Home interface</string>
+    <string name="home_design_desc">Damavand or Portal</string>
     <string name="ring_auto_fastest">The fastest server is picked automatically</string>
     <string name="ring_step_keys">Negotiating keys</string>
     <string name="ring_step_route">Checking route</string>
