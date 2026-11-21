@@ -119,8 +119,6 @@ import androidx.graphics.shapes.TransformResult
 import androidx.graphics.shapes.circle
 import androidx.graphics.shapes.star
 import com.amyrmo.damavand.lite.AutoSelectIds
-import com.amyrmo.damavand.lite.HOME_DESIGN_DAMAVAND
-import com.amyrmo.damavand.lite.HOME_DESIGN_PORTAL
 import com.amyrmo.damavand.lite.Chain
 import com.amyrmo.damavand.lite.Profile
 import com.amyrmo.damavand.lite.R
@@ -1489,62 +1487,5 @@ private fun ParticleBurst(trigger: Int) {
                 drawCircle(color = color, radius = p.radius / 2f, center = Offset(p.x, p.y))
             }
         }
-    }
-}
-
-/**
- * The Damavand / Portal switcher — shared chrome on the connect page,
- * identical above both home interfaces. The choice is persisted via
- * [com.amyrmo.damavand.lite.ui.LiteViewModel.setHomeDesign].
- */
-@Composable
-fun HomeDesignSwitch(selected: String, onSelect: (String) -> Unit) {
-    Surface(
-        shape = RoundedCornerShape(24.dp),
-        color = LiteColors.surface2,
-        modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 8.dp),
-    ) {
-        Row(Modifier.padding(4.dp), horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-            HomeDesignChoice(
-                label = stringResource(R.string.app_name),
-                selected = selected == HOME_DESIGN_DAMAVAND,
-                onClick = { onSelect(HOME_DESIGN_DAMAVAND) },
-                modifier = Modifier.weight(1f),
-            )
-            HomeDesignChoice(
-                label = stringResource(R.string.home_design_portal),
-                selected = selected == HOME_DESIGN_PORTAL,
-                onClick = { onSelect(HOME_DESIGN_PORTAL) },
-                modifier = Modifier.weight(1f),
-            )
-        }
-    }
-}
-
-@Composable
-private fun HomeDesignChoice(
-    label: String,
-    selected: Boolean,
-    onClick: () -> Unit,
-    modifier: Modifier = Modifier,
-) {
-    Surface(
-        onClick = onClick,
-        shape = RoundedCornerShape(20.dp),
-        color = if (selected) LiteColors.accent else Color.Transparent,
-        modifier = modifier,
-    ) {
-        Text(
-            text = label,
-            style = TextStyle(
-                fontFamily = Vazirmatn,
-                fontWeight = FontWeight.Bold,
-                fontSize = 14.sp,
-            ),
-            color = if (selected) Color.White else LiteColors.textSecondary,
-            textAlign = TextAlign.Center,
-            maxLines = 1,
-            modifier = Modifier.padding(vertical = 8.dp),
-        )
     }
 }
