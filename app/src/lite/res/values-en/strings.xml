@@ -18,6 +18,18 @@
 
     <!-- Ring -->
     <string name="ring_tap_to_connect">Tap to connect</string>
+    <!-- 1.0.1.8 (Portal home interface) -->
+    <string name="home_download">Download</string>
+    <string name="home_upload">Upload</string>
+    <string name="home_select_config">Choose a config</string>
+    <string name="home_no_config_body">No config selected yet</string>
+    <string name="home_tap_to_change">Tap to change</string>
+    <string name="home_local_proxy">Proxy · %1$s</string>
+    <string name="copied">Copied</string>
+    <string name="action_connect">Connect</string>
+    <string name="action_disconnect">Disconnect</string>
+    <string name="action_cancel">Cancel</string>
+    <string name="home_design_portal">Portal</string>
     <string name="ring_auto_fastest">The fastest server is picked automatically</string>
     <string name="ring_step_keys">Negotiating keys</string>
     <string name="ring_step_route">Checking route</string>
