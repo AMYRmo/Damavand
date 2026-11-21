@@ -107,12 +107,10 @@ dependencies {
     implementation("androidx.compose.ui:ui")
     implementation("androidx.compose.ui:ui-graphics")
     implementation("androidx.compose.ui:ui-tooling-preview")
-    // 1.0.1.8 (Portal): MaterialShapes / toShape / Morph.toPath landed in
-    // material3 1.5.0 — the 2024.09.00 BOM pins 1.3.0, which has none of them.
-    // CI run 526 failed on exactly those unresolved references, so pin 1.5.0
-    // until the BOM itself is bumped.
-    implementation("androidx.compose.material3:material3:1.5.0")
-    // 1.0.1.8 (Portal): MaterialShapes morphing (graphics-shapes).
+    // 1.0.1.8 (Portal): morphing shapes live in PortalHomeScreen.kt, built
+    // directly on graphics-shapes — material3 stays on the BOM's 1.3.0.
+    // (Pinning material3 1.5.0 pulled Compose 1.12, which needs compileSdk 37
+    // + AGP 9; CI run 44877422449 went red on 22 dependency errors.)
     implementation("androidx.graphics:graphics-shapes:1.0.1")
     implementation("androidx.compose.animation:animation")
     implementation("androidx.core:core-ktx:1.17.0")
