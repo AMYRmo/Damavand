@@ -107,7 +107,11 @@ dependencies {
     implementation("androidx.compose.ui:ui")
     implementation("androidx.compose.ui:ui-graphics")
     implementation("androidx.compose.ui:ui-tooling-preview")
-    implementation("androidx.compose.material3:material3")
+    // 1.0.1.8 (Portal): MaterialShapes / toShape / Morph.toPath landed in
+    // material3 1.5.0 — the 2024.09.00 BOM pins 1.3.0, which has none of them.
+    // CI run 526 failed on exactly those unresolved references, so pin 1.5.0
+    // until the BOM itself is bumped.
+    implementation("androidx.compose.material3:material3:1.5.0")
     // 1.0.1.8 (Portal): MaterialShapes morphing (graphics-shapes).
     implementation("androidx.graphics:graphics-shapes:1.0.1")
     implementation("androidx.compose.animation:animation")
