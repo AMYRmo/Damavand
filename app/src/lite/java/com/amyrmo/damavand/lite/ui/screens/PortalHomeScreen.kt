@@ -23,6 +23,7 @@ import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.ScrollState
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
@@ -44,6 +45,7 @@ import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -489,15 +491,39 @@ fun PortalHomeScreen(
                             horizontalAlignment = Alignment.CenterHorizontally,
                         ) {
                             PortalCaption(state, compact, onStatusTap = { vm.refreshLocation() })
-                            AnimatedVisibility(visible = live) {
-                                Column {
-                                    Spacer(Modifier.height(14.dp))
-                                    ConnectionInfoPill(
-                                        connection = connection,
-                                        onRefresh = { vm.refreshLocation() },
-                                        profile = profile,
-                                        chain = selectedChain,
-                                        chainMembers = chainMembers,
+                            Spacer(Modifier.height(14.dp))
+                            // 1.0.1.12: location + speeds are ONE card —
+                            // the pill's contents and the FlowMeter share
+                            // a single surface. The location part appears
+                            // only while connected; the speeds stay visible.
+                            Surface(
+                                shape = RoundedCornerShape(22.dp),
+                                color = LiteColors.surface,
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .border(1.dp, LiteColors.hairline, RoundedCornerShape(22.dp)),
+                            ) {
+                                Column(Modifier.padding(horizontal = 12.dp, vertical = 8.dp)) {
+                                    AnimatedVisibility(visible = live) {
+                                        Column {
+                                            ConnectionInfoContent(
+                                                connection = connection,
+                                                onRefresh = { vm.refreshLocation() },
+                                                profile = profile,
+                                                chain = selectedChain,
+                                                chainMembers = chainMembers,
+                                            )
+                                            Spacer(Modifier.height(8.dp))
+                                            HorizontalDivider(color = LiteColors.hairline)
+                                            Spacer(Modifier.height(8.dp))
+                                        }
+                                    }
+                                    FlowMeter(
+                                        live = live,
+                                        downloadBps = connection.downSpeed,
+                                        uploadBps = connection.upSpeed,
+                                        totalDownload = connection.totalDown,
+                                        totalUpload = connection.totalUp,
                                     )
                                 }
                             }
@@ -536,14 +562,6 @@ fun PortalHomeScreen(
                         }
                     }
                 }
-                FlowMeter(
-                    live = live,
-                    downloadBps = connection.downSpeed,
-                    uploadBps = connection.upSpeed,
-                    totalDownload = connection.totalDown,
-                    totalUpload = connection.totalUp,
-                    modifier = Modifier.padding(horizontal = 20.dp),
-                )
                 Spacer(Modifier.height(8.dp))
                 PortalTicket(
                     name = profile?.name,
@@ -1128,18 +1146,15 @@ private fun FlowMeter(
     totalUpload: Long,
     modifier: Modifier = Modifier,
 ) {
-    Surface(
-        shape = RoundedCornerShape(22.dp),
-        color = LiteColors.surface2,
-        modifier = modifier.fillMaxWidth(),
+    // 1.0.1.12: no own card — the merged home card provides the
+    // surface; this is just the two halves side by side.
+    Row(
+        modifier
+            .fillMaxWidth()
+            .height(IntrinsicSize.Min)
+            .padding(vertical = 4.dp),
+        verticalAlignment = Alignment.CenterVertically,
     ) {
-        Row(
-            Modifier
-                .fillMaxWidth()
-                .height(IntrinsicSize.Min)
-                .padding(vertical = 12.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
             FlowHalf(
                 icon = R.drawable.ic_download,
                 label = stringResource(R.string.home_download),
@@ -1150,12 +1165,8 @@ private fun FlowMeter(
                 onBadge = LiteColors.green,
                 modifier = Modifier.weight(1f),
             )
-            Box(
-                Modifier
-                    .fillMaxHeight()
-                    .width(1.dp)
-                    .background(LiteColors.hairline),
-            )
+            // 1.0.1.12: no divider — the line down the middle still
+            // read as two cards. One seamless card, both halves in it.
             FlowHalf(
                 icon = R.drawable.ic_upload,
                 label = stringResource(R.string.home_upload),
@@ -1167,7 +1178,6 @@ private fun FlowMeter(
                 modifier = Modifier.weight(1f),
             )
         }
-    }
 }
 
 @Composable
