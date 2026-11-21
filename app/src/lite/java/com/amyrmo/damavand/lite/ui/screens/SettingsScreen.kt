@@ -57,6 +57,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.amyrmo.damavand.lite.BuildConfig
 import com.amyrmo.damavand.lite.GeoDownloader
+import com.amyrmo.damavand.lite.HOME_DESIGN_DAMAVAND
+import com.amyrmo.damavand.lite.HOME_DESIGN_PORTAL
 import com.amyrmo.damavand.lite.LiteTileService
 import com.amyrmo.damavand.lite.R
 import com.amyrmo.damavand.lite.ui.LiteViewModel
@@ -128,6 +130,9 @@ fun SettingsScreen(
     val confirmDelete by vm.confirmDelete.collectAsState(initial = true)
     val language by vm.language.collectAsState(initial = "auto")
     val themeMode by vm.themeMode.collectAsState(initial = "system")
+    // 1.0.1.9 (Portal): the home-interface choice — Damavand or Portal —
+    // moved here from the connect-page switcher.
+    val homeDesign by vm.homeDesign.collectAsState(initial = HOME_DESIGN_DAMAVAND)
     val doubleColumn by vm.doubleColumn.collectAsState(initial = false)
     // 3.2.8 (Auto): tuning for the autoselect core.
     val autoProbeUrl by vm.autoProbeUrl.collectAsState(initial = "https://www.gstatic.com/generate_204")
@@ -703,6 +708,22 @@ fun SettingsScreen(
                 // 3.2.5: no restart — the theme is state, MainActivity
                 // applies it live as soon as the setting changes.
                 onSelect = { next -> vm.setThemeMode(next) }
+            )
+            GroupDivider()
+            // 1.0.1.9 (Portal): the home-interface choice, moved here
+            // from the connect-page switcher — tap cycles Damavand/Portal.
+            val damavandLabel = stringResource(R.string.app_name)
+            val portalLabel = stringResource(R.string.home_design_portal)
+            CycleRow(
+                titleRes = R.string.home_design_title,
+                descRes = R.string.home_design_desc,
+                options = listOf(damavandLabel, portalLabel),
+                current = if (homeDesign == HOME_DESIGN_PORTAL) portalLabel else damavandLabel,
+                onSelect = { label ->
+                    vm.setHomeDesign(
+                        if (label == portalLabel) HOME_DESIGN_PORTAL else HOME_DESIGN_DAMAVAND
+                    )
+                }
             )
             GroupDivider()
             // 3.2.7 (PattNG): two-column server list. Off by default —
