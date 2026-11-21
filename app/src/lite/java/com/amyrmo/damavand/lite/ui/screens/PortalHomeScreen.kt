@@ -8,7 +8,6 @@ import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.Animatable
-import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.animate
 import androidx.compose.animation.core.spring
@@ -492,10 +491,12 @@ fun PortalHomeScreen(
                         ) {
                             PortalCaption(state, compact, onStatusTap = { vm.refreshLocation() })
                             Spacer(Modifier.height(14.dp))
-                            // 1.0.1.12: location + speeds are ONE card —
-                            // the pill's contents and the FlowMeter share
-                            // a single surface. The location part appears
-                            // only while connected; the speeds stay visible.
+                            // 1.0.1.13: ALL home cards are ONE card now —
+                            // location + profile + speeds + proxy + server
+                            // share a single surface, so Home shows one
+                            // card instead of three. The location part
+                            // appears only while connected; the speeds and
+                            // the server row stay visible.
                             Surface(
                                 shape = RoundedCornerShape(22.dp),
                                 color = LiteColors.surface,
@@ -525,36 +526,47 @@ fun PortalHomeScreen(
                                         totalDownload = connection.totalDown,
                                         totalUpload = connection.totalUp,
                                     )
-                                }
-                            }
-                            if (localProxyAddress != null && live) {
-                                Spacer(Modifier.height(12.dp))
-                                Surface(
-                                    onClick = {
-                                        val clip = context.getSystemService(Context.CLIPBOARD_SERVICE)
-                                            as? ClipboardManager
-                                        clip?.setPrimaryClip(
-                                            ClipData.newPlainText("proxy", localProxyAddress)
-                                        )
-                                        Toast.makeText(
-                                            context,
-                                            context.getString(R.string.copied),
-                                            Toast.LENGTH_SHORT,
-                                        ).show()
-                                    },
-                                    shape = CircleShape,
-                                    color = LiteColors.surface2,
-                                ) {
-                                    Text(
-                                        text = stringResource(R.string.home_local_proxy, localProxyAddress),
-                                        style = TextStyle(
-                                            fontFamily = Vazirmatn,
-                                            fontWeight = FontWeight.Medium,
-                                            fontSize = 14.sp,
-                                        ),
-                                        color = LiteColors.textSecondary,
-                                        maxLines = 1,
-                                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+                                    if (localProxyAddress != null && live) {
+                                        Spacer(Modifier.height(8.dp))
+                                        HorizontalDivider(color = LiteColors.hairline)
+                                        Spacer(Modifier.height(8.dp))
+                                        Box(
+                                            Modifier
+                                                .fillMaxWidth()
+                                                .clickable {
+                                                    val clip = context.getSystemService(Context.CLIPBOARD_SERVICE)
+                                                        as? ClipboardManager
+                                                    clip?.setPrimaryClip(
+                                                        ClipData.newPlainText("proxy", localProxyAddress)
+                                                    )
+                                                    Toast.makeText(
+                                                        context,
+                                                        context.getString(R.string.copied),
+                                                        Toast.LENGTH_SHORT,
+                                                    ).show()
+                                                },
+                                            contentAlignment = Alignment.Center,
+                                        ) {
+                                            Text(
+                                                text = stringResource(R.string.home_local_proxy, localProxyAddress),
+                                                style = TextStyle(
+                                                    fontFamily = Vazirmatn,
+                                                    fontWeight = FontWeight.Medium,
+                                                    fontSize = 14.sp,
+                                                ),
+                                                color = LiteColors.textSecondary,
+                                                maxLines = 1,
+                                            )
+                                        }
+                                    }
+                                    Spacer(Modifier.height(8.dp))
+                                    HorizontalDivider(color = LiteColors.hairline)
+                                    Spacer(Modifier.height(8.dp))
+                                    PortalTicket(
+                                        name = profile?.name,
+                                        detail = profile?.let { "${it.address}:${it.port}" },
+                                        locked = false,
+                                        onClick = onGoToServers,
                                     )
                                 }
                             }
@@ -562,15 +574,6 @@ fun PortalHomeScreen(
                         }
                     }
                 }
-                Spacer(Modifier.height(8.dp))
-                PortalTicket(
-                    name = profile?.name,
-                    detail = profile?.let { "${it.address}:${it.port}" },
-                    locked = false,
-                    onClick = onGoToServers,
-                    modifier = Modifier.padding(horizontal = 20.dp),
-                )
-                Spacer(Modifier.height(12.dp))
             }
         }
         ParticleBurst(trigger = burst)
@@ -1269,27 +1272,20 @@ private fun PortalTicket(
 ) {
     val source = remember { MutableInteractionSource() }
     val pressed by source.collectIsPressedAsState()
-    val corner by animateDpAsState(
-        if (pressed) 18.dp else 30.dp,
-        spring(dampingRatio = 0.8f, stiffness = 380f),
-        label = "ticket-corner",
-    )
     val turn by animateFloatAsState(
         if (pressed) 60f else 0f,
         spring(dampingRatio = 0.8f, stiffness = 380f),
         label = "ticket-turn",
     )
-    Surface(
-        onClick = onClick,
-        interactionSource = source,
-        shape = RoundedCornerShape(corner),
-        color = LiteColors.accent.copy(alpha = 0.16f),
-        modifier = modifier.fillMaxWidth(),
+    // 1.0.1.13: no own card — the merged home card provides the
+    // surface; this is just the server row inside it.
+    Row(
+        modifier
+            .fillMaxWidth()
+            .clickable(interactionSource = source, indication = null, onClick = onClick)
+            .padding(vertical = 4.dp),
+        verticalAlignment = Alignment.CenterVertically,
     ) {
-        Row(
-            Modifier.fillMaxWidth().padding(start = 12.dp, end = 12.dp, top = 12.dp, bottom = 12.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
             Box(Modifier.size(46.dp), contentAlignment = Alignment.Center) {
                 Box(
                     Modifier
@@ -1348,7 +1344,6 @@ private fun PortalTicket(
                 )
             }
         }
-    }
 }
 
 internal const val STAGE_ID = "home-stage"
