@@ -108,6 +108,8 @@ dependencies {
     implementation("androidx.compose.ui:ui-graphics")
     implementation("androidx.compose.ui:ui-tooling-preview")
     implementation("androidx.compose.material3:material3")
+    // 1.0.1.8 (Portal): MaterialShapes morphing (graphics-shapes).
+    implementation("androidx.graphics:graphics-shapes:1.0.1")
     implementation("androidx.compose.animation:animation")
     implementation("androidx.core:core-ktx:1.17.0")
     implementation("androidx.activity:activity-compose:1.9.2")
