@@ -425,16 +425,25 @@ class LiteViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
-    // ---- update check (3.2.8): compare with the newest v* release
-    // of AMYRmo/DamavandLite — the app's own repo since the 2026-11-16
-    // move (the old Damavand repo + lite-v* tags never match again). ----
+    // ---- update check (1.0.2): compare with the newest PUBLISHED
+    // v* release of AMYRmo/Damavand and hand the browser the APK
+    // that matches this phone's ABI, so the user taps once and the
+    // download starts — no picking a file from the release page.
+    // The old check (3.2.8) pointed at the renamed DamavandLite
+    // repo, read a list drafts never appear in, used a plain
+    // connection (dead when the VPN tunnel is up but broken), and
+    // opened only the release page. ----
     sealed interface UpdateCheckState {
         data object Idle : UpdateCheckState
         data object Checking : UpdateCheckState
         data class Result(
             val updateAvailable: Boolean,
             val tag: String,
-            val url: String
+            val url: String,
+            /** Direct APK download for this phone's ABI (null: open [url]). */
+            val downloadUrl: String? = null,
+            /** ABI the [downloadUrl] was picked for, e.g. "arm64-v8a". */
+            val abi: String? = null
         ) : UpdateCheckState
         data class Failed(val message: String) : UpdateCheckState
     }
@@ -448,28 +457,39 @@ class LiteViewModel(app: Application) : AndroidViewModel(app) {
         _updateCheck.value = UpdateCheckState.Checking
         viewModelScope.launch(Dispatchers.IO) {
             try {
-                val url = java.net.URL(
-                    "https://api.github.com/repos/AMYRmo/DamavandLite/releases?per_page=20"
+                // /releases/latest returns the newest PUBLISHED release
+                // only — drafts are invisible to it, which is what we
+                // want: only a published 1.0.2 may be offered. When
+                // there is no published release yet it 404s, so fall
+                // back to the list and take the first non-draft v* tag.
+                val body = fetchReleaseJson(
+                    "https://api.github.com/repos/AMYRmo/Damavand/releases/latest"
+                ) ?: fetchReleaseJson(
+                    "https://api.github.com/repos/AMYRmo/Damavand/releases?per_page=20"
                 )
-                val conn = url.openConnection() as java.net.HttpURLConnection
-                conn.connectTimeout = 10_000
-                conn.readTimeout = 10_000
-                conn.setRequestProperty("Accept", "application/vnd.github+json")
-                val body = conn.inputStream.bufferedReader().readText()
-                conn.disconnect()
-                // Releases come newest-first; take the first v* tag.
-                val tag = Regex("\"tag_name\"\\s*:\\s*\"(v[0-9.]+)\"")
-                    .find(body)?.groupValues?.getOrNull(1)
+                if (body == null) {
+                    _updateCheck.value = UpdateCheckState.Failed(strings.getString(R.string.update_not_found))
+                    return@launch
+                }
+                val tag = firstPublishedTag(body)
                 if (tag == null) {
                     _updateCheck.value = UpdateCheckState.Failed(strings.getString(R.string.update_not_found))
                 } else {
                     val latest = tag.removePrefix("v")
                     val current = com.amyrmo.damavand.lite.BuildConfig.VERSION_NAME
                     val available = compareVersions(latest, current) > 0
+                    val abi = deviceAbi()
+                    val downloadUrl = if (available) {
+                        pickApkForAbi(body, latest, abi)
+                    } else {
+                        null
+                    }
                     _updateCheck.value = UpdateCheckState.Result(
                         updateAvailable = available,
                         tag = tag,
-                        url = "https://github.com/AMYRmo/DamavandLite/releases/tag/$tag"
+                        url = "https://github.com/AMYRmo/Damavand/releases/tag/$tag",
+                        downloadUrl = downloadUrl,
+                        abi = if (downloadUrl != null) abi else null
                     )
                 }
             } catch (e: Exception) {
@@ -477,6 +497,73 @@ class LiteViewModel(app: Application) : AndroidViewModel(app) {
                     UpdateCheckState.Failed(e.message ?: strings.getString(R.string.update_error))
             }
         }
+    }
+
+    /** GET a GitHub API URL and return its body, or null on any
+     *  failure (non-2xx, network error). Goes through [HttpFetch],
+     *  so it also works while the VPN tunnel is up but broken: the
+     *  plain default route is retried on the direct networks. */
+    private fun fetchReleaseJson(url: String): String? {
+        val outcome = com.amyrmo.damavand.lite.HttpFetch.openConnectionDetailed(
+            context, url, 10_000, 10_000, "Damavand"
+        )
+        val conn = (outcome as? com.amyrmo.damavand.lite.HttpFetch.Outcome.Ok)?.connection
+            ?: return null
+        return try {
+            conn.inputStream.bufferedReader().readText()
+        } catch (_: Exception) {
+            null
+        } finally {
+            conn.disconnect()
+        }
+    }
+
+    /** First v* tag_name in the body whose release is not a draft
+     *  and not a prerelease. In the /latest body there is only one
+     *  release; in the list, the object after a tag_name carries its
+     *  own "draft"/"prerelease" flags before the next tag_name. */
+    private fun firstPublishedTag(body: String): String? {
+        val tagRegex = Regex("\"tag_name\"\\s*:\\s*\"(v[0-9.]+)\"")
+        val matches = tagRegex.findAll(body).toList()
+        for ((index, match) in matches.withIndex()) {
+            val end = matches.getOrNull(index + 1)?.range?.first ?: body.length
+            val segment = body.substring(match.range.first, end)
+            if (Regex("\"draft\"\\s*:\\s*true").containsMatchIn(segment)) continue
+            if (Regex("\"prerelease\"\\s*:\\s*true").containsMatchIn(segment)) continue
+            return match.groupValues[1]
+        }
+        return null
+    }
+
+    /** This phone's ABI, from the OS-ordered list. The CI splits
+     *  only arm64-v8a + armeabi-v7a (+ universal); anything else
+     *  (e.g. x86_64) falls back to the universal APK. */
+    private fun deviceAbi(): String {
+        val supported = Build.SUPPORTED_ABIS
+        return supported.firstOrNull { it == "arm64-v8a" || it == "armeabi-v7a" }
+            ?: supported.firstOrNull()
+            ?: "universal"
+    }
+
+    /** Direct download URL of the Damavand-<ver>-<abi>.apk asset in
+     *  the release JSON, preferring the exact ABI and falling back
+     *  to the universal APK; null when the release has no APK asset
+     *  (the caller then opens the release page instead). */
+    private fun pickApkForAbi(body: String, version: String, abi: String): String? {
+        // Asset objects list "name" before "browser_download_url".
+        val nameRegex = Regex("\"name\"\\s*:\\s*\"(Damavand-[^\"]+\\.apk)\"")
+        val urlRegex = Regex("\"browser_download_url\"\\s*:\\s*\"([^\"]+)\"")
+        val assets = nameRegex.findAll(body).map { match ->
+            val tail = body.substring(match.range.first, minOf(body.length, match.range.first + 2000))
+            match.groupValues[1] to urlRegex.find(tail)?.groupValues?.getOrNull(1)
+        }.toList()
+        val exact = assets.firstOrNull { (name, url) ->
+            url != null && name == "Damavand-$version-$abi.apk"
+        }?.second
+        if (exact != null) return exact
+        return assets.firstOrNull { (name, url) ->
+            url != null && name == "Damavand-$version-universal.apk"
+        }?.second
     }
 
     private fun compareVersions(a: String, b: String): Int {
