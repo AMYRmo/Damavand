@@ -1,5 +1,11 @@
 <?xml version="1.0" encoding="utf-8"?>
 <shortcuts xmlns:android="http://schemas.android.com/apk/res/android">
+    <!--
+      targetPackage is the applicationId (com.amyrmo.damavand since 1.0.1),
+      NOT the Kotlin package. Resource XML gets no ${applicationId}
+      placeholder, so keep this in step with app/build.gradle.kts.
+      targetClass is the Kotlin class name, which stays .lite.
+    -->
     <shortcut
         android:shortcutId="connect"
         android:enabled="true"
