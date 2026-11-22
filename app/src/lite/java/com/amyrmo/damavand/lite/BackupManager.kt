@@ -82,6 +82,10 @@ object BackupManager {
             // 3.2.7: the theme + the balancer groups were missing —
             // a restore used to lose both.
             settings.put("theme_mode", store.themeMode.first())
+            // 1.0.1.18 (#87): the home design was the only setting
+            // missing from backups — a restore silently reset Portal
+            // back to Damavand.
+            settings.put("home_design", store.homeDesign.first())
             settings.put("balancer_groups", JSONArray(store.balancerGroups.first().toList()))
             settings.put("double_column", store.doubleColumn.first())
             // 3.2.8: the Auto group + tuning were missing too.
@@ -179,7 +183,7 @@ object BackupManager {
             "mtu", "iface_addr", "core_loglevel", "domain_strategy",
             "mux_concurrency", "mux_xudp_concurrency", "domestic_dns",
             "dns_hosts", "real_ping_concurrency", "ip_api_url", "language",
-            "hev_loglevel", "hev_rw_timeout", "theme_mode", "selected_group",
+            "hev_loglevel", "hev_rw_timeout", "theme_mode", "home_design", "selected_group",
             "auto_probe_url", "auto_check_seconds", "auto_sweep_minutes",
             "auto_switch_margin", "aether_listen_port", "aether_keys_settings",
             "asset_geoip_url", "asset_geosite_url", "asset_psiphon_url",
@@ -247,12 +251,32 @@ object BackupManager {
                 staged.forEach { (tmp, _) -> runCatching { tmp.delete() } }
                 return false
             }
-            // All staged — swap them in.
-            staged.forEach { (tmp, target) ->
-                if (!tmp.renameTo(target)) {
-                    tmp.copyTo(target, overwrite = true)
-                    tmp.delete()
+            // All staged — swap them in. Each live file is backed up
+            // first, so a failure mid-swap rolls back to the previous
+            // generation instead of leaving mixed data (1.0.1.18, #88).
+            val swapped = mutableListOf<Pair<File, File>>()
+            try {
+                staged.forEach { (tmp, target) ->
+                    val backup = if (target.exists()) File(filesDir, target.name + ".bak") else null
+                    if (backup != null) {
+                        if (!target.renameTo(backup)) throw java.io.IOException("backup failed for ${target.name}")
+                        swapped += backup to target
+                    }
+                    if (!tmp.renameTo(target)) {
+                        tmp.copyTo(target, overwrite = true)
+                        tmp.delete()
+                    }
                 }
+                swapped.forEach { (backup, _) -> runCatching { backup.delete() } }
+            } catch (_: Exception) {
+                swapped.forEach { (backup, target) ->
+                    runCatching {
+                        target.delete()
+                        backup.renameTo(target)
+                    }
+                }
+                staged.forEach { (tmp, _) -> runCatching { tmp.delete() } }
+                return false
             }
             // 1.0.1.2 (#87): the Aether work dir. Paths are confined
             // to the aether dir — a crafted bundle must not write
@@ -268,8 +292,18 @@ object BackupManager {
                         val target = File(dir, rel)
                         if (!target.canonicalPath.startsWith(dir.canonicalPath + File.separator)) continue
                         val bytes = android.util.Base64.decode(b64, android.util.Base64.DEFAULT)
+                        // 1.0.1.18 (#88): export skips files over 1 MB —
+                        // import must cap the same way, or a crafted
+                        // bundle can write unbounded data here.
+                        if (bytes.size > 1_048_576) continue
                         target.parentFile?.mkdirs()
-                        target.writeBytes(bytes)
+                        // Stage + rename, like the data files above.
+                        val tmp = File(target.parent, target.name + ".tmp")
+                        tmp.writeBytes(bytes)
+                        if (!tmp.renameTo(target)) {
+                            tmp.copyTo(target, overwrite = true)
+                            tmp.delete()
+                        }
                     } catch (_: Exception) {
                     }
                 }
@@ -318,6 +352,12 @@ object BackupManager {
                     if (settings.has("hev_rw_timeout")) store.setHevRwTimeout(settings.getString("hev_rw_timeout"))
                     // 3.2.7.
                     if (settings.has("theme_mode")) store.setThemeMode(settings.getString("theme_mode") ?: "system")
+                    // 1.0.1.18 (#87): only damavand/portal are valid.
+                    if (settings.has("home_design")) {
+                        settings.optString("home_design").takeIf {
+                            it == HOME_DESIGN_DAMAVAND || it == HOME_DESIGN_PORTAL
+                        }?.let { store.setHomeDesign(it) }
+                    }
                     if (settings.has("balancer_groups")) {
                         val arr = settings.optJSONArray("balancer_groups")
                         val keys = (0 until (arr?.length() ?: 0))
