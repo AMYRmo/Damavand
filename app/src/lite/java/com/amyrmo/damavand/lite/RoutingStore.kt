@@ -18,6 +18,36 @@ class RoutingStore(private val context: Context) {
     private val perAppFile: File get() = File(context.filesDir, "perapp.json")
     private val usageFile: File get() = File(context.filesDir, "usage.json")
 
+    // 1.0.1.18 (M10): one lock for every read-modify-write, and
+    // temp + rename writes — the poller records usage every 10 s
+    // while the UI toggles packages or edits rules, and a torn file
+    // used to load as the empty default and then be saved empty,
+    // wiping the rules / per-app list / usage history for good.
+    private val fileLock = Any()
+
+    /** Atomic write (same pattern as ProfileRepository): never truncate the live file. */
+    private fun atomicWrite(file: File, text: String) {
+        synchronized(fileLock) {
+            try {
+                val tmp = File(file.parent, file.name + ".tmp")
+                tmp.writeText(text)
+                if (!tmp.renameTo(file)) {
+                    val tmp2 = File(file.parent, file.name + ".tmp2")
+                    tmp.copyTo(tmp2, overwrite = true)
+                    if (!tmp2.renameTo(file)) {
+                        tmp.delete()
+                        tmp2.delete()
+                    } else {
+                        tmp.delete()
+                    }
+                }
+            } catch (_: Exception) {
+                runCatching { File(file.parent, file.name + ".tmp").delete() }
+                runCatching { File(file.parent, file.name + ".tmp2").delete() }
+            }
+        }
+    }
+
     // ---- routing ----
 
     fun loadRouting(): RoutingConfig {
@@ -31,28 +61,36 @@ class RoutingStore(private val context: Context) {
 
     fun saveRouting(config: RoutingConfig) {
         try {
-            routingFile.writeText(json.encodeToString(config))
+            atomicWrite(routingFile, json.encodeToString(config))
         } catch (_: Exception) {
         }
     }
 
     fun setRoutingMode(mode: String) {
-        saveRouting(loadRouting().copy(mode = mode))
+        synchronized(fileLock) {
+            saveRouting(loadRouting().copy(mode = mode))
+        }
     }
 
     fun addRule(rule: RoutingRule) {
-        val config = loadRouting()
-        saveRouting(config.copy(rules = config.rules + rule))
+        synchronized(fileLock) {
+            val config = loadRouting()
+            saveRouting(config.copy(rules = config.rules + rule))
+        }
     }
 
     fun updateRule(updated: RoutingRule) {
-        val config = loadRouting()
-        saveRouting(config.copy(rules = config.rules.map { if (it.id == updated.id) updated else it }))
+        synchronized(fileLock) {
+            val config = loadRouting()
+            saveRouting(config.copy(rules = config.rules.map { if (it.id == updated.id) updated else it }))
+        }
     }
 
     fun deleteRule(id: String) {
-        val config = loadRouting()
-        saveRouting(config.copy(rules = config.rules.filter { it.id != id }))
+        synchronized(fileLock) {
+            val config = loadRouting()
+            saveRouting(config.copy(rules = config.rules.filter { it.id != id }))
+        }
     }
 
     // ---- per-app proxy ----
@@ -68,20 +106,24 @@ class RoutingStore(private val context: Context) {
 
     fun savePerApp(config: PerAppConfig) {
         try {
-            perAppFile.writeText(json.encodeToString(config))
+            atomicWrite(perAppFile, json.encodeToString(config))
         } catch (_: Exception) {
         }
     }
 
     fun setPerAppMode(mode: String) {
-        savePerApp(loadPerApp().copy(mode = mode))
+        synchronized(fileLock) {
+            savePerApp(loadPerApp().copy(mode = mode))
+        }
     }
 
     fun togglePerAppPackage(packageName: String) {
-        val config = loadPerApp()
-        val pkgs = config.packages.toMutableSet()
-        if (packageName in pkgs) pkgs.remove(packageName) else pkgs.add(packageName)
-        savePerApp(config.copy(packages = pkgs))
+        synchronized(fileLock) {
+            val config = loadPerApp()
+            val pkgs = config.packages.toMutableSet()
+            if (packageName in pkgs) pkgs.remove(packageName) else pkgs.add(packageName)
+            savePerApp(config.copy(packages = pkgs))
+        }
     }
 
     // ---- per-server usage (bytes per profile id, bucketed by local day) ----
@@ -108,7 +150,7 @@ class RoutingStore(private val context: Context) {
 
     private fun saveUsageDays(days: Map<String, Map<String, Long>>) {
         try {
-            usageFile.writeText(json.encodeToString(days))
+            atomicWrite(usageFile, json.encodeToString(days))
         } catch (_: Exception) {
         }
     }
@@ -141,21 +183,25 @@ class RoutingStore(private val context: Context) {
 
     fun recordUsage(profileId: String, bytes: Long) {
         if (profileId.isBlank() || bytes <= 0) return
-        try {
-            val days = loadUsageDays().toMutableMap()
-            val today = (days[todayKey()] ?: emptyMap()).toMutableMap()
-            today[profileId] = (today[profileId] ?: 0L) + bytes
-            days[todayKey()] = today
-            saveUsageDays(pruneDays(days))
-        } catch (_: Exception) {
+        synchronized(fileLock) {
+            try {
+                val days = loadUsageDays().toMutableMap()
+                val today = (days[todayKey()] ?: emptyMap()).toMutableMap()
+                today[profileId] = (today[profileId] ?: 0L) + bytes
+                days[todayKey()] = today
+                saveUsageDays(pruneDays(days))
+            } catch (_: Exception) {
+            }
         }
     }
 
     /** 3.2.30: wipe ALL recorded usage (the Stats reset button). */
     fun clearUsage() {
-        try {
-            if (usageFile.exists()) usageFile.delete()
-        } catch (_: Exception) {
+        synchronized(fileLock) {
+            try {
+                if (usageFile.exists()) usageFile.delete()
+            } catch (_: Exception) {
+            }
         }
     }
 }
