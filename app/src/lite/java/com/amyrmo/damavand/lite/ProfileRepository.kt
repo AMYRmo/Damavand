@@ -55,12 +55,24 @@ class ProfileRepository(private val context: Context) {
             try {
                 val tmp = File(file.parent, file.name + ".tmp")
                 tmp.writeText(text)
-                if (!tmp.renameTo(file)) file.writeText(text)
-            } catch (_: Exception) {
-                try {
-                    file.writeText(text)
-                } catch (_: Exception) {
+                if (!tmp.renameTo(file)) {
+                    // Same-directory rename failed (rare): try via a
+                    // second temp. NEVER writeText the live file — a
+                    // failure part-way would truncate it (1.0.1.18, L1).
+                    val tmp2 = File(file.parent, file.name + ".tmp2")
+                    tmp.copyTo(tmp2, overwrite = true)
+                    if (!tmp2.renameTo(file)) {
+                        tmp.delete()
+                        tmp2.delete()
+                    } else {
+                        tmp.delete()
+                    }
                 }
+            } catch (_: Exception) {
+                // Keep the old file: a failed save must never destroy
+                // the last good profiles/subscriptions/chains.
+                runCatching { File(file.parent, file.name + ".tmp").delete() }
+                runCatching { File(file.parent, file.name + ".tmp2").delete() }
             }
             Unit
         }
@@ -166,7 +178,7 @@ class ProfileRepository(private val context: Context) {
     fun renameProfile(id: String, name: String) {
         synchronized(fileLock) {
             val profiles = loadProfiles().map {
-                if (it.id == id) it.copy(name = name.trim().ifEmpty { it.name }) else it
+                if (it.id == id) it.copy(name = name.trim().ifEmpty { it.name }, userRenamed = true) else it
             }
             saveProfiles(profiles)
         }
@@ -195,6 +207,8 @@ class ProfileRepository(private val context: Context) {
                         address = parsed.addr,
                         port = parsed.port,
                         name = remark.ifEmpty { it.name },
+                        // A remark the user typed is their chosen name.
+                        userRenamed = if (remark.isNotEmpty()) true else it.userRenamed,
                     )
                 } else it
             }
@@ -427,10 +441,25 @@ class ProfileRepository(private val context: Context) {
                     // link side by side). Other subscriptions stay.
                     // A surviving link keeps its last ping result.
                     val kept = existing.filter { it.subscriptionUrl != url }
-                    val pingByLink = existing.associate { it.link to it.lastPingMs }
-                    val freshWithPing = fresh.map { p ->
-                        val ping = pingByLink[p.link]
-                        if (ping != null && ping >= 0) p.copy(lastPingMs = ping) else p
+                    val keptLinks = kept.map { it.link }.toHashSet()
+                    val byLink = existing.associateBy { it.link }
+                    // 1.0.1.18 (H4): the same link served by two
+                    // subscriptions shares one id — keep only this sub's
+                    // copy, or the Servers All tab crashes on the
+                    // duplicate key. Dedupe within the fetch too.
+                    val freshDeduped = fresh.distinctBy { it.link }
+                        .filter { it.link !in keptLinks }
+                    // 1.0.1.18 (M2): a surviving link keeps its last
+                    // ping AND its last test time; a name the user chose
+                    // in the app wins over the panel's name.
+                    val freshWithPing = freshDeduped.map { p ->
+                        val old = byLink[p.link] ?: return@map p
+                        p.copy(
+                            lastPingMs = if (old.lastPingMs >= 0) old.lastPingMs else p.lastPingMs,
+                            lastTestedAt = old.lastTestedAt,
+                            name = if (old.userRenamed) old.name else p.name,
+                            userRenamed = old.userRenamed,
+                        )
                     }
                     saveProfiles(kept + freshWithPing)
                     // Prune chains whose members vanished with the
@@ -855,8 +884,14 @@ class ProfileRepository(private val context: Context) {
                 saveSubscriptions(subs + subscription)
             }
             val existing = loadProfiles().toMutableList()
+            val blocked = loadDeletedLinkIds()
             var changed = false
             for (fresh in profiles) {
+                // 1.0.1.18 (M9): a country the user deleted must stay
+                // deleted — deleting one profile already puts its link
+                // on the blocklist, but seeding never consulted it, so
+                // the country came back on every launch.
+                if (isDeletedLink(blocked, fresh.link)) continue
                 val at = existing.indexOfFirst { it.id == fresh.id }
                 if (at < 0) {
                     existing += fresh
@@ -864,13 +899,16 @@ class ProfileRepository(private val context: Context) {
                 } else {
                     val old = existing[at]
                     if (old.proto != fresh.proto || old.link != fresh.link || old.core != fresh.core ||
-                        old.aetherJson != fresh.aetherJson || old.countryCode != fresh.countryCode ||
-                        old.subscriptionUrl != fresh.subscriptionUrl
+                        old.aetherJson != fresh.aetherJson || old.countryCode != fresh.countryCode
                     ) {
                         existing[at] = fresh.copy(
                             name = old.name,
                             lastPingMs = old.lastPingMs,
                             lastTestedAt = old.lastTestedAt,
+                            // A profile the user moved to another group
+                            // stays moved — the seed used to reset its
+                            // subscriptionUrl on every launch.
+                            subscriptionUrl = old.subscriptionUrl,
                         )
                         changed = true
                     }
@@ -902,22 +940,50 @@ class ProfileRepository(private val context: Context) {
             val existing = loadProfiles()
             val existingLinks = existing.map { it.link }.toHashSet()
             val blocked = loadDeletedLinkIds()
-            val pingByLink = existing.associate { it.link to it.lastPingMs }
+            val byLink = existing.associateBy { it.link }
             val merged = existing.toMutableList()
+            val mergedLinks = merged.map { it.link }.toMutableSet()
+            // 1.0.1.18 (M3): the subscriptions list is re-read under
+            // the lock — a sub deleted while the fetches ran must not
+            // have its servers merged back from the stale fetch list.
+            // (The same fresh list is used for the subscriptions
+            // write-back below, so a concurrent add/rename is not
+            // undone either.)
+            val currentSubs = loadSubscriptions()
+            val currentUrls = currentSubs.map { it.url }.toSet()
             for ((sub, result) in fetched) {
                 if (result !is FetchResult.Ok) continue
+                if (sub.url !in currentUrls) continue
                 // 1.0.1.2 (#90): REPLACE this subscription's profiles
                 // instead of appending — removed/renamed servers on
                 // the panel used to linger and duplicate.
                 merged.removeAll { it.subscriptionUrl == sub.url }
+                mergedLinks.retainAll(merged.map { it.link }.toSet())
                 for (p in result.profiles) {
                     if (isDeletedLink(blocked, p.link)) continue
+                    // 1.0.1.18 (H4): skip a link another subscription
+                    // already contributed — same id, duplicate key crash.
+                    if (p.link in mergedLinks) continue
                     if (p.link !in existingLinks) added++
-                    val ping = pingByLink[p.link]
-                    merged.add(if (ping != null && ping >= 0) p.copy(lastPingMs = ping) else p)
+                    val old = byLink[p.link]
+                    merged.add(
+                        if (old == null) p else p.copy(
+                            lastPingMs = if (old.lastPingMs >= 0) old.lastPingMs else p.lastPingMs,
+                            lastTestedAt = old.lastTestedAt,
+                            name = if (old.userRenamed) old.name else p.name,
+                            userRenamed = old.userRenamed,
+                        )
+                    )
+                    mergedLinks.add(p.link)
                 }
             }
-            if (merged.size != existing.size || added > 0) saveProfiles(merged)
+            // 1.0.1.18 (M2): save whenever the content changed, not
+            // only on size/add count — a pure panel rename (same links,
+            // same count) never landed before. Compared by id so the
+            // refresh's order churn alone does not force a write.
+            val changed = merged.map { it.id to it }.toMap() !=
+                existing.map { it.id to it }.toMap()
+            if (changed) saveProfiles(merged)
             // Prune chains whose members vanished with removed servers.
             val alive = merged.map { it.id }.toSet()
             val pruned = loadChains().mapNotNull { chain ->
@@ -925,10 +991,6 @@ class ProfileRepository(private val context: Context) {
                 if (members.size < 2) null else chain.copy(memberIds = members)
             }
             saveChains(pruned)
-            // Re-read under the lock: a subscription added, renamed or
-            // deleted while the fetches ran must not be undone by writing
-            // back the stale list read before them.
-            val currentSubs = loadSubscriptions()
             if (currentSubs.isNotEmpty()) {
                 val infoByUrl = fetched.mapNotNull { (sub, result) ->
                     (result as? FetchResult.Ok)?.userInfo?.let { sub.url to it }
