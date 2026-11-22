@@ -840,7 +840,7 @@ fun SettingsScreen(
                         context.startActivity(
                             Intent(
                                 Intent.ACTION_VIEW,
-                                Uri.parse("https://github.com/AMYRmo/Damavand/tree/lite")
+                                Uri.parse("https://github.com/AMYRmo/Damavand")
                             )
                         )
                     }
@@ -872,8 +872,15 @@ fun SettingsScreen(
                     .clickable {
                         val st = updateCheck
                         if (st is LiteViewModel.UpdateCheckState.Result && st.updateAvailable) {
+                            // 1.0.2: open the direct APK link for this
+                            // phone's ABI in the browser, so the
+                            // download starts at once; fall back to the
+                            // release page when no APK asset was found.
                             context.startActivity(
-                                Intent(Intent.ACTION_VIEW, Uri.parse(st.url))
+                                Intent(
+                                    Intent.ACTION_VIEW,
+                                    Uri.parse(st.downloadUrl ?: st.url)
+                                )
                             )
                         } else {
                             vm.checkForUpdate()
@@ -899,9 +906,17 @@ fun SettingsScreen(
                                 stringResource(R.string.update_check_checking)
                             is LiteViewModel.UpdateCheckState.Result ->
                                 if (st.updateAvailable) {
+                                    // 1.0.2: show the version (without the
+                                    // "v") plus the ABI whose APK the tap
+                                    // will download — the ABI stays Latin,
+                                    // toPersian would rewrite its digits.
+                                    val version = LiteFormat.toPersian(
+                                        st.tag.removePrefix("v").removePrefix("lite-v")
+                                    )
+                                    val label = if (st.abi != null) "$version (${st.abi})" else version
                                     stringResource(
                                         R.string.update_check_available,
-                                        LiteFormat.toPersian(st.tag.removePrefix("lite-v"))
+                                        label
                                     )
                                 } else {
                                     stringResource(R.string.update_check_latest)
