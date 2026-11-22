@@ -18,6 +18,10 @@ data class Profile(
     val lastPingMs: Long = -1,
     val lastTestedAt: Long = 0,
     val subscriptionUrl: String = "",
+    // 1.0.1.18 (M2): true when the user renamed this profile in the
+    // app — a refresh keeps the user's name instead of the panel's.
+    // Defaults false, so profiles stored before 1.0.1.18 load fine.
+    val userRenamed: Boolean = false,
     // 3.2.10 (Aether): the Aether settings of an Aether profile, as
     // JSON (see AetherSettings); empty for every other profile. An
     // Aether profile's link is "aether://<uuid>", its address empty
