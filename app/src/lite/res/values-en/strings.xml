@@ -438,7 +438,7 @@
     <string name="server_share_send">Send…</string>
     <string name="server_move_title">Move to group</string>
     <string name="server_delete_multi_title">Delete servers</string>
-    <string name="server_delete_multi_body">Delete %1$d servers?</string>
+    <string name="server_delete_multi_body">Delete %1$s servers?</string>
     <string name="multiselect_test">Test</string>
     <string name="multiselect_delete">Delete</string>
     <string name="multiselect_cancel">Cancel</string>
