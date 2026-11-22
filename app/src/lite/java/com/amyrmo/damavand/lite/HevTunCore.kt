@@ -44,6 +44,7 @@ object HevTunCore {
             val (tcpTimeout, udpTimeout) = parseRwTimeout(rwTimeout)
             val yaml = buildYaml(
                 socksPort, mtu, ipv4, ipv6,
+                pipeline = pipeline,
                 logLevel = logLevel,
                 tcpTimeoutSeconds = tcpTimeout,
                 udpTimeoutSeconds = udpTimeout,
