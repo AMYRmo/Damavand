@@ -39,7 +39,15 @@ class GeoDownloader(private val context: Context) {
     }
 
     @Serializable
-    private data class Meta(val version: String, val downloadedAt: Long)
+    private data class Meta(
+        val version: String,
+        val downloadedAt: Long,
+        // 1.0.1.18 (M11): expected sizes — a truncated file left by an
+        // interrupted swap must not report Ready. Defaults 0, so metas
+        // written before 1.0.1.18 still load (size check skipped).
+        val geoipSize: Long = 0,
+        val geositeSize: Long = 0,
+    )
 
     private val _state = MutableStateFlow<State>(State.Missing)
     val state: StateFlow<State> = _state.asStateFlow()
@@ -228,10 +236,22 @@ class GeoDownloader(private val context: Context) {
      */
     private fun ensurePresent(): Boolean = filesPresent()
 
-    private fun filesPresent(): Boolean = geoipFile.exists() && geositeFile.exists()
+    private fun filesPresent(): Boolean {
+        if (!geoipFile.exists() || !geositeFile.exists()) return false
+        if (geoipFile.length() == 0L || geositeFile.length() == 0L) return false
+        // 1.0.1.18 (M11): a truncated file left by an interrupted swap
+        // used to report Ready — existence is not enough. When the
+        // download recorded the expected sizes, they must match.
+        val meta = readMeta()
+        if (meta != null) {
+            if (meta.geoipSize > 0 && geoipFile.length() != meta.geoipSize) return false
+            if (meta.geositeSize > 0 && geositeFile.length() != meta.geositeSize) return false
+        }
+        return true
+    }
 
     private fun currentState(): State {
-        if (geoipFile.exists() && geositeFile.exists()) {
+        if (filesPresent()) {
             // 1.0.1.2 (#114): the FILES are what the core uses — a
             // missing meta file (old files, a restored backup) used to
             // report "Missing" while geo routing was live. Report Ready
@@ -255,6 +275,20 @@ class GeoDownloader(private val context: Context) {
         try {
             metaFile.writeText(json.encodeToString(meta))
         } catch (_: Exception) {
+        }
+    }
+
+    /**
+     * Atomically install a verified download: stage beside the target
+     * (same filesystem) and rename. A failure leaves the previous good
+     * file in place instead of a truncated one (M11).
+     */
+    private fun swapIn(tmp: File, target: File) {
+        val stage = File(target.parent, target.name + ".tmp")
+        tmp.copyTo(stage, overwrite = true)
+        if (!stage.renameTo(target)) {
+            stage.delete()
+            throw java.io.IOException("geo swap failed for ${target.name}")
         }
     }
 
@@ -301,12 +335,22 @@ class GeoDownloader(private val context: Context) {
             }
             if (cancelRequested) throw InterruptedException("cancelled")
             geoDir.mkdirs()
-            geoipTmp.copyTo(geoipFile, overwrite = true)
-            geositeTmp.copyTo(geositeFile, overwrite = true)
+            // 1.0.1.18 (M11): swap via a staged temp + rename — the old
+            // copyTo truncated the live file in place, so an interruption
+            // left a corrupt geoip/geosite that still reported Ready.
+            swapIn(geoipTmp, geoipFile)
+            swapIn(geositeTmp, geositeFile)
             val version = java.text.SimpleDateFormat(
                 "yyyy-MM-dd", java.util.Locale.US
             ).format(java.util.Date())
-            writeMeta(Meta(version = version, downloadedAt = System.currentTimeMillis()))
+            writeMeta(
+                Meta(
+                    version = version,
+                    downloadedAt = System.currentTimeMillis(),
+                    geoipSize = geoipFile.length(),
+                    geositeSize = geositeFile.length(),
+                )
+            )
             _state.value = State.Ready(version)
             true
         } catch (e: InterruptedException) {
