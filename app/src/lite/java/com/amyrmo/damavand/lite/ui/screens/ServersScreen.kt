@@ -218,13 +218,18 @@ fun ServersScreen(
                 it.country.contains(query, ignoreCase = true)
         }
         val frozen = frozenIds
-        if (frozen != null) {
+        val raw = if (frozen != null) {
             val byId = filtered.associateBy { it.id }
             val ordered = frozen.mapNotNull { byId[it] }
             ordered + filtered.filter { it.id !in frozen.toSet() }
         } else {
             sortProfiles(filtered, sortMode)
         }
+        // 1.0.1.18 (H4, defence in depth): the same link from two
+        // subscriptions shares one id — the All tab keys rows by id,
+        // so a duplicate crashes Compose. The refresh merge dedupes
+        // too; this keeps the tab safe regardless.
+        raw.distinctBy { it.id }
     }
     val groups: List<ServerGroup> = remember(flatList, subscriptions) {
         val bySub = flatList.groupBy { it.subscriptionUrl }
