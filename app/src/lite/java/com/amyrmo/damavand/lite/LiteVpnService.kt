@@ -294,7 +294,13 @@ class LiteVpnService : VpnService() {
                 // switches to it (V2rayNG: connect → stop → start)
                 // instead of being silently dropped — Tasker and
                 // shortcuts could never switch servers.
-                if (running) stopTunnel()
+                // 1.0.1.18 (H2): a start while a session runs switches
+                // to it — but stopTunnel() ends in stopSelf(), which
+                // would destroy the service right after this
+                // onStartCommand returns, tearing the new session down
+                // in onDestroy(). The switch teardown must not terminate
+                // the service; the new session owns it now.
+                if (running) stopTunnel(stopService = false)
                 startTunnel(links ?: emptyList(), candidates, testUrl, autoSelect, autoId, aether, psiphon)
             }
             ACTION_STOP -> {
@@ -457,7 +463,7 @@ class LiteVpnService : VpnService() {
             .setContentTitle(currentProfileName.ifBlank { getString(R.string.app_name) })
             .setContentText(contentText)
             .setStyle(NotificationCompat.BigTextStyle().bigText(bigText))
-            .setSubText("Xray")
+            .setSubText(when { psiphonMode -> "Psiphon"; aetherMode -> "Aether"; else -> "Xray" })
             // 3.2.0: the total session volume as the short critical chip
             // (status-bar chip on Android 15+ with promoted ongoing).
             .setShortCriticalText(formatBytes(totalDown + totalUp))
@@ -1023,10 +1029,18 @@ class LiteVpnService : VpnService() {
             if (!connected || intentionalStop) return@post
             if (PsiphonEngine.isRunning) return@post
             val reason = PsiphonEngine.stoppedMessage()
-            lastDetail = if (reason != null) getString(R.string.conn_psiphon_stopped, reason)
+            val detail = if (reason != null) getString(R.string.conn_psiphon_stopped, reason)
             else getString(R.string.conn_core_failed, "")
+            // 1.0.1.18 (H6): the core dying must go through
+            // onTunnelDropped, not stopTunnel — with kill switch on,
+            // that keeps the tun up (traffic stays blocked) and
+            // reconnects once; stopTunnel closed the tun and leaked
+            // traffic direct. Restore the specific reason afterwards:
+            // onTunnelDropped overwrites lastDetail with the generic
+            // reconnecting text.
+            onTunnelDropped()
+            lastDetail = detail
             broadcastStatus()
-            stopTunnel()
         }
     }
 
@@ -1041,10 +1055,14 @@ class LiteVpnService : VpnService() {
             if (!connected || intentionalStop) return@post
             if (AetherEngine.isRunning) return@post
             val reason = AetherEngine.stoppedMessage()
-            lastDetail = if (reason != null) getString(R.string.conn_aether_stopped, reason)
+            val detail = if (reason != null) getString(R.string.conn_aether_stopped, reason)
             else getString(R.string.conn_core_failed, "")
+            // 1.0.1.18 (H6): same as onPsiphonExit — route through
+            // onTunnelDropped so the kill switch holds the tun and
+            // reconnects, instead of leaking traffic direct.
+            onTunnelDropped()
+            lastDetail = detail
             broadcastStatus()
-            stopTunnel()
         }
     }
 
@@ -1196,7 +1214,15 @@ class LiteVpnService : VpnService() {
                     addRoute("::", 0)
                 }
                 // Local DNS off: the tun uses the system DNS.
-                if (localDns) dnsServers.filter { withIpv6 || !it.contains(":") }.forEach { addDnsServer(it) }
+                // 1.0.1.18 (M4): the DNS setting is free text — a DoH
+                // URL or hostname makes addDnsServer throw and aborts
+                // the whole establish. Skip invalid entries instead of
+                // failing every connect.
+                if (localDns) dnsServers.filter { withIpv6 || !it.contains(":") }.forEach { server ->
+                    runCatching { addDnsServer(server) }.onFailure {
+                        AppLog.e("LiteVpnService", "ignoring invalid DNS server: $server")
+                    }
+                }
                 // Per-app proxy (3.1.0, PattNG): bypass mode excludes
                 // the listed apps; allow-only mode includes only them.
                 // 1.0.1.2 (#64): PattNG's configurePerAppProxy NEVER
@@ -1493,6 +1519,25 @@ class LiteVpnService : VpnService() {
         return if (url == TRACE_URL) parseTraceGeo(body)?.let { mergeIsp(it) } else parseJsonGeo(url, body)
     }
 
+    /**
+     * End-to-end liveness probe through the local SOCKS listener
+     * (1.0.1.18, H1): Psiphon mode has no Xray controller to ask, so
+     * the poller measures a real HTTPS fetch through the tunnel the
+     * way fetchGeo does. Returns the round-trip ms, or -1 on failure.
+     */
+    private fun measureDelayViaSocks(url: String): Long = try {
+        val proxy = Proxy(Proxy.Type.SOCKS, InetSocketAddress("127.0.0.1", activeSocksPort))
+        val start = System.nanoTime()
+        val conn = URL(url).openConnection(proxy) as HttpURLConnection
+        conn.connectTimeout = 8000
+        conn.readTimeout = 8000
+        val code = conn.responseCode
+        conn.disconnect()
+        if (code in 200..399) (System.nanoTime() - start) / 1_000_000 else -1L
+    } catch (_: Exception) {
+        -1L
+    }
+
     /** Cloudflare's trace format (Oblivion GeoService.parseTrace): ip=, loc= (country code), colo=. */
     private fun parseTraceGeo(body: String): ExitGeo? {
         val fields = mutableMapOf<String, String>()
@@ -1662,7 +1707,13 @@ class LiteVpnService : VpnService() {
                         // HTTPS fetch through the tunnel, so its ms must
                         // never become the displayed ping — it only fills
                         // in when the profile has no tested ping yet.
-                        val probe = XrayController.measureDelay(currentTestUrl)
+                        // 1.0.1.18 (H1): in Psiphon mode Xray never
+                        // runs, so measureDelay is -1 on every tick and
+                        // the poller drops a healthy tunnel after ~30 s.
+                        // Probe through the tunnel's SOCKS listener
+                        // instead — the same path fetchLocation uses.
+                        val probe = if (psiphonMode) measureDelayViaSocks(currentTestUrl)
+                        else XrayController.measureDelay(currentTestUrl)
                         if (probe >= 0) {
                             probePingMs = probe
                             if (profilePingMs <= 0) pingMs = probe
@@ -1790,6 +1841,11 @@ class LiteVpnService : VpnService() {
 
     private fun onTunnelDropped() {
         if (!running || intentionalStop) return
+        // 1.0.1.18 (#106): flush the unrecorded usage remainder
+        // BEFORE clearing connected — recordUsageRemainder() is gated
+        // on it, so the 1.0.1.2 flush in startTunnel could never run
+        // on this path and up to 10 s of usage was lost per reconnect.
+        recordUsageRemainder()
         connected = false
         lastDetail = getString(R.string.conn_dropped_reconnecting)
         broadcastStatus()
@@ -1826,7 +1882,7 @@ class LiteVpnService : VpnService() {
 
     // ---- stop ----
 
-    private fun stopTunnel() {
+    private fun stopTunnel(stopService: Boolean = true) {
         // 3.2.23: a stale worker unwinding after a newer connect
         // started must never tear the new session down: only the main
         // thread (a user/system stop), the current connect worker, or
@@ -1851,7 +1907,7 @@ class LiteVpnService : VpnService() {
             // state and broadcast, or the tile stays "connected"
             // forever and can never connect again.
             broadcastStatus()
-            stopSelf()
+            if (stopService) stopSelf()
             return
         }
         running = false
@@ -1880,7 +1936,7 @@ class LiteVpnService : VpnService() {
         tun = null
         stopForeground(STOP_FOREGROUND_REMOVE)
         broadcastStatus()
-        stopSelf()
+        if (stopService) stopSelf()
     }
 
     /**
