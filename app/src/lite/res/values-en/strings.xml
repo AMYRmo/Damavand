@@ -156,7 +156,7 @@
     <string name="about_package">App package</string>
     <string name="about_core">Core</string>
     <string name="about_repo">Repository</string>
-    <string name="about_repo_value">AMYRmo/Damavand — lite branch</string>
+    <string name="about_repo_value">AMYRmo/Damavand</string>
     <string name="about_copy">Damavand — built for fast, low-usage connections.</string>
 
     <!-- Subscription import -->
