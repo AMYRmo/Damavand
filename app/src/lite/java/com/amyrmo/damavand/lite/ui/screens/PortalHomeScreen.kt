@@ -827,6 +827,22 @@ private fun WallOfLight(
             }
         }
 
+        // 1.0.1.16: the wall's color used to start at full strength on a
+        // straight line at the stage's top edge (the glow + dot field
+        // begin at the stage boundary, so the tint cut off against the
+        // white header). Fade the top 56dp in from the background so
+        // the color dissolves instead of cutting. Drawn after the dots
+        // and before the rings, so the rings stay crisp.
+        val fadeH = with(density) { 56.dp.toPx() }
+        drawRect(
+            brush = Brush.verticalGradient(
+                listOf(LiteColors.bg, LiteColors.bg.copy(alpha = 0f)),
+                startY = 0f,
+                endY = fadeH,
+            ),
+            size = Size(size.width, fadeH),
+        )
+
         val ringAlpha = 0.10f + 0.16f * opening + 0.08f * wave
         val ringColor = lerp(dotColor, accent, opening)
         val solid = opening > 0.6f
