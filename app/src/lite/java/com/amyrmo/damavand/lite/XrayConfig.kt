@@ -903,17 +903,19 @@ object XrayConfig {
      * True when the custom JSON has a SOCKS (or mixed) inbound listening
      * on [port] — the inbound the tun bridge forwards into (L5).
      */
-    private fun hasSocksInboundOnPort(json: String, port: Int): Boolean = try {
-        val inbounds = JSONObject(json).optJSONArray("inbounds") ?: return false
-        for (i in 0 until inbounds.length()) {
-            val inbound = inbounds.optJSONObject(i) ?: continue
-            val protocol = inbound.optString("protocol")
-            if (protocol != "socks" && protocol != "mixed") continue
-            if (inbound.optInt("port", -1) == port) return true
+    private fun hasSocksInboundOnPort(json: String, port: Int): Boolean {
+        return try {
+            val inbounds = JSONObject(json).optJSONArray("inbounds") ?: return false
+            for (i in 0 until inbounds.length()) {
+                val inbound = inbounds.optJSONObject(i) ?: continue
+                val protocol = inbound.optString("protocol")
+                if (protocol != "socks" && protocol != "mixed") continue
+                if (inbound.optInt("port", -1) == port) return true
+            }
+            false
+        } catch (_: Exception) {
+            false
         }
-        false
-    } catch (_: Exception) {
-        false
     }
 
     /**
