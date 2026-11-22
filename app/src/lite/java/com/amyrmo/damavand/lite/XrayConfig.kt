@@ -121,12 +121,22 @@ object XrayConfig {
         // (obfs-password query param). Without it the obfs layer of
         // a Hysteria2 link can never authenticate.
         val obfsPassword: String = "",
+        // 1.0.1.18 (M7): VLESS Encryption value from the link (e.g.
+        // the mlkem768 strings 3x-ui writes after Generate).
+        val encryption: String = "",
         val customJson: String = "",
     )
 
     fun parse(link: String): Parsed? {
         return try {
-            val proto = link.substringBefore("://")
+            // 1.0.1.18 (M6): schemes are case-insensitive, and the two
+            // short/standard aliases most panels emit — hy2:// for
+            // Hysteria2, wireguard:// for WireGuard — are accepted too.
+            val proto = when (val raw = link.substringBefore("://").lowercase()) {
+                "hy2" -> "hysteria2"
+                "wireguard" -> "wg"
+                else -> raw
+            }
             if (proto !in setOf(
                     "vless", "vmess", "trojan", "ss",
                     "socks", "http", "hysteria2", "wg", "custom"
@@ -184,6 +194,11 @@ object XrayConfig {
                     path = j.optString("path"),
                     host = j.optString("host"),
                     flow = "",
+                    // 1.0.1.18 (M12): v2rayN carries the TCP header type
+                    // in "type" (e.g. "http") — the old code never read
+                    // it, so the obfuscation the server expects was
+                    // silently dropped.
+                    headerType = j.optString("type"),
                     // 3.2.16 (#52): v2rayN carries the gRPC service
                     // name in the JSON `path` (PattNG VmessFmt) — the
                     // old code always sent "" and grpc never connected.
@@ -201,14 +216,32 @@ object XrayConfig {
             // SOCKS / HTTP may arrive as base64(user:pass@host:port).
             var effectiveRest = rest
             if ((proto == "socks" || proto == "http") && '@' !in effectiveRest) {
-                effectiveRest = b64decode(effectiveRest) ?: return null
+                // 1.0.1.18 (M8): only take the decode when it really is
+                // a userinfo@host:port — android.util.Base64 skips
+                // out-of-alphabet chars instead of throwing, so decoding
+                // a bare "1.2.3.4:1080" "succeeds" with garbage. A
+                // credential-less link keeps its rest as-is.
+                val decoded = b64decode(effectiveRest)
+                if (decoded != null && '@' in decoded &&
+                    decoded.substringAfterLast('@').contains(':')
+                ) effectiveRest = decoded
             }
             val atIdx = effectiveRest.lastIndexOf('@')
-            if (atIdx < 0) return null
+            if (atIdx < 0 && proto != "socks" && proto != "http") return null
             // RFC 3986 userinfo is percent-encoded (a trojan/hysteria2
             // password with '@', ':' or '+', a WireGuard key's '/', '=').
-            val user = percentDecode(effectiveRest.substring(0, atIdx))
-            val afterAt = effectiveRest.substring(atIdx + 1)
+            // 1.0.1.18 (M8): a credential-less socks://host:port has no
+            // '@' at all — parse it with an empty user instead of
+            // rejecting it. A base64 userinfo segment (no ':') is
+            // decoded too, or the whole blob would be sent as the
+            // SOCKS username.
+            val user = if (atIdx < 0) "" else {
+                val rawUser = effectiveRest.substring(0, atIdx)
+                if (':' !in rawUser) {
+                    b64decode(rawUser)?.takeIf { ':' in it } ?: rawUser
+                } else rawUser
+            }.let { percentDecode(it) }
+            val afterAt = if (atIdx < 0) effectiveRest else effectiveRest.substring(atIdx + 1)
             val hostPort = afterAt.substringBefore("?").substringBefore("/")
             val query = afterAt.substringAfter("?", "")
             val (addr, port) = splitHostPort(hostPort)
@@ -224,13 +257,21 @@ object XrayConfig {
                 port = port,
                 id = user,
                 net = type,
-                tls = q["security"] ?: "",
+                // 1.0.1.18 (M5): trojan:// links in the common
+                // trojan-gfw shape omit security= — but a Trojan server
+                // IS a TLS server, so a missing value must mean TLS,
+                // not plaintext.
+                tls = q["security"] ?: if (proto == "trojan") "tls" else "",
                 sni = q["sni"] ?: q["host"] ?: "",
                 path = q["path"] ?: "",
                 host = q["host"] ?: "",
                 flow = q["flow"] ?: "",
                 serviceName = q["serviceName"] ?: "",
                 alpn = q["alpn"] ?: "",
+                // 1.0.1.18 (M7): VLESS Encryption (e.g. the mlkem768
+                // strings 3x-ui writes) — the outbound used to hardcode
+                // "none", so encrypted servers rejected the client.
+                encryption = q["encryption"] ?: "",
                 // 3.2.16 (#52): TCP+HTTP-header obfuscation
                 // (headerType=http) — parsed like PattNG's FmtBase.
                 headerType = q["headerType"] ?: "",
@@ -258,12 +299,18 @@ object XrayConfig {
                 echConfigList = q["ech"] ?: "",
                 echOutbound = q["echOutbound"] ?: "",
                 verifyPeerCertByName = q["vcn"] ?: "",
-                pinnedCA256 = q["pcs"] ?: "",
+                // 1.0.1.18 (L6): pinSHA256 is the same pinned-CA hash
+                // under its other name; without it a self-signed hy2
+                // server has no working trust path at all.
+                pinnedCA256 = q["pcs"] ?: q["pinSHA256"] ?: "",
                 mldsa65Verify = q["pqv"] ?: "",
                 // 3.2.0: WireGuard + Hysteria2 query params.
-                wgPublicKey = q["publicKey"] ?: "",
-                wgPresharedKey = q["presharedKey"] ?: "",
-                wgAllowedIps = q["allowedIPs"] ?: "",
+                // 1.0.1.18 (L6): some panels emit the WireGuard keys
+                // lowercase — read both casings, or the peer key is
+                // silently empty and the config is rejected by the core.
+                wgPublicKey = q["publicKey"] ?: q["publickey"] ?: "",
+                wgPresharedKey = q["presharedKey"] ?: q["presharedkey"] ?: "",
+                wgAllowedIps = q["allowedIPs"] ?: q["allowedips"] ?: "",
                 wgAddress = q["address"] ?: "",
                 wgMtu = q["mtu"] ?: "",
                 wgReserved = q["reserved"] ?: "",
@@ -584,7 +631,14 @@ object XrayConfig {
             put("streamSettings", stream)
             // MUX (3.1.0): several streams over one connection.
             // 3.2.0: concurrency + XUDP concurrency from settings.
-            if (settings.muxEnabled) {
+            // 1.0.1.18 (H5): never on a VLESS Vision flow — the server
+            // drops muxed Vision with "common/mux: unexpected network
+            // TCP" (3x-ui #6418), so the tunnel comes up with zero
+            // traffic — and never on SOCKS/HTTP outbounds, where mux
+            // is meaningless.
+            if (settings.muxEnabled && p.proto !in setOf("socks", "http") &&
+                p.flow !in setOf("xtls-rprx-vision", "xtls-rprx-vision-udp443")
+            ) {
                 putJsonObject("mux") {
                     put("enabled", true)
                     put("concurrency", settings.muxConcurrency)
@@ -603,7 +657,7 @@ object XrayConfig {
                             putJsonArray("users") {
                                 add(buildJsonObject {
                                     put("id", p.id)
-                                    put("encryption", "none")
+                                    put("encryption", p.encryption.ifBlank { "none" })
                                     put("flow", p.flow)
                                     // 3.2.0 (PattNG mux XUDP QUIC): Xray's
                                     // MuxConfig has NO quic field (verified
@@ -834,9 +888,32 @@ object XrayConfig {
         // 3.2.0 (PattNG): a custom-JSON profile IS the whole config.
         // The user supplies the full Xray JSON (it must include a SOCKS
         // inbound on the connect port for the tun bridge to work).
-        if (p.proto == "custom") return p.customJson
+        // 1.0.1.18 (L5): that requirement was only a comment — a JSON
+        // without the inbound connected the tunnel into a port nothing
+        // listens on (zero traffic, no error). Refuse it here instead.
+        if (p.proto == "custom") {
+            if (!hasSocksInboundOnPort(p.customJson, socksPort)) return null
+            return p.customJson
+        }
         val ob = outbound(p, "proxy", settings = settings) ?: return null
         return assemble(listOf(ob), socksPort, geoAvailable, settings)
+    }
+
+    /**
+     * True when the custom JSON has a SOCKS (or mixed) inbound listening
+     * on [port] — the inbound the tun bridge forwards into (L5).
+     */
+    private fun hasSocksInboundOnPort(json: String, port: Int): Boolean = try {
+        val inbounds = JSONObject(json).optJSONArray("inbounds") ?: return false
+        for (i in 0 until inbounds.length()) {
+            val inbound = inbounds.optJSONObject(i) ?: continue
+            val protocol = inbound.optString("protocol")
+            if (protocol != "socks" && protocol != "mixed") continue
+            if (inbound.optInt("port", -1) == port) return true
+        }
+        false
+    } catch (_: Exception) {
+        false
     }
 
     /**
@@ -1114,6 +1191,10 @@ object XrayConfig {
         }
         if (core.invalidListener != null || core.unreachableListener != null) return null
         if (AetherArgs.invalidPort(core) != null) return null
+        // 1.0.1.18 (#107, chain path): the same guard as buildAether —
+        // the Aether listener and the local SOCKS inbound must not
+        // share a port, or the connect fails with a bind error.
+        if (aetherPort == socksPort) return null
         val secondaryPort = aetherPort + AetherArgs.SECONDARY_SOCKS_OFFSET
         if (secondaryPort == socksPort || secondaryPort == socksPort + 1) return null
         // Resolved exit-first, tags like buildChain: the exit hop is
