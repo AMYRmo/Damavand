@@ -437,7 +437,7 @@
     <string name="server_share_send">ارسال…</string>
     <string name="server_move_title">انتقال به گروه</string>
     <string name="server_delete_multi_title">حذف سرورها</string>
-    <string name="server_delete_multi_body">%1$d سرور حذف شود؟</string>
+    <string name="server_delete_multi_body">%1$s سرور حذف شود؟</string>
     <string name="multiselect_test">تست</string>
     <string name="multiselect_delete">حذف</string>
     <string name="multiselect_cancel">لغو</string>
